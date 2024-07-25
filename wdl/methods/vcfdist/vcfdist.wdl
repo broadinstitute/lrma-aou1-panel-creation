@@ -42,7 +42,7 @@ workflow VcfdistEval {
     
     }
 
-    call FinalizeToDir as F1 { input: files = RunVcfdistTask.prs_tsv, outdir = output_directory}
+    # call FinalizeToDir as F1 { input: files = RunVcfdistTask.prs_tsv, outdir = output_directory}
 
     output {
         Array[File] prs_tsv = RunVcfdistTask.prs_tsv
