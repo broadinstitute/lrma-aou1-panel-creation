@@ -1,11 +1,6 @@
 version 1.0
 
-import "../../../tasks/Utility/Utils.wdl" as U
-import "../../../tasks/Utility/VariantUtils.wdl" as VU
-import "../../../tasks/Phasing/StatisticalPhasing.wdl" as StatPhase
-import "../../../tasks/Phasing/Hiphase.wdl"
-import "../../../tasks/Phasing/SplitJointCallbySample.wdl"
-import "../../../tasks/Utility/Finalize.wdl" as FF
+import "./Helper.wdl" as H
 
 
 workflow HybridPhase {
@@ -49,13 +44,13 @@ workflow HybridPhase {
     Int data_length = length(wholegenome_bams_from_all_samples)
     Array[Int] indexes= range(data_length)
 
-    call VU.SubsetVCF as SubsetSNPsJoint { input:
+    call H.SubsetVCF as SubsetSNPsJoint { input:
             vcf_gz = wholegenome_joint_vcf,
             vcf_tbi = wholegenome_joint_vcf_tbi,
             locus = region
         }
 
-    call VU.SubsetVCF as SubsetSVsJoint { input:
+    call H.SubsetVCF as SubsetSVsJoint { input:
         vcf_gz = wholegenome_joint_sv,
         vcf_tbi = wholegenome_joint_sv_tbi,
         locus = region
@@ -66,7 +61,7 @@ workflow HybridPhase {
         File all_chr_bai = wholegenome_bais_from_all_samples[idx]
 
         ####### Subset Bam####
-        call U.SubsetBam as SubsetBam { input:
+        call H.SubsetBam as SubsetBam { input:
             bam = all_chr_bam,
             bai = all_chr_bai,
             locus = region
@@ -75,19 +70,19 @@ workflow HybridPhase {
         ####### DONE ######
 
 
-        call U.InferSampleName { input: 
+        call H.InferSampleName { input: 
             bam = all_chr_bam, 
             bai = all_chr_bai
         }
         String sample_id = InferSampleName.sample_name
 
-        call SplitJointCallbySample.SplitVCFbySample as SP { input:
+        call H.SplitVCFbySample as SP { input:
             joint_vcf = SubsetSNPsJoint.subset_vcf,
             region = region,
             samplename = sample_id
         }
 
-        call SplitJointCallbySample.SplitVCFbySample as SV_split { input:
+        call H.SplitVCFbySample as SV_split { input:
             joint_vcf = SubsetSVsJoint.subset_vcf,
             region = region,
             samplename = sample_id
@@ -100,7 +95,7 @@ workflow HybridPhase {
                 
         }
 
-        call Hiphase.HiphaseSVs as HP_SV { input:
+        call H.HiphaseSVs as HP_SV { input:
             bam = SubsetBam.subset_bam,
             bai = SubsetBam.subset_bai,
             unphased_snp_vcf = SP.single_sample_vcf,
@@ -115,15 +110,15 @@ workflow HybridPhase {
     }
     
     ### phase small variants as scaffold  
-    call VU.MergePerChrVcfWithBcftools as MergeAcrossSamples { input:
+    call H.MergePerChrVcfWithBcftools as MergeAcrossSamples { input:
         vcf_input = HP_SV.phased_snp_vcf,
         tbi_input = HP_SV.phased_snp_vcf_tbi,
-        pref = prefix
+        pref = prefix + "sv."
     }
     call SplitMultiallelicCalls as Norm_SNPs { input:
         bcftools_merged_vcf = MergeAcrossSamples.merged_vcf,
         bcftools_merged_vcf_tbi = MergeAcrossSamples.merged_tbi,
-        prefix = prefix
+        prefix = prefix + "small."
     }
     # ##### add filtering small variants step #######
     # call FilterSmallVariants as Filter_SNPs{ input:
@@ -133,7 +128,7 @@ workflow HybridPhase {
     # }
 
     ##### add merge small + sv vcf step #######
-    call VU.MergePerChrVcfWithBcftools as MergeAcrossSamplesSVs { input:
+    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSVs { input:
         vcf_input = HP_SV.phased_sv_vcf,
         tbi_input = HP_SV.phased_sv_vcf_tbi,
         pref = prefix
@@ -155,16 +150,16 @@ workflow HybridPhase {
     }
 
     ################################
-    call StatPhase.Shapeit4 as Shapeit4scaffold { input:
+    call H.Shapeit4 as Shapeit4scaffold { input:
         vcf_input = Filter_SNPSVs.filtered_vcf,
         vcf_index = Filter_SNPSVs.filtered_vcf_tbi,
         mappingfile = genetic_mapping_dict[chromosome],
         region = region,
         num_threads = num_t
     }
-    call FF.FinalizeToFile as Finalizescaffold {
-        input: outdir = gcs_out_root_dir, file = Shapeit4scaffold.scaffold_vcf
-    }
+    # call FF.FinalizeToFile as Finalizescaffold {
+    #     input: outdir = gcs_out_root_dir, file = Shapeit4scaffold.scaffold_vcf
+    # }
     ##### phase structural variants
 
     # call StatPhase.Shapeit4_phaseSVs as Shapeit4SVphase { input:
