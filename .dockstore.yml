@@ -3,3 +3,6 @@ workflows:
 - name: vcfdist
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/vcfdist/vcfdist.wdl
+- name: hybridphasing
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/HybridPhaseOneChrSmallVariantHyphase.wdl
