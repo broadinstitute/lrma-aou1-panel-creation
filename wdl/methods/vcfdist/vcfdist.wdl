@@ -8,7 +8,7 @@ workflow VcfdistEval {
         File bed_file
         File fasta_file
         File fai
-        String docker = "timd1/vcfdist:latest"
+        String docker = "timd1/vcfdist:v2.5.3"
         Int verbosity = 1
         String region = "chr1:100000000-110000000" 
         String output_directory
