@@ -80,6 +80,12 @@ task RunVcfdistTask {
 
         mv "precision-recall-summary.tsv" "~{sampleid}-precision-recall-summary.tsv"
         mv "phasing-summary.tsv" "~{sampleid}-phasing-summary.tsv"
+        mv "summary.vcf" "~{sampleid}-summary.vcf"
+        mv "precision-recall.tsv" "~{sampleid}-precision-recall.tsv"
+        mv "query.tsv" "~{sampleid}-query.tsv"
+        mv "truth.tsv" "~{sampleid}-truth.tsv"
+        mv "switchflips.tsv" "~{sampleid}-switchflips.tsv"
+
     >>>
 
     runtime {
@@ -92,12 +98,12 @@ task RunVcfdistTask {
 
     output {
         File prs_tsv = "~{sampleid}-precision-recall-summary.tsv"
-        File summary = "summary.vcf"
-        File precrec_tsv = "precision-recall.tsv"
-        File query_tsv = "query.tsv"
-        File truth_tsv = "truth.tsv"
+        File summary = "~{sampleid}-summary.vcf"
+        File precrec_tsv = "~{sampleid}-precision-recall.tsv"
+        File query_tsv = "~{sampleid}-query.tsv"
+        File truth_tsv = "~{sampleid}-truth.tsv"
         File phasing_tsv = "~{sampleid}-phasing-summary.tsv"
-        File switch_flip_tsv = "switchflips.tsv"
+        File switch_flip_tsv = "~{sampleid}-switchflips.tsv"
     }
 }
 
