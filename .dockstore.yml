@@ -1,0 +1,5 @@
+version: 1.2
+workflows:
+- name: vcfdist
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/vcfdist/vcfdist.wdl
