@@ -3,17 +3,8 @@ version 1.0
 import "./Helper.wdl" as H
 
 
-workflow HybridPhase {
-    meta{
-        description : "..."
-    }
+workflow PhysicalAndStatisticalPhasing {
     parameter_meta {
-        one_chr_bams_from_all_samples:  "GCS path to subset BAM files"
-        one_chr_bais_from_all_samples:  "GCS path to subset BAI file indices"
-        one_chr_joint_vcf:  "path to subset joint vcf per chromosome"
-        one_chr_joint_vcf_tbi:  "path to subset joint vcf index per chromosome"
-        reference: "path to reference genome fasta file"
-        reference_index: "path to reference genome index fai file"
         genetic_mapping_tsv_for_shapeit4: "path to the tsv file for the genetic mapping file address per chromosome"
         chromosome: "string for chromosome to be processed"
         prefix: "output file prefix, usually using chromosome"
@@ -21,13 +12,12 @@ workflow HybridPhase {
     }
 
     input {
-        Array[File] wholegenome_bams_from_all_samples
-        Array[File] wholegenome_bais_from_all_samples
-
-        File wholegenome_joint_vcf
-        File wholegenome_joint_vcf_tbi
-        File wholegenome_joint_sv
-        File wholegenome_joint_sv_tbi
+        Array[File] bams_from_all_samples
+        Array[File] bais_from_all_samples
+        File joint_vcf
+        File joint_vcf_tbi
+        File joint_sv
+        File joint_sv_tbi
         File reference
         File reference_index
         File genetic_mapping_tsv_for_shapeit4
@@ -36,44 +26,42 @@ workflow HybridPhase {
         String prefix
         String gcs_out_root_dir
         Int num_t
+        Int merge_num_t = 4
+        Int hiphase_memory
+        Int shapeit4_memory
     }
 
-
-
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
-    Int data_length = length(wholegenome_bams_from_all_samples)
+    Int data_length = length(bams_from_all_samples)
     Array[Int] indexes= range(data_length)
 
     call H.SubsetVCF as SubsetSNPsJoint { input:
-            vcf_gz = wholegenome_joint_vcf,
-            vcf_tbi = wholegenome_joint_vcf_tbi,
-            locus = region
-        }
+        vcf_gz = joint_vcf,
+        vcf_tbi = joint_vcf_tbi,
+        locus = region
+    }
 
     call H.SubsetVCF as SubsetSVsJoint { input:
-        vcf_gz = wholegenome_joint_sv,
-        vcf_tbi = wholegenome_joint_sv_tbi,
+        vcf_gz = joint_sv,
+        vcf_tbi = joint_sv_tbi,
         locus = region
     }
 
     scatter (idx in indexes)  {
-        File all_chr_bam = wholegenome_bams_from_all_samples[idx]
-        File all_chr_bai = wholegenome_bais_from_all_samples[idx]
+        File all_chr_bam = bams_from_all_samples[idx]
+        File all_chr_bai = bais_from_all_samples[idx]
 
-        ####### Subset Bam####
         call H.SubsetBam as SubsetBam { input:
             bam = all_chr_bam,
             bai = all_chr_bai,
             locus = region
         }
 
-        ####### DONE ######
-
-
         call H.InferSampleName { input: 
             bam = all_chr_bam, 
             bai = all_chr_bai
         }
+
         String sample_id = InferSampleName.sample_name
 
         call H.SplitVCFbySample as SP { input:
@@ -104,80 +92,63 @@ workflow HybridPhase {
             unphased_sv_tbi = cleanvcf.subset_tbi,
             ref_fasta = reference,
             ref_fasta_fai = reference_index,
-            samplename = sample_id
-
+            samplename = sample_id,
+            memory = hiphase_memory
         }
     }
-    
-    ### phase small variants as scaffold  
+
     call H.MergePerChrVcfWithBcftools as MergeAcrossSamples { input:
         vcf_input = HP_SV.phased_snp_vcf,
         tbi_input = HP_SV.phased_snp_vcf_tbi,
-        pref = prefix + "sv."
+        pref = prefix + "short",
+        threads_num = merge_num_t
     }
-    call SplitMultiallelicCalls as Norm_SNPs { input:
+
+    call SplitMultiallelicCalls as SplitMultiallelicCallsShort { input:
         bcftools_merged_vcf = MergeAcrossSamples.merged_vcf,
         bcftools_merged_vcf_tbi = MergeAcrossSamples.merged_tbi,
-        prefix = prefix + "small."
+        prefix = prefix + "short.split"
     }
-    # ##### add filtering small variants step #######
-    # call FilterSmallVariants as Filter_SNPs{ input:
-    #     bcftools_vcf = Norm_SNPs.normed_vcf,
-    #     bcftools_vcf_tbi = Norm_SNPs.normed_vcf_tbi,
-    #     prefix = prefix
-    # }
 
-    ##### add merge small + sv vcf step #######
-    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSVs { input:
+    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
         vcf_input = HP_SV.phased_sv_vcf,
         tbi_input = HP_SV.phased_sv_vcf_tbi,
-        pref = prefix
+        pref = prefix + "SV",
+        threads_num = merge_num_t
     }
 
     call ConcatVCFs { input:
-        bcftools_small_vcf = Norm_SNPs.normed_vcf,
-        bcftools_small_vcf_tbi = Norm_SNPs.normed_vcf_tbi,
-        bcftools_sv_vcf = MergeAcrossSamplesSVs.merged_vcf,
-        bcftools_sv_vcf_tbi = MergeAcrossSamplesSVs.merged_tbi,
-        prefix = prefix
+        bcftools_small_vcf = SplitMultiallelicCallsShort.normed_vcf,
+        bcftools_small_vcf_tbi = SplitMultiallelicCallsShort.normed_vcf_tbi,
+        bcftools_sv_vcf = MergeAcrossSamplesSV.merged_vcf,
+        bcftools_sv_vcf_tbi = MergeAcrossSamplesSV.merged_tbi,
+        prefix = prefix + "concat_short_and_SV"
     }
 
-    #### add filtering small variants step #######
-    call FilterSmallVariants as Filter_SNPSVs{ input:
+    call FilterVariants as FilterShortAndSV { input:
         bcftools_vcf = ConcatVCFs.concat_vcf,
         bcftools_vcf_tbi = ConcatVCFs.concat_vcf_tbi,
-        prefix = prefix
+        prefix = prefix + "concat_short_and_SV.filter"
     }
 
-    ################################
-    call H.Shapeit4 as Shapeit4scaffold { input:
-        vcf_input = Filter_SNPSVs.filtered_vcf,
-        vcf_index = Filter_SNPSVs.filtered_vcf_tbi,
+    call H.Shapeit4 as Shapeit4ShortAndSV { input:
+        vcf_input = FilterShortAndSV.filtered_vcf,
+        vcf_index = FilterShortAndSV.filtered_vcf_tbi,
         mappingfile = genetic_mapping_dict[chromosome],
         region = region,
-        num_threads = num_t
+        prefix = prefix + "concat_short_and_SV.filter.phased",
+        num_threads = num_t,
+        memory = shapeit4_memory
     }
-    # call FF.FinalizeToFile as Finalizescaffold {
-    #     input: outdir = gcs_out_root_dir, file = Shapeit4scaffold.scaffold_vcf
-    # }
-    ##### phase structural variants
 
-    # call StatPhase.Shapeit4_phaseSVs as Shapeit4SVphase { input:
-    #     vcf_input = MergeAcrossSamplesSVs.merged_vcf,
-    #     vcf_index = MergeAcrossSamplesSVs.merged_tbi,
-    #     scaffold_vcf = Shapeit4scaffold.scaffold_vcf,
-    #     mappingfile = genetic_mapping_dict[chromosome],
-    #     region = region,
-    #     num_threads = num_t
-    # }
-    # call FF.FinalizeToFile as FinalizeSVs {
-    #     input: outdir = gcs_out_root_dir, file = Shapeit4SVphase.final_phased_vcf
-    # }
-
-    output{
-        File snp_shapeit4scaffold = Shapeit4scaffold.scaffold_vcf
-        # File sv_shapeit4scaffold = Shapeit4SVphase.final_phased_vcf
-        
+    output {
+        File hiphase_short_vcf = MergeAcrossSamples.merged_vcf
+        File hiphase_short_tbi = MergeAcrossSamples.merged_tbi
+        File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
+        File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
+        File filtered_vcf = FilterShortAndSV.filtered_vcf
+        File filtered_tbi = FilterShortAndSV.filtered_vcf_tbi
+        File phased_bcf = Shapeit4ShortAndSV.phased_bcf
     }
 }
 
@@ -225,7 +196,6 @@ task convert {
 
 }
 
-
 task SplitMultiallelicCalls {
 
     meta {
@@ -266,10 +236,10 @@ task SplitMultiallelicCalls {
 
 }
 
-task FilterSmallVariants {
+task FilterVariants {
 
     meta {
-        description: "using bcftools to filter small variants by F-missing and MAC"
+        description: "using bcftools to filter variants by F-missing and MAC"
     }
 
     parameter_meta {

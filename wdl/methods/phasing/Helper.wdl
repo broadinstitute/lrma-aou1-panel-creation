@@ -375,6 +375,7 @@ task Shapeit4 {
         File vcf_index
         File mappingfile
         String region
+        String prefix
         Int num_threads
         Int memory
 
@@ -393,7 +394,7 @@ task Shapeit4 {
                 --region ~{region} \
                 --use-PS 0.0001 \
                 --sequencing \
-                --output ~{region}_scaffold.bcf \
+                --output ~{prefix}.bcf \
                 --thread ~{num_threads} \
                 --log phased.log
         
@@ -402,7 +403,7 @@ task Shapeit4 {
 
     output{
         # File resouce_monitor_log = "resources.log"
-        File scaffold_vcf = "~{region}_scaffold.bcf"
+        File phased_bcf = "~{prefix}.bcf"
     }
 
     #Int disk_size = 100 + ceil(2 * size(vcf_input, "GiB"))

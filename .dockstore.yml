@@ -1,8 +1,11 @@
 version: 1.2
 workflows:
-- name: vcfdist
+- name: PhysicalAndStatisticalPhasing
   subclass: wdl
-  primaryDescriptorPath: /wdl/methods/vcfdist/vcfdist.wdl
-- name: hybridphasing
+  primaryDescriptorPath: /wdl/methods/phasing/PhysicalAndStatisticalPhasing.wdl
+- name: VcfdistEvaluation
   subclass: wdl
-  primaryDescriptorPath: /wdl/methods/phasing/HybridPhaseOneChrSmallVariantHyphase.wdl
+  primaryDescriptorPath: /wdl/evaluation/vcfdist/VcfdistEvaluation.wdl
+- name: PhasedPanelEvaluation
+  subclass: wdl
+  primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluation.wdl
