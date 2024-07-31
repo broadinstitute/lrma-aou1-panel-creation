@@ -8,7 +8,7 @@ workflow VcfdistEvaluation {
         File bed_file
         String region
         File reference_fasta
-        File reference_fai
+        File reference_fasta_fai
         String docker = "timd1/vcfdist:v2.5.3"
         Int verbosity = 1
     }
@@ -17,14 +17,14 @@ workflow VcfdistEvaluation {
 
         call SplitVCFbySample as SP_eval { input:
             joint_vcf = eval_vcf,
-            reference_index = reference_fai,
+            reference_index = reference_fasta_fai,
             region = region,
             samplename = sample_id
         }
 
         call SplitVCFbySample as SP_truth { input:
             joint_vcf = truth_vcf,
-            reference_index = reference_fai,
+            reference_index = reference_fasta_fai,
             region = region,
             samplename = sample_id,
         }

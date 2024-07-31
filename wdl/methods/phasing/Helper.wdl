@@ -15,7 +15,7 @@ struct DataTypeParameters {
     String map_preset
 }
 
-task HiphaseSVs {
+task HiPhase {
 
     meta {
         description: "Generates phased VCF. Note this runs fast so no need to parallize."
