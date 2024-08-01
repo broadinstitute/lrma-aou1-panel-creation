@@ -1,0 +1,227 @@
+version 1.0
+
+import "./Helper.wdl" as H
+
+
+workflow PhysicalAndStatisticalPhasing {
+    parameter_meta {
+        genetic_mapping_tsv_for_shapeit4: "path to the tsv file for the genetic mapping file address per chromosome"
+        chromosome: "string for chromosome to be processed"
+        prefix: "output file prefix, usually using chromosome"
+        num_t: "integer for threads"
+    }
+
+    input {
+        Array[File] sample_bams
+        Array[File] sample_bais
+        File joint_short_vcf
+        File joint_short_vcf_tbi
+        File joint_sv_vcf
+        File joint_sv_vcf_tbi
+        File reference_fasta
+        File reference_fasta_fai
+        File genetic_mapping_tsv_for_shapeit4
+        String chromosome
+        String region
+        String prefix
+        String gcs_out_root_dir
+        Int num_t
+        Int merge_num_t = 4
+        Int hiphase_memory
+        Int shapeit4_memory
+    }
+
+    Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
+    Int data_length = length(sample_bams)
+    Array[Int] indexes= range(data_length)
+
+    call H.SubsetVCF as SubsetVcfShort { input:
+        vcf_gz = joint_short_vcf,
+        vcf_tbi = joint_short_vcf_tbi,
+        locus = region
+    }
+
+    call H.SubsetVCF as SubsetVcfSV { input:
+        vcf_gz = joint_sv_vcf,
+        vcf_tbi = joint_sv_vcf_tbi,
+        locus = region
+    }
+
+    scatter (idx in indexes)  {
+        File all_chr_bam = sample_bams[idx]
+        File all_chr_bai = sample_bais[idx]
+
+        call H.SubsetBam { input:
+            bam = all_chr_bam,
+            bai = all_chr_bai,
+            locus = region
+        }
+
+        call H.InferSampleName { input: 
+            bam = all_chr_bam, 
+            bai = all_chr_bai
+        }
+
+        String sample_id = InferSampleName.sample_name
+
+        call H.SplitVCFbySample as SplitVcfbySampleShort { input:
+            joint_vcf = SubsetVcfShort.subset_vcf,
+            region = region,
+            samplename = sample_id
+        }
+
+        call H.SplitVCFbySample as SplitVcfbySampleSV { input:
+            joint_vcf = SubsetVcfSV.subset_vcf,
+            region = region,
+            samplename = sample_id
+        }
+
+        call ConvertLowerCase {
+            input:
+                vcf = SplitVcfbySampleSV.single_sample_vcf,
+                samplename = sample_id
+                
+        }
+
+        call H.HiPhase { input:
+            bam = SubsetBam.subset_bam,
+            bai = SubsetBam.subset_bai,
+            unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
+            unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
+            unphased_sv_vcf = ConvertLowerCase.subset_vcf,
+            unphased_sv_tbi = ConvertLowerCase.subset_tbi,
+            ref_fasta = reference_fasta,
+            ref_fasta_fai = reference_fasta_fai,
+            samplename = sample_id,
+            memory = hiphase_memory
+        }
+    }
+
+    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesShort { input:
+        vcf_input = HiPhase.phased_snp_vcf,
+        tbi_input = HiPhase.phased_snp_vcf_tbi,
+        pref = prefix + ".short",
+        threads_num = merge_num_t
+    }
+
+    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
+        vcf_input = HiPhase.phased_sv_vcf,
+        tbi_input = HiPhase.phased_sv_vcf_tbi,
+        pref = prefix + ".SV",
+        threads_num = merge_num_t
+    }
+
+    call FilterAndConcatVcfs { input:
+        short_vcf = MergeAcrossSamplesShort.merged_vcf,
+        short_vcf_tbi = MergeAcrossSamplesShort.merged_tbi,
+        sv_vcf = MergeAcrossSamplesSV.merged_vcf,
+        sv_vcf_tbi = MergeAcrossSamplesSV.merged_tbi,
+        prefix = prefix + ".filter_and_concat"
+    }
+
+    call H.Shapeit4 { input:
+        vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
+        vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+        mappingfile = genetic_mapping_dict[chromosome],
+        region = region,
+        prefix = prefix + ".filter_and_concat.phased",
+        num_threads = num_t,
+        memory = shapeit4_memory
+    }
+
+    output {
+        File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
+        File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
+        File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
+        File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
+        File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
+        File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
+        File phased_bcf = Shapeit4.phased_bcf
+    }
+}
+
+task ConvertLowerCase {
+    input {
+        File vcf
+        String samplename
+    }
+
+    Int disk_size = 2*ceil(size([vcf], "GB")) + 1
+    String docker_dir = "/truvari_intrasample"
+    String work_dir = "/cromwell_root/truvari_intrasample"
+
+    command <<<
+        set -euxo pipefail
+        mkdir -p ~{work_dir}
+        cp ~{docker_dir}/convert_lower_case.py ~{work_dir}/convert_lower_case.py
+        cd ~{work_dir}
+
+        python convert_lower_case.py -i ~{vcf} -o ~{samplename}_sv_cleaned.vcf
+        bgzip ~{samplename}_sv_cleaned.vcf ~{samplename}_sv_cleaned.vcf.gz
+        tabix -p vcf ~{samplename}_sv_cleaned.vcf.gz
+    >>>
+
+    output {
+        File subset_vcf = "~{work_dir}/~{samplename}_sv_cleaned.vcf.gz"
+        File subset_tbi = "~{work_dir}/~{samplename}_sv_cleaned.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 2
+        memory:  "32 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"hangsuunc/cleanvcf:v1"
+    }
+
+}
+
+# filter out singletons (i.e., keep MAC >= 2) and concatenate with deduplication
+task FilterAndConcatVcfs {
+
+    input {
+        File short_vcf         # multiallelic
+        File short_vcf_tbi
+        File sv_vcf            # biallelic
+        File sv_vcf_tbi
+        String prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        # filter SV singletons
+        bcftools view -i 'MAC>=2' ~{sv_vcf} \
+            --write-index -Oz -o ~{prefix}.SV.vcf.gz
+
+        # filter short singletons and split to biallelic
+        bcftools view -i 'MAC>=2' ~{short_vcf} | \
+            bcftools norm -m-any --do-not-normalize \
+            --write-index -Oz -o ~{prefix}.short.vcf.gz
+
+        # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
+        bcftools concat \
+            ~{prefix}.SV.vcf.gz \
+            ~{prefix}.short.vcf.gz \
+            --allow-overlaps --remove-duplicates \
+            -Oz -o ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File filter_and_concat_vcf = "~{prefix}.vcf.gz"
+        File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+}
