@@ -265,6 +265,6 @@ task FilterPhasingInfo {
         bootDiskSizeGb: 10
         preemptible_tries:     3
         max_retries:           2
-        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+        docker:"hangsuunc/cleanvcf:v1"
     }
 }
