@@ -47,6 +47,13 @@ workflow PhysicalAndStatisticalPhasing {
         locus = region
     }
 
+    call FilterPhasingInfo as FilterPhasing { input:
+        sv_vcf = SubsetVcfSV.subset_vcf,
+        sv_vcf_tbi = SubsetVcfSV.subset_tbi,
+        prefix = prefix + "filter_phasing"
+
+    }
+
     scatter (idx in indexes)  {
         File all_chr_bam = sample_bams[idx]
         File all_chr_bai = sample_bais[idx]
@@ -71,7 +78,7 @@ workflow PhysicalAndStatisticalPhasing {
         }
 
         call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-            joint_vcf = SubsetVcfSV.subset_vcf,
+            joint_vcf = FilterPhasing.filter_phasing_vcf,
             region = region,
             samplename = sample_id
         }
@@ -213,6 +220,42 @@ task FilterAndConcatVcfs {
     output {
         File filter_and_concat_vcf = "~{prefix}.vcf.gz"
         File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+}
+
+
+# filter out singletons (i.e., keep MAC >= 2) and concatenate with deduplication
+task FilterPhasingInfo {
+
+    input {
+        File sv_vcf            # biallelic
+        File sv_vcf_tbi
+        String prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        # filter SV singletons
+        bcftools +setGT ~{sv_vcf} -- -t a -n u | bgzip > ~{prefix}.vcf.gz
+        bcftools index --tbi ~{prefix}.vcf.gz
+
+
+    >>>
+
+    output {
+        File filter_phasing_vcf = "~{prefix}.vcf.gz"
+        File filter_phasing_vcf_tbi = "~{prefix}.vcf.gz.tbi"
     }
     ###################
     runtime {
