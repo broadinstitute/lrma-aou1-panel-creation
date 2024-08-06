@@ -85,7 +85,7 @@ workflow PhysicalAndStatisticalPhasing {
         call ConvertLowerCase {
             input:
                 vcf = SplitVcfbySampleSV.single_sample_vcf,
-                samplename = sample_id + ".uppercased"
+                prefix = sample_id + ".uppercased_sv_cleaned"
                 
         }
 
@@ -149,7 +149,7 @@ workflow PhysicalAndStatisticalPhasing {
 task ConvertLowerCase {
     input {
         File vcf
-        String samplename
+        String prefix
     }
 
     Int disk_size = 2*ceil(size([vcf], "GB")) + 1
@@ -162,14 +162,14 @@ task ConvertLowerCase {
         cp ~{docker_dir}/convert_lower_case.py ~{work_dir}/convert_lower_case.py
         cd ~{work_dir}
 
-        python convert_lower_case.py -i ~{vcf} -o ~{samplename}_sv_cleaned.vcf
-        bgzip ~{samplename}_sv_cleaned.vcf ~{samplename}_sv_cleaned.vcf.gz
-        tabix -p vcf ~{samplename}_sv_cleaned.vcf.gz
+        python convert_lower_case.py -i ~{vcf} -o ~{prefix}.vcf
+        bgzip ~{prefix}.vcf ~{prefix}.vcf.gz
+        tabix -p vcf ~{prefix}.vcf.gz
     >>>
 
     output {
-        File subset_vcf = "~{work_dir}/~{samplename}_sv_cleaned.vcf.gz"
-        File subset_tbi = "~{work_dir}/~{samplename}_sv_cleaned.vcf.gz.tbi"
+        File subset_vcf = "~{work_dir}/~{prefix}.vcf.gz"
+        File subset_tbi = "~{work_dir}/~{prefix}.vcf.gz.tbi"
     }
     ###################
     runtime {
