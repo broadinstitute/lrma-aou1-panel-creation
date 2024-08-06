@@ -47,11 +47,10 @@ workflow PhysicalAndStatisticalPhasing {
         locus = region
     }
 
-    call FilterPhasingInfo as FilterPhasing { input:
+    call UnphaseGenotypes as UnphaseSVGenotypes { input:
         sv_vcf = SubsetVcfSV.subset_vcf,
         sv_vcf_tbi = SubsetVcfSV.subset_tbi,
-        prefix = prefix + "filter_phasing"
-
+        prefix = prefix + ".unphased"
     }
 
     scatter (idx in indexes)  {
@@ -78,7 +77,7 @@ workflow PhysicalAndStatisticalPhasing {
         }
 
         call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-            joint_vcf = FilterPhasing.filter_phasing_vcf,
+            joint_vcf = UnphaseSVGenotypes.filter_phasing_vcf,
             region = region,
             samplename = sample_id
         }
@@ -86,7 +85,7 @@ workflow PhysicalAndStatisticalPhasing {
         call ConvertLowerCase {
             input:
                 vcf = SplitVcfbySampleSV.single_sample_vcf,
-                samplename = sample_id
+                samplename = sample_id + ".uppercased"
                 
         }
 
@@ -234,11 +233,11 @@ task FilterAndConcatVcfs {
 }
 
 
-# filter out singletons (i.e., keep MAC >= 2) and concatenate with deduplication
-task FilterPhasingInfo {
+
+task UnphaseGenotypes {
 
     input {
-        File sv_vcf            # biallelic
+        File sv_vcf            
         File sv_vcf_tbi
         String prefix
     }
@@ -246,11 +245,8 @@ task FilterPhasingInfo {
     command <<<
         set -euxo pipefail
 
-        # filter SV singletons
         bcftools +setGT ~{sv_vcf} -- -t a -n u | bgzip > ~{prefix}.vcf.gz
-        bcftools index --tbi ~{prefix}.vcf.gz
-
-
+        bcftools index -t ~{prefix}.vcf.gz
     >>>
 
     output {
