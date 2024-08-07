@@ -243,7 +243,9 @@ task UnphaseGenotypes {
     command <<<
         set -euxo pipefail
 
-        bcftools +setGT ~{sv_vcf} -- -t a -n u | bgzip > ~{prefix}.vcf.gz
+        bcftools +setGT ~{sv_vcf} -- -t a -n u | bgzip > ~{prefix}.vcf.gz 
+        #-t: target_gt genotypes to change; a : all genotypes, 
+        # -n: --new-gt genotypes to set; u unphase genotype and sort by allele (1|0 becomes 0/1)
         bcftools index -t ~{prefix}.vcf.gz
     >>>
 
