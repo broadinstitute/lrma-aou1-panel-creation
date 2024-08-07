@@ -9,128 +9,73 @@ workflow VcfdistEvaluation {
         String region
         File reference_fasta
         File reference_fasta_fai
-        String docker = "timd1/vcfdist:v2.5.3"
-        Int verbosity = 1
-    }
-
-    scatter (sample_id in samples)  {
-
-        call SplitVCFbySample as SP_eval { input:
-            joint_vcf = eval_vcf,
-            reference_index = reference_fasta_fai,
-            region = region,
-            samplename = sample_id
-        }
-
-        call SplitVCFbySample as SP_truth { input:
-            joint_vcf = truth_vcf,
-            reference_index = reference_fasta_fai,
-            region = region,
-            samplename = sample_id,
-        }
-
-        call RunVcfdistTask { input:
-            sampleid = sample_id,
-            truth_vcf = SP_truth.single_sample_vcf,
-            eval_vcf = SP_eval.single_sample_vcf,
-            bed_file = bed_file,
-            reference_fasta = reference_fasta,
-            docker = docker,
-            verbosity = verbosity
-        }
-    }
-
-    output {
-        Array[File] prs_tsv = RunVcfdistTask.prs_tsv
-        Array[File] vcfdistsummary = RunVcfdistTask.summary
-        Array[File] precrec_tsv = RunVcfdistTask.precrec_tsv
-        Array[File] query_tsv = RunVcfdistTask.query_tsv
-        Array[File] truth_tsv = RunVcfdistTask.truth_tsv
-        
-    }
-}
-
-task RunVcfdistTask {
-    input {
-        File truth_vcf
-        File eval_vcf
-        File bed_file
-        File reference_fasta
-        Int verbosity
-        String sampleid
-        
         String docker
-        Int disk_size_gb = ceil(size(truth_vcf, "GiB") + 10)
-        Int mem_gb = 16
-        Int cpu = 2
-        Int preemptible = 1
     }
 
-    command <<<
-        vcfdist \
-            ~{eval_vcf} \
-            ~{truth_vcf} \
-            ~{reference_fasta} \
-            -b ~{bed_file} \
-            -v ~{verbosity}
+    scatter (sample in samples) {
 
-        mv "precision-recall-summary.tsv" "~{sampleid}.precision-recall-summary.tsv"
-        mv "phasing-summary.tsv" "~{sampleid}.phasing-summary.tsv"
-        mv "summary.vcf" "~{sampleid}.summary.vcf"
-        mv "precision-recall.tsv" "~{sampleid}.precision-recall.tsv"
-        mv "query.tsv" "~{sampleid}.query.tsv"
-        mv "truth.tsv" "~{sampleid}.truth.tsv"
-        mv "switchflips.tsv" "~{sampleid}.switchflips.tsv"
+        call SubsetSampleFromVcf as SubsetSampleFromVcfEval { input:
+            vcf = eval_vcf,
+            sample = sample,
+            region = region,
+            reference_fasta_fai = reference_fasta_fai
+        }
 
-    >>>
+        call SubsetSampleFromVcf as SubsetSampleFromVcfTruth { input:
+            vcf = truth_vcf,
+            sample = sample,
+            region = region,
+            reference_fasta_fai = reference_fasta_fai
+        }
 
-    runtime {
-        docker: docker
-        disks: "local-disk " + disk_size_gb + " HDD"
-        memory: mem_gb + " GiB"
-        cpu: cpu
-        preemptible: preemptible
+        call Vcfdist { input:
+            sample = sample,
+            eval_vcf = SubsetSampleFromVcfEval.single_sample_vcf,
+            truth_vcf = SubsetSampleFromVcfTruth.single_sample_vcf,
+            bed_file = bed_file,
+            reference_fasta = reference_fasta
+        }
     }
 
     output {
-        File prs_tsv = "~{sampleid}.precision-recall-summary.tsv"
-        File summary = "~{sampleid}.summary.vcf"
-        File precrec_tsv = "~{sampleid}.precision-recall.tsv"
-        File query_tsv = "~{sampleid}.query.tsv"
-        File truth_tsv = "~{sampleid}.truth.tsv"
-        File phasing_tsv = "~{sampleid}.phasing-summary.tsv"
-        File switch_flip_tsv = "~{sampleid}.switchflips.tsv"
+        Array[File] precision_recall_summary_tsvs = Vcfdist.precision_recall_summary_tsv
+        Array[File] summary_vcfs = Vcfdist.summary_vcf
+        Array[File] precision_recall_tsvs = Vcfdist.precision_recall_tsv
+        Array[File] query_tsvs = Vcfdist.query_tsv
+        Array[File] truth_tsvs = Vcfdist.truth_tsv
+        Array[File] phasing_summary_tsvs = Vcfdist.phasing_summary_tsv
+        Array[File] switch_flips_tsvs = Vcfdist.switch_flips_tsv
     }
 }
 
-task SplitVCFbySample {
-    input{       
-        File joint_vcf
-        File reference_index
+task SubsetSampleFromVcf {
+    input {
+        File vcf
+        String sample
         String region
-        String samplename
+        File reference_fasta_fai
     }
-    
+
+    Int disk_size = 1 + ceil(2 * (size(vcf, "GiB")))
+
     command <<<
-        set -x pipefail
+        set -euxo pipefail
 
-        bcftools index ~{joint_vcf}
-
-        bcftools view -s ~{samplename} ~{joint_vcf} -r ~{region} -o ~{samplename}.subset.g.vcf.gz
-
-        bcftools reheader --fai ~{reference_index} ~{samplename}.subset.g.vcf.gz > ~{samplename}.subset.reheadered.g.vcf.gz
-
-        tabix -p vcf ~{samplename}.subset.reheadered.g.vcf.gz
-
+        bcftools index ~{vcf}
+        bcftools view ~{vcf} \
+            -s ~{sample} \
+            -r ~{region} \
+            -Oz -o ~{sample}.subset.g.vcf.gz
+        bcftools reheader ~{sample}.subset.g.vcf.gz \
+            --fai ~{reference_fasta_fai} \
+            -Oz -o ~{sample}.subset.reheadered.g.vcf.gz
+        bcftools index -t ~{sample}.subset.reheadered.g.vcf.gz
     >>>
     
     output {
-        File single_sample_vcf = "~{samplename}.subset.reheadered.g.vcf.gz"
-        File single_sample_vcf_tbi = "~{samplename}.subset.reheadered.g.vcf.gz.tbi"
+        File single_sample_vcf = "~{sample}.subset.reheadered.g.vcf.gz"
+        File single_sample_vcf_tbi = "~{sample}.subset.reheadered.g.vcf.gz.tbi"
     }
-
-
-    Int disk_size = 1 + ceil(2 * (size(joint_vcf, "GiB")))
 
     runtime {
         cpu: 1
@@ -140,5 +85,53 @@ task SplitVCFbySample {
         preemptible: 0
         maxRetries: 1
         docker: "us.gcr.io/broad-dsp-lrma/lr-basic:0.1.1"
+    }
+}
+
+task Vcfdist {
+    input {
+        String sample
+        File eval_vcf
+        File truth_vcf
+        File bed_file
+        File reference_fasta
+        Int verbosity = 1
+
+        String docker = "timd1/vcfdist:v2.5.3"
+        Int disk_size_gb = ceil(size(truth_vcf, "GiB") + 10)
+        Int mem_gb = 16
+        Int cpu = 2
+        Int preemptible = 1
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        vcfdist \
+            ~{eval_vcf} \
+            ~{truth_vcf} \
+            ~{reference_fasta} \
+            -b ~{bed_file} \
+            -v ~{verbosity}
+
+        for tsv in $(ls *.tsv); do mv $tsv ~{sample}.$tsv; done
+    >>>
+
+    output {
+        File precision_recall_summary_tsv = "~{sample}.precision-recall-summary.tsv"
+        File summary_vcf = "~{sample}.summary.vcf"
+        File precision_recall_tsv = "~{sample}.precision-recall.tsv"
+        File query_tsv = "~{sample}.query.tsv"
+        File truth_tsv = "~{sample}.truth.tsv"
+        File phasing_summary_tsv = "~{sample}.phasing-summary.tsv"
+        File switch_flips_tsv = "~{sample}.switchflips.tsv"
+    }
+
+    runtime {
+        docker: docker
+        disks: "local-disk " + disk_size_gb + " HDD"
+        memory: mem_gb + " GiB"
+        cpu: cpu
+        preemptible: preemptible
     }
 }
