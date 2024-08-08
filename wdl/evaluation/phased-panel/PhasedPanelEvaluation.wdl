@@ -2,7 +2,7 @@ version 1.0
 
 import "../../methods/phasing/PhysicalAndStatisticalPhasing.wdl"
 import "../../methods/pangenie/PanGeniePanelCreation.wdl"
-import "../vcfdist/VcfdistEvaluation.wdl"
+import "./VcfdistAndOverlapMetricsEvaluation.wdl"
 
 workflow PhasedPanelEvaluation {
 
@@ -32,12 +32,12 @@ workflow PhasedPanelEvaluation {
         String panel_creation_docker
         File? panel_creation_monitoring_script
 
-        # inputs for VcfdistEvaluation
+        # inputs for VcfdistAndOverlapMetricsEvaluation
         Array[String] vcfdist_samples
         File vcfdist_truth_vcf
         File vcfdist_bed_file
-        String vcfdist_docker = "timd1/vcfdist:v2.5.3"
-        Int vcfdist_verbosity = 1
+        String? vcfdist_extra_args
+        String overlap_metrics_docker
     }
 
     call PhysicalAndStatisticalPhasing.PhysicalAndStatisticalPhasing { input:
@@ -69,71 +69,76 @@ workflow PhasedPanelEvaluation {
     }
 
     # evaluate HiPhase short
-    call VcfdistEvaluation.VcfdistEvaluation as VcfdistEvaluationHiPhaseShort { input:
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         eval_vcf = PhysicalAndStatisticalPhasing.hiphase_short_vcf,
-        bed_file = vcfdist_bed_file,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
-        docker = vcfdist_docker,
-        verbosity = vcfdist_verbosity
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "PS",
+        overlap_metrics_docker = overlap_metrics_docker
     }
 
     # evaluate HiPhase SV
-    call VcfdistEvaluation.VcfdistEvaluation as VcfdistEvaluationHiPhaseSV { input:
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseSV { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         eval_vcf = PhysicalAndStatisticalPhasing.hiphase_sv_vcf,
-        bed_file = vcfdist_bed_file,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
-        docker = vcfdist_docker,
-        verbosity = vcfdist_verbosity
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "PS",
+        overlap_metrics_docker = overlap_metrics_docker
     }
 
     # evaluate filtered short + SV
-    call VcfdistEvaluation.VcfdistEvaluation as VcfdistEvaluationFiltered { input:
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFiltered { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         eval_vcf = PhysicalAndStatisticalPhasing.filtered_vcf,
-        bed_file = vcfdist_bed_file,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
-        docker = vcfdist_docker,
-        verbosity = vcfdist_verbosity
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "PS",
+        overlap_metrics_docker = overlap_metrics_docker
     }
 
     # evaluate Shapeit4 short + SV
-    call VcfdistEvaluation.VcfdistEvaluation as VcfdistEvaluationShapeit4 { input:
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         eval_vcf = PhysicalAndStatisticalPhasing.phased_bcf,
-        bed_file = vcfdist_bed_file,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
-        docker = vcfdist_docker,
-        verbosity = vcfdist_verbosity
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "NONE",
+        overlap_metrics_docker = overlap_metrics_docker
     }
 
     # evaluate panel short + SV
-    call VcfdistEvaluation.VcfdistEvaluation as VcfdistEvaluationPanel { input:
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         eval_vcf = PanGeniePanelCreation.panel_vcf_gz,
-        bed_file = vcfdist_bed_file,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
-        docker = vcfdist_docker,
-        verbosity = vcfdist_verbosity
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "NONE",
+        overlap_metrics_docker = overlap_metrics_docker
     }
 
-    output{
+    output {
     }
 }
 
