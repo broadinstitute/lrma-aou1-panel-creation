@@ -4,12 +4,6 @@ import "./Helper.wdl" as H
 
 
 workflow PhysicalAndStatisticalPhasing {
-    parameter_meta {
-        genetic_mapping_tsv_for_shapeit4: "path to the tsv file for the genetic mapping file address per chromosome"
-        chromosome: "string for chromosome to be processed"
-        prefix: "output file prefix, usually using chromosome"
-        num_t: "integer for threads"
-    }
 
     input {
         Array[File] sample_bams
@@ -25,8 +19,8 @@ workflow PhysicalAndStatisticalPhasing {
         String region
         String prefix
         String gcs_out_root_dir
-        Int num_t
-        Int merge_num_t = 4
+        Int shapeit4_num_threads
+        Int merge_num_threads = 4
         Int hiphase_memory
         Int shapeit4_memory
     }
@@ -45,6 +39,12 @@ workflow PhysicalAndStatisticalPhasing {
         vcf_gz = joint_sv_vcf,
         vcf_tbi = joint_sv_vcf_tbi,
         locus = region
+    }
+
+    call UnphaseGenotypes as UnphaseSVGenotypes { input:
+        vcf = SubsetVcfSV.subset_vcf,
+        vcf_tbi = SubsetVcfSV.subset_tbi,
+        prefix = prefix + ".unphased"
     }
 
     scatter (idx in indexes)  {
@@ -71,7 +71,7 @@ workflow PhysicalAndStatisticalPhasing {
         }
 
         call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-            joint_vcf = SubsetVcfSV.subset_vcf,
+            joint_vcf = UnphaseSVGenotypes.unphased_vcf,
             region = region,
             samplename = sample_id
         }
@@ -79,7 +79,7 @@ workflow PhysicalAndStatisticalPhasing {
         call ConvertLowerCase {
             input:
                 vcf = SplitVcfbySampleSV.single_sample_vcf,
-                samplename = sample_id
+                prefix = sample_id + ".uppercased_sv_cleaned"
                 
         }
 
@@ -101,14 +101,14 @@ workflow PhysicalAndStatisticalPhasing {
         vcf_input = HiPhase.phased_snp_vcf,
         tbi_input = HiPhase.phased_snp_vcf_tbi,
         pref = prefix + ".short",
-        threads_num = merge_num_t
+        threads_num = merge_num_threads
     }
 
     call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
         vcf_input = HiPhase.phased_sv_vcf,
         tbi_input = HiPhase.phased_sv_vcf_tbi,
         pref = prefix + ".SV",
-        threads_num = merge_num_t
+        threads_num = merge_num_threads
     }
 
     call FilterAndConcatVcfs { input:
@@ -125,7 +125,7 @@ workflow PhysicalAndStatisticalPhasing {
         mappingfile = genetic_mapping_dict[chromosome],
         region = region,
         prefix = prefix + ".filter_and_concat.phased",
-        num_threads = num_t,
+        num_threads = shapeit4_num_threads,
         memory = shapeit4_memory
     }
 
@@ -143,7 +143,7 @@ workflow PhysicalAndStatisticalPhasing {
 task ConvertLowerCase {
     input {
         File vcf
-        String samplename
+        String prefix
     }
 
     Int disk_size = 2*ceil(size([vcf], "GB")) + 1
@@ -156,14 +156,14 @@ task ConvertLowerCase {
         cp ~{docker_dir}/convert_lower_case.py ~{work_dir}/convert_lower_case.py
         cd ~{work_dir}
 
-        python convert_lower_case.py -i ~{vcf} -o ~{samplename}_sv_cleaned.vcf
-        bgzip ~{samplename}_sv_cleaned.vcf ~{samplename}_sv_cleaned.vcf.gz
-        tabix -p vcf ~{samplename}_sv_cleaned.vcf.gz
+        python convert_lower_case.py -i ~{vcf} -o ~{prefix}.vcf
+        bgzip ~{prefix}.vcf ~{prefix}.vcf.gz
+        tabix -p vcf ~{prefix}.vcf.gz
     >>>
 
     output {
-        File subset_vcf = "~{work_dir}/~{samplename}_sv_cleaned.vcf.gz"
-        File subset_tbi = "~{work_dir}/~{samplename}_sv_cleaned.vcf.gz.tbi"
+        File subset_vcf = "~{work_dir}/~{prefix}.vcf.gz"
+        File subset_tbi = "~{work_dir}/~{prefix}.vcf.gz.tbi"
     }
     ###################
     runtime {
@@ -223,5 +223,37 @@ task FilterAndConcatVcfs {
         preemptible_tries:     3
         max_retries:           2
         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+}
+
+task UnphaseGenotypes {
+
+    input {
+        File vcf
+        File vcf_tbi
+        String prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        # set (a)ll genotypes to (u)nphased and sort by allele (e.g., 1|0 becomes 0/1)
+        bcftools +setGT ~{vcf} -Oz -o ~{prefix}.vcf.gz -- --target-gt a --new-gt u
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File unphased_vcf = "~{prefix}.vcf.gz"
+        File unphased_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
     }
 }
