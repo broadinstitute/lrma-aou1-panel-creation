@@ -47,6 +47,12 @@ workflow PhysicalAndStatisticalPhasing {
         locus = region
     }
 
+    call UnphaseGenotypes as UnphaseSVGenotypes { input:
+        sv_vcf = SubsetVcfSV.subset_vcf,
+        sv_vcf_tbi = SubsetVcfSV.subset_tbi,
+        prefix = prefix + ".unphased"
+    }
+
     scatter (idx in indexes)  {
         File all_chr_bam = sample_bams[idx]
         File all_chr_bai = sample_bais[idx]
@@ -71,7 +77,7 @@ workflow PhysicalAndStatisticalPhasing {
         }
 
         call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-            joint_vcf = SubsetVcfSV.subset_vcf,
+            joint_vcf = UnphaseSVGenotypes.filter_phasing_vcf,
             region = region,
             samplename = sample_id
         }
@@ -79,7 +85,7 @@ workflow PhysicalAndStatisticalPhasing {
         call ConvertLowerCase {
             input:
                 vcf = SplitVcfbySampleSV.single_sample_vcf,
-                samplename = sample_id
+                prefix = sample_id + ".uppercased_sv_cleaned"
                 
         }
 
@@ -143,7 +149,7 @@ workflow PhysicalAndStatisticalPhasing {
 task ConvertLowerCase {
     input {
         File vcf
-        String samplename
+        String prefix
     }
 
     Int disk_size = 2*ceil(size([vcf], "GB")) + 1
@@ -156,14 +162,14 @@ task ConvertLowerCase {
         cp ~{docker_dir}/convert_lower_case.py ~{work_dir}/convert_lower_case.py
         cd ~{work_dir}
 
-        python convert_lower_case.py -i ~{vcf} -o ~{samplename}_sv_cleaned.vcf
-        bgzip ~{samplename}_sv_cleaned.vcf ~{samplename}_sv_cleaned.vcf.gz
-        tabix -p vcf ~{samplename}_sv_cleaned.vcf.gz
+        python convert_lower_case.py -i ~{vcf} -o ~{prefix}.vcf
+        bgzip ~{prefix}.vcf ~{prefix}.vcf.gz
+        tabix -p vcf ~{prefix}.vcf.gz
     >>>
 
     output {
-        File subset_vcf = "~{work_dir}/~{samplename}_sv_cleaned.vcf.gz"
-        File subset_tbi = "~{work_dir}/~{samplename}_sv_cleaned.vcf.gz.tbi"
+        File subset_vcf = "~{work_dir}/~{prefix}.vcf.gz"
+        File subset_tbi = "~{work_dir}/~{prefix}.vcf.gz.tbi"
     }
     ###################
     runtime {
@@ -223,5 +229,38 @@ task FilterAndConcatVcfs {
         preemptible_tries:     3
         max_retries:           2
         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+}
+
+task UnphaseGenotypes {
+
+    input {
+        File sv_vcf            
+        File sv_vcf_tbi
+        String prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        bcftools +setGT ~{sv_vcf} -- -t a -n u | bgzip > ~{prefix}.vcf.gz 
+        #-t: target_gt genotypes to change; a : all genotypes, 
+        # -n: --new-gt genotypes to set; u unphase genotype and sort by allele (1|0 becomes 0/1)
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File filter_phasing_vcf = "~{prefix}.vcf.gz"
+        File filter_phasing_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
     }
 }
