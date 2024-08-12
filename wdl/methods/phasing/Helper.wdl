@@ -378,6 +378,7 @@ task Shapeit4 {
         String prefix
         Int num_threads
         Int memory
+        String extra_args
 
         RuntimeAttr? runtime_attr_override
         String zones = "us-central1-a us-central1-b us-central1-c us-central1-f"
@@ -392,12 +393,11 @@ task Shapeit4 {
         shapeit4.2 --input ~{vcf_input} \
                 --map ~{mappingfile} \
                 --region ~{region} \
-                --use-PS 0.0001 \
                 --sequencing \
                 --output ~{prefix}.bcf \
                 --thread ~{num_threads} \
-                --log phased.log
-        
+                ~{extra_args}
+
         # if ps -p "${job_id}" > /dev/null; then kill "${job_id}"; fi
     >>>
 
