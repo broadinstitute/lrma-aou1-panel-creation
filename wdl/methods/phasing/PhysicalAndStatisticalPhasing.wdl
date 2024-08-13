@@ -23,6 +23,7 @@ workflow PhysicalAndStatisticalPhasing {
         Int merge_num_threads = 4
         Int hiphase_memory
         Int shapeit4_memory
+        String shapeit4_extra_args = "--use-PS 0.0001" # expected error rate in phase sets derived from physical phasing
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
@@ -126,7 +127,8 @@ workflow PhysicalAndStatisticalPhasing {
         region = region,
         prefix = prefix + ".filter_and_concat.phased",
         num_threads = shapeit4_num_threads,
-        memory = shapeit4_memory
+        memory = shapeit4_memory,
+        extra_args = shapeit4_extra_args
     }
 
     output {
@@ -175,7 +177,6 @@ task ConvertLowerCase {
         max_retries:           2
         docker:"hangsuunc/cleanvcf:v1"
     }
-
 }
 
 # filter out singletons (i.e., keep MAC >= 2) and concatenate with deduplication
