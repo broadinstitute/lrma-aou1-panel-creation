@@ -24,6 +24,10 @@ workflow PhasedPanelEvaluation {
         File genetic_mapping_tsv_for_shapeit4
         String chromosome
         Int shapeit4_num_threads
+        Int merge_num_threads
+        Int hiphase_memory
+        Int shapeit4_memory
+        String shapeit4_extra_args
 
         # inputs for PanGeniePanelCreation
         File prepare_vcf_script
@@ -54,7 +58,11 @@ workflow PhasedPanelEvaluation {
         region = region,
         prefix = output_prefix,
         gcs_out_root_dir = gcs_out_root_dir + "/Phasing",
-        shapeit4_num_threads = shapeit4_num_threads
+        shapeit4_num_threads = shapeit4_num_threads,
+        merge_num_threads = merge_num_threads,
+        hiphase_memory = hiphase_memory,
+        shapeit4_memory = shapeit4_memory,
+        shapeit4_extra_args = shapeit4_extra_args
     }
 
     call PanGeniePanelCreation.PanGeniePanelCreation { input:
