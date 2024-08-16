@@ -9,9 +9,9 @@ workflows:
 - name: PanGeniePanelCreation
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/pangenie/PanGeniePanelCreation.wdl
-- name: VcfdistEvaluation
+- name: VcfdistAndOverlapMetricsEvaluation
   subclass: wdl
-  primaryDescriptorPath: /wdl/evaluation/vcfdist/VcfdistEvaluation.wdl
+  primaryDescriptorPath: /wdl/evaluation/phased-panel/VcfdistAndOverlapMetricsEvaluation.wdl
 - name: PhasedPanelEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluation.wdl
