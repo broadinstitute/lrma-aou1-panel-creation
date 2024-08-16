@@ -1,7 +1,7 @@
 version 1.0
 
-import "../methods/kage/KAGEPanelWithPreprocessing.wdl" as KAGEPanelWithPreprocessing
-import "../methods/pangenie/PanGenieCase.wdl" as PanGenieCase
+import "../../methods/kage/KAGEPanelWithPreprocessing.wdl" as KAGEPanelWithPreprocessing
+import "../../methods/pangenie/PanGenieCase.wdl" as PanGenieCase
 
 struct RuntimeAttributes {
     Int? cpu
