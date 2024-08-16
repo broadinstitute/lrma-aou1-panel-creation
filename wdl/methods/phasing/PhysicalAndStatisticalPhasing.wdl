@@ -24,6 +24,7 @@ workflow PhysicalAndStatisticalPhasing {
         Int hiphase_memory
         Int shapeit4_memory
         String shapeit4_extra_args = "--use-PS 0.0001" # expected error rate in phase sets derived from physical phasing
+        String hiphase_extra_args
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
@@ -94,7 +95,8 @@ workflow PhysicalAndStatisticalPhasing {
             ref_fasta = reference_fasta,
             ref_fasta_fai = reference_fasta_fai,
             samplename = sample_id,
-            memory = hiphase_memory
+            memory = hiphase_memory,
+            extra_args = hiphase_extra_args
         }
     }
 

@@ -28,6 +28,7 @@ workflow PhasedPanelEvaluation {
         Int hiphase_memory
         Int shapeit4_memory
         String shapeit4_extra_args
+        String hiphase_extra_args
 
         # inputs for PanGeniePanelCreation
         File prepare_vcf_script
@@ -62,7 +63,8 @@ workflow PhasedPanelEvaluation {
         merge_num_threads = merge_num_threads,
         hiphase_memory = hiphase_memory,
         shapeit4_memory = shapeit4_memory,
-        shapeit4_extra_args = shapeit4_extra_args
+        shapeit4_extra_args = shapeit4_extra_args,
+        hiphase_extra_args = hiphase_extra_args
     }
 
     call PanGeniePanelCreation.PanGeniePanelCreation { input:
