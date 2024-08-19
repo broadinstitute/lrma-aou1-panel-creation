@@ -38,6 +38,8 @@ task HiPhase {
         Int memory
         String zones = "us-central1-a us-central1-b us-central1-c us-central1-f"
 
+        String extra_args
+
         RuntimeAttr? runtime_attr_override
     }
 
@@ -63,7 +65,8 @@ task HiPhase {
         --stats-file ~{samplename}.stats.csv \
         --blocks-file ~{samplename}.blocks.tsv \
         --summary-file ~{samplename}.summary.tsv \
-        --verbose
+        --verbose \
+        ~{extra_args}
 
         bcftools sort ~{samplename}_phased_snp.vcf.gz -O z -o ~{samplename}_phased_snp.sorted.vcf.gz
         tabix -p vcf ~{samplename}_phased_snp.sorted.vcf.gz
