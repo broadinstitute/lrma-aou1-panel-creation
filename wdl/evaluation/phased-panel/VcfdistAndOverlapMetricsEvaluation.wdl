@@ -1,5 +1,22 @@
 version 1.0
 
+struct VcfdistOutputs {
+    File summary_vcf
+    File precision_recall_summary_tsv
+    File precision_recall_tsv
+    File query_tsv
+    File truth_tsv
+    File phasing_summary_tsv
+    File switchflips_tsv
+    File superclusters_tsv
+    File phase_blocks_tsv
+}
+
+struct OverlapMetricsOutputs {
+    File inconsistent_tsv
+    File metrics_tsv
+}
+
 workflow VcfdistAndOverlapMetricsEvaluation {
     input {
         Array[String] samples
@@ -48,18 +65,11 @@ workflow VcfdistAndOverlapMetricsEvaluation {
     }
 
     output {
-        Array[File] summary_vcfs = Vcfdist.summary_vcf
-        Array[File] precision_recall_summary_tsvs = Vcfdist.precision_recall_summary_tsv
-        Array[File] precision_recall_tsvs = Vcfdist.precision_recall_tsv
-        Array[File] query_tsvs = Vcfdist.query_tsv
-        Array[File] truth_tsvs = Vcfdist.truth_tsv
-        Array[File] phasing_summary_tsvs = Vcfdist.phasing_summary_tsv
-        Array[File] switch_flips_tsvs = Vcfdist.switch_flips_tsv
-        Array[File] superclusters_tsvs = Vcfdist.superclusters_tsv
-        Array[File] phase_blocks_tsvs = Vcfdist.phase_blocks_tsv
+        # per-sample
+        Array[VcfdistOutputs] vcfdist_outputs_per_sample = Vcfdist.outputs
 
-        File inconsistent_tsv = CalculateOverlapMetrics.inconsistent_tsv
-        File metrics_tsv = CalculateOverlapMetrics.metrics_tsv
+        # per-cohort
+        OverlapMetricsOutputs overlap_metrics_outputs = CalculateOverlapMetrics.outputs
     }
 }
 
@@ -95,7 +105,7 @@ task SubsetSampleFromVcf {
     runtime {
         cpu: 1
         memory: "64 GiB"
-        disks: "local-disk " + disk_size + " HDD" #"local-disk 100 HDD"
+        disks: "local-disk " + disk_size + " HDD"
         bootDiskSizeGb: 10
         preemptible: 0
         maxRetries: 1
@@ -135,15 +145,17 @@ task Vcfdist {
     >>>
 
     output {
-        File summary_vcf = "~{sample}.summary.vcf"
-        File precision_recall_summary_tsv = "~{sample}.precision-recall-summary.tsv"
-        File precision_recall_tsv = "~{sample}.precision-recall.tsv"
-        File query_tsv = "~{sample}.query.tsv"
-        File truth_tsv = "~{sample}.truth.tsv"
-        File phasing_summary_tsv = "~{sample}.phasing-summary.tsv"
-        File switch_flips_tsv = "~{sample}.switchflips.tsv"
-        File superclusters_tsv = "~{sample}.superclusters.tsv"
-        File phase_blocks_tsv = "~{sample}.phase-blocks.tsv"
+        VcfdistOutputs outputs = {
+            "summary_vcf": "~{sample}.summary.vcf",
+            "precision_recall_summary_tsv": "~{sample}.precision-recall-summary.tsv",
+            "precision_recall_tsv": "~{sample}.precision-recall.tsv",
+            "query_tsv": "~{sample}.query.tsv",
+            "truth_tsv": "~{sample}.truth.tsv",
+            "phasing_summary_tsv": "~{sample}.phasing-summary.tsv",
+            "switchflips_tsv": "~{sample}.switchflips.tsv",
+            "superclusters_tsv": "~{sample}.superclusters.tsv",
+            "phase_blocks_tsv": "~{sample}.phase-blocks.tsv"
+        }
     }
 
     runtime {
@@ -285,8 +297,10 @@ task CalculateOverlapMetrics {
     >>>
 
     output {
-        File inconsistent_tsv = "inconsistent.tsv"
-        File metrics_tsv = "metrics.tsv"
+        OverlapMetricsOutputs outputs = {
+            "inconsistent_tsv": "inconsistent.tsv",
+            "metrics_tsv": "metrics.tsv"
+        }
     }
 
     runtime {

@@ -148,8 +148,121 @@ workflow PhasedPanelEvaluation {
         overlap_metrics_docker = overlap_metrics_docker
     }
 
+    call SummarizeEvaluations { input:
+        labels_per_vcf = ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "Panel"],
+        vcfdist_outputs_per_vcf_and_sample = [
+            EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
+            EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
+            EvaluateFiltered.vcfdist_outputs_per_sample,
+            EvaluateShapeit4.vcfdist_outputs_per_sample,
+            EvaluatePanel.vcfdist_outputs_per_sample
+        ],
+        overlap_metrics_outputs_per_vcf = [
+            EvaluateHiPhaseShort.overlap_metrics_outputs,
+            EvaluateHiPhaseSV.overlap_metrics_outputs,
+            EvaluateFiltered.overlap_metrics_outputs,
+            EvaluateShapeit4.overlap_metrics_outputs,
+            EvaluatePanel.overlap_metrics_outputs
+        ]
+    }
+
     output {
     }
 }
 
+task SummarizeEvaluations {
+    input {
+        Array[String] labels_per_vcf
+        Array[Array[VcfdistOutputs]] vcfdist_outputs_per_vcf_and_sample
+        Array[OverlapMetricsOutputs] overlap_metrics_outputs_per_vcf
 
+        String docker
+        Int disk_size_gb = 50
+        Int boot_disk_size_gb = 15
+        Int mem_gb = 8
+        Int cpu = 2
+        Int preemptible = 1
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        python - --labels_per_vcf_txt ~{write_lines(labels_per_vcf)} \
+                 --vcfdist_outputs_per_vcf_and_sample_json ~{write_json(vcfdist_outputs_per_vcf_and_sample)} \
+                 --overlap_metrics_outputs_per_vcf_json ~{write_json(overlap_metrics_outputs_per_vcf)} \
+                 <<-'EOF'
+        import argparse
+        import json
+        import pandas as pd
+
+        def summarize(labels_per_vcf_txt,
+                      vcfdist_outputs_per_vcf_and_sample_json,
+                      overlap_metrics_outputs_per_vcf_json):
+            with open(labels_per_vcf_txt) as f:
+                labels = f.read().splitlines()
+
+            with open(vcfdist_outputs_per_vcf_and_sample_json) as f:
+                vcfdist_outputs_per_vcf_and_sample = json.load(f)
+
+            with open(overlap_metrics_outputs_per_vcf_json) as f:
+                overlap_metrics_outputs_per_vcf = json.load(f)
+
+            summary_dict = {}
+            for i, label in enumerate(labels):
+                summary_dict[label] = {}
+                summary_dict[label]['NUM_VCFDIST_SAMPLES'] = len(vcfdist_outputs_per_vcf_and_sample[i])
+                summary_dict[label].update(summarize_vcfdist_outputs_over_samples(vcfdist_outputs_per_vcf_and_sample[i]))
+                summary_dict[label].update(summarize_overlap_metrics_outputs(overlap_metrics_outputs_per_vcf[i]))
+
+            pd.DataFrame.from_dict(summary_dict, orient='index').to_csv('evaluation_summary.tsv', sep='\t', float_format="%.4f")
+
+        def summarize_vcfdist_outputs_over_samples(vcfdist_outputs_per_sample):
+            precision_recall_metrics_dict = {}
+            for s, vcfdist_outputs in enumerate(vcfdist_outputs_per_sample):
+                precision_recall_metrics_dict[s] = {}
+                pr_metrics_df = pd.read_csv(vcfdist_outputs['precision_recall_summary_tsv'], sep='\t', index_col=[0, 1])
+                for var_type in ['SNP', 'INDEL', 'SV']:
+                    var_type_metrics_dict = pr_metrics_df.loc[var_type, 'NONE'][['TRUTH_TP', 'QUERY_TP', 'TRUTH_FN', 'QUERY_FP', 'PREC', 'RECALL', 'F1_SCORE']].add_prefix(f'{var_type}_').to_dict()
+                    precision_recall_metrics_dict[s].update(var_type_metrics_dict)
+            return pd.DataFrame.from_dict(precision_recall_metrics_dict, orient='index').mean(axis=0)
+
+
+        def summarize_overlap_metrics_outputs(overlap_metrics_outputs):
+            return pd.read_csv(overlap_metrics_outputs['metrics_tsv'], sep='\t').iloc[0].to_dict()
+
+        def main():
+            parser = argparse.ArgumentParser()
+
+            parser.add_argument('--labels_per_vcf_txt',
+                                type=str)
+
+            parser.add_argument('--vcfdist_outputs_per_vcf_and_sample_json',
+                                type=str)
+
+            parser.add_argument('--overlap_metrics_outputs_per_vcf_json',
+                                type=str)
+
+            args = parser.parse_args()
+
+            summarize(args.labels_per_vcf_txt,
+                      args.vcfdist_outputs_per_vcf_and_sample_json,
+                      args.overlap_metrics_outputs_per_vcf_json)
+
+        if __name__ == '__main__':
+            main()
+        EOF
+    >>>
+
+    output {
+        File evaluation_summary_tsv = "evaluation_summary.tsv"
+    }
+
+    runtime {
+        docker: docker
+        disks: "local-disk " + disk_size_gb + " HDD"
+        bootDiskSizeGb: boot_disk_size_gb
+        memory: mem_gb + " GiB"
+        cpu: cpu
+        preemptible: preemptible
+    }
+}
