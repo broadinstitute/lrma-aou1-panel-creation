@@ -217,7 +217,7 @@ task CalculateOverlapMetrics {
             chrom_v = split_callset['variants/CHROM'][is_multi_V]
             pos_v = split_callset['variants/POS'][is_multi_V]
             samples_s = split_callset['samples']
-            
+
             # group split records by multiallelic site (indexed by m)
             m_splits = np.unique(pos_v, return_index=True)[1][1:]
             gt_mvsp = np.split(gt_vsp, m_splits)

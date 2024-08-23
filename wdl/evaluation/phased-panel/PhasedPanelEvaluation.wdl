@@ -30,10 +30,17 @@ workflow PhasedPanelEvaluation {
         String shapeit4_extra_args
         String hiphase_extra_args
 
+        # inputs for FixVariantCollisions
+        File fix_variant_collisions_java
+        Int operation
+        String weight_tag
+        Int is_weight_format_field
+
         # inputs for PanGeniePanelCreation
         File prepare_vcf_script
         File add_ids_script
         File merge_vcfs_script
+        Float frac_missing
         String panel_creation_docker
         File? panel_creation_monitoring_script
 
@@ -67,12 +74,22 @@ workflow PhasedPanelEvaluation {
         hiphase_extra_args = hiphase_extra_args
     }
 
-    call PanGeniePanelCreation.PanGeniePanelCreation { input:
+    call FixVariantCollisions { input:
         phased_bcf = PhysicalAndStatisticalPhasing.phased_bcf,
+        fix_variant_collisions_java = fix_variant_collisions_java,
+        operation = operation,
+        weight_tag = weight_tag,
+        is_weight_format_field = is_weight_format_field,
+        output_prefix = output_prefix
+    }
+
+    call PanGeniePanelCreation.PanGeniePanelCreation { input:
+        phased_bcf = FixVariantCollisions.phased_collisionless_bcf,
         reference_fasta = reference_fasta,
         prepare_vcf_script = prepare_vcf_script,
         add_ids_script = add_ids_script,
         merge_vcfs_script = merge_vcfs_script,
+        frac_missing = frac_missing,
         output_prefix = output_prefix,
         docker = panel_creation_docker,
         monitoring_script = panel_creation_monitoring_script
@@ -134,6 +151,20 @@ workflow PhasedPanelEvaluation {
         overlap_metrics_docker = overlap_metrics_docker
     }
 
+    # evaluate collisionless short + SV
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFixVariantCollisions { input:
+        samples = vcfdist_samples,
+        truth_vcf = vcfdist_truth_vcf,
+        eval_vcf = FixVariantCollisions.phased_collisionless_bcf,
+        region = region,
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "NONE",
+        overlap_metrics_docker = overlap_metrics_docker
+    }
+
     # evaluate panel short + SV
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
         samples = vcfdist_samples,
@@ -149,12 +180,13 @@ workflow PhasedPanelEvaluation {
     }
 
     call SummarizeEvaluations { input:
-        labels_per_vcf = ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "Panel"],
+        labels_per_vcf = ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel"],
         vcfdist_outputs_per_vcf_and_sample = [
             EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
             EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
             EvaluateFiltered.vcfdist_outputs_per_sample,
             EvaluateShapeit4.vcfdist_outputs_per_sample,
+            EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluatePanel.vcfdist_outputs_per_sample
         ],
         overlap_metrics_outputs_per_vcf = [
@@ -162,11 +194,63 @@ workflow PhasedPanelEvaluation {
             EvaluateHiPhaseSV.overlap_metrics_outputs,
             EvaluateFiltered.overlap_metrics_outputs,
             EvaluateShapeit4.overlap_metrics_outputs,
+            EvaluateFixVariantCollisions.overlap_metrics_outputs,
             EvaluatePanel.overlap_metrics_outputs
         ]
     }
 
     output {
+    }
+}
+
+task FixVariantCollisions {
+
+    input {
+        File phased_bcf                     # biallelic
+        File fix_variant_collisions_java
+        Int operation = 1                   # 0=can only remove an entire VCF record; 1=can remove single ones from a GT
+        String weight_tag = "UNIT_WEIGHT"   # ID of the weight field; if this field is not found, all weights are set to one; weights are assumed to be non-negative
+        Int is_weight_format_field = 0      # given a VCF record in a sample, assign it a weight encoded in the sample column (1) or in the INFO field (0)
+        String output_prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        # convert bcf to vcf.gz
+        bcftools view ~{phased_bcf} -Oz -o phased.vcf.gz
+        bcftools index -t phased.vcf.gz
+
+        java ~{fix_variant_collisions_java} \
+            phased.vcf.gz \
+            ~{operation} \
+            ~{weight_tag} \
+            ~{is_weight_format_field} \
+            collisionless.vcf \
+            windows.txt \
+            histogram.txt \
+            null                            # do not output figures
+
+        # replace all missing alleles (correctly) emitted with reference alleles, since this is expected by PanGenie panel-creation script
+        bcftools view collisionless.vcf | \
+            sed -e 's/\.|0/0|0/g' | sed -e 's/0|\./0|0/g' | sed -e 's/\.|1/0|1/g' | sed -e 's/1|\./1|0/g' | sed -e 's/\.|\./0|0/g' | \
+            bcftools view -Ob -o ~{output_prefix}.phased.collisionless.bcf
+    >>>
+
+    output {
+        File phased_collisionless_bcf = "~{output_prefix}.phased.collisionless.bcf"
+        File windows = "windows.txt"
+        File histogram = "histogram.txt"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "16 GiB"
+        disks: "local-disk 100 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-gatk/gatk:4.6.0.0"
     }
 }
 
