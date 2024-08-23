@@ -118,7 +118,8 @@ public class FixVariantCollisions {
      * 4: writes to this file (uncompressed VCF) the input VCF.GZ with all
      *    collisions fixed; "null"=collisions are not fixed and the file is not
      *    written;
-     * 5: writes to this file the list of all windows processed;
+     * 5: writes to this file the list of all processed windows; warning: 
+     *    turning this on makes the program much slower;
      * 6: histogram: for each X, the number of (window,sample) pairs with X
      *    collisions; "null"=the histogram is not printed;
      * 7: directory where to store figures for every window and sample with
