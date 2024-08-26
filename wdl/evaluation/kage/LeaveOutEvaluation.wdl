@@ -30,6 +30,7 @@ workflow LeaveOutEvaluation {
         String output_prefix
         Array[String] chromosomes
         Array[Array[String]] leave_out_sample_names_array
+        Int case_average_coverage
         Boolean do_pangenie
 
         # TODO we require the alignments to subset by chromosome; change to start from raw reads
@@ -125,6 +126,7 @@ workflow LeaveOutEvaluation {
                     reference_fasta_fai = reference_fasta_fai,
                     output_prefix = leave_out_sample_name,
                     sample_name = leave_out_sample_name,
+                    average_coverage = case_average_coverage,
                     docker = kage_docker,
                     monitoring_script = monitoring_script
             }

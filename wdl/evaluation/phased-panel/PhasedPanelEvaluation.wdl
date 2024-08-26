@@ -3,6 +3,7 @@ version 1.0
 import "../../methods/phasing/PhysicalAndStatisticalPhasing.wdl"
 import "../../methods/pangenie/PanGeniePanelCreation.wdl"
 import "./VcfdistAndOverlapMetricsEvaluation.wdl"
+import "../kage/LeaveOutEvaluation.wdl"
 
 workflow PhasedPanelEvaluation {
 
@@ -50,6 +51,26 @@ workflow PhasedPanelEvaluation {
         File vcfdist_bed_file
         String? vcfdist_extra_args
         String overlap_metrics_docker
+
+        # inputs for LeaveOutEvaluation
+        File case_reference_fasta
+        File case_reference_fasta_fai
+        Array[File] genetic_maps
+        File repeat_mask_bed
+        File segmental_duplications_bed
+        File simple_repeats_bed
+        File challenging_medically_relevant_genes_bed
+        Array[String] leave_out_chromosomes
+        Array[Array[String]] leave_out_sample_names_array
+        Int case_average_coverage
+        Boolean do_pangenie
+        Map[String, File] leave_out_crams
+        String leave_out_docker
+        String kage_docker
+        String pangenie_docker
+        RuntimeAttributes? leave_out_runtime_attributes
+        RuntimeAttributes? leave_out_medium_runtime_attributes
+        RuntimeAttributes? leave_out_large_runtime_attributes
     }
 
     call PhysicalAndStatisticalPhasing.PhysicalAndStatisticalPhasing { input:
@@ -93,6 +114,32 @@ workflow PhasedPanelEvaluation {
         output_prefix = output_prefix,
         docker = panel_creation_docker,
         monitoring_script = panel_creation_monitoring_script
+    }
+
+    call LeaveOutEvaluation.LeaveOutEvaluation { input:
+        input_vcf_gz = PanGeniePanelCreation.panel_vcf_gz,
+        input_vcf_gz_tbi = PanGeniePanelCreation.panel_vcf_gz_tbi,
+        case_reference_fasta = case_reference_fasta,
+        case_reference_fasta_fai = case_reference_fasta_fai,
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
+        genetic_maps = genetic_maps,
+        repeat_mask_bed = repeat_mask_bed,
+        segmental_duplications_bed = segmental_duplications_bed,
+        simple_repeats_bed = simple_repeats_bed,
+        challenging_medically_relevant_genes_bed = challenging_medically_relevant_genes_bed,
+        output_prefix = output_prefix,
+        chromosomes = leave_out_chromosomes,
+        leave_out_sample_names_array = leave_out_sample_names_array,
+        case_average_coverage = case_average_coverage,
+        do_pangenie = do_pangenie,
+        leave_out_crams = leave_out_crams,
+        docker = leave_out_docker,
+        kage_docker = kage_docker,
+        pangenie_docker = pangenie_docker,
+        runtime_attributes = leave_out_runtime_attributes,
+        medium_runtime_attributes = leave_out_medium_runtime_attributes,
+        large_runtime_attributes = leave_out_large_runtime_attributes
     }
 
     # evaluate HiPhase short
