@@ -18,6 +18,7 @@ workflow PanGeniePanelCreation {
         File prepare_vcf_script
         File add_ids_script
         File merge_vcfs_script
+        Float frac_missing = 0.2
         String output_prefix
 
         String docker
@@ -31,6 +32,7 @@ workflow PanGeniePanelCreation {
             prepare_vcf_script = prepare_vcf_script,
             add_ids_script = add_ids_script,
             merge_vcfs_script = merge_vcfs_script,
+            frac_missing = frac_missing,
             output_prefix = output_prefix,
             docker = docker,
             monitoring_script = monitoring_script
@@ -53,7 +55,7 @@ task PanGeniePanelCreation {
         File prepare_vcf_script
         File add_ids_script
         File merge_vcfs_script
-        Float frac_missing = 0.2
+        Float frac_missing
 
         String docker
         File? monitoring_script
