@@ -25,6 +25,7 @@ workflow PanGenieCase {
         String docker
         String pangenie_docker
         File? monitoring_script
+        RuntimeAttributes? pangenie_runtime_attributes
     }
 
     call IndexCaseReads {
@@ -74,7 +75,8 @@ workflow PanGenieCase {
             sample_name = sample_name,
             output_prefix = sample_name,
             docker = pangenie_docker,
-            monitoring_script = monitoring_script
+            monitoring_script = monitoring_script,
+            runtime_attributes = pangenie_runtime_attributes
     }
 
     output {
