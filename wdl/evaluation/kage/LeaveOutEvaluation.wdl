@@ -44,6 +44,7 @@ workflow LeaveOutEvaluation {
         RuntimeAttributes? runtime_attributes
         RuntimeAttributes? medium_runtime_attributes
         RuntimeAttributes? large_runtime_attributes
+        Int? cpu_make_count_model
     }
 
     call PreprocessPanelVCF {
@@ -87,7 +88,11 @@ workflow LeaveOutEvaluation {
                 output_prefix = leave_out_output_prefix,
                 chromosomes = chromosomes,
                 docker = kage_docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = runtime_attributes,
+                medium_runtime_attributes = medium_runtime_attributes,
+                large_runtime_attributes = large_runtime_attributes,
+                cpu_make_count_model = cpu_make_count_model
         }
 
         scatter (j in range(length(leave_out_sample_names))) {
