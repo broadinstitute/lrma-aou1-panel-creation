@@ -95,7 +95,7 @@ workflow LeaveOutEvaluation {
 
     scatter (j in range(length(leave_out_sample_names))) {
         String leave_out_sample_name = leave_out_sample_names[j]
-        String leave_out_cram = leave_out_crams[leave_out_sample_name]
+        File leave_out_cram = leave_out_crams[leave_out_sample_name]
 
         call IndexCaseReads {
             # TODO we require the alignments to subset by chromosome; change to start from raw reads
