@@ -4,6 +4,7 @@ import "../../methods/phasing/PhysicalAndStatisticalPhasing.wdl"
 import "../../methods/pangenie/PanGeniePanelCreation.wdl"
 import "./VcfdistAndOverlapMetricsEvaluation.wdl"
 import "../kage/LeaveOutEvaluation.wdl"
+import "../../methods/phasing/Helper.wdl"
 
 workflow PhasedPanelEvaluation {
 
@@ -61,7 +62,7 @@ workflow PhasedPanelEvaluation {
         File simple_repeats_bed
         File challenging_medically_relevant_genes_bed
         Array[String] leave_out_chromosomes
-        Array[Array[String]] leave_out_sample_names_array
+        Array[String] leave_out_sample_names
         Int case_average_coverage
         Boolean do_pangenie
         Map[String, File] leave_out_crams
@@ -131,7 +132,7 @@ workflow PhasedPanelEvaluation {
         challenging_medically_relevant_genes_bed = challenging_medically_relevant_genes_bed,
         output_prefix = output_prefix,
         chromosomes = leave_out_chromosomes,
-        leave_out_sample_names_array = leave_out_sample_names_array,
+        leave_out_sample_names = leave_out_sample_names,
         case_average_coverage = case_average_coverage,
         do_pangenie = do_pangenie,
         leave_out_crams = leave_out_crams,
@@ -144,6 +145,26 @@ workflow PhasedPanelEvaluation {
         large_runtime_attributes = leave_out_large_runtime_attributes,
         cpu_make_count_model = cpu_make_count_model
     }
+
+    # merge GLIMPSE VCFs
+    call Helper.MergePerChrVcfWithBcftools as GLIMPSEMergeAcrossSamples { input:
+        vcf_input = LeaveOutEvaluation.glimpse_vcf_gzs,
+        tbi_input = LeaveOutEvaluation.glimpse_vcf_gz_tbis,
+        pref = output_prefix + ".glimpse.merged",
+        threads_num = merge_num_threads
+    }
+
+#    if (do_pangenie) {
+#        # merge PanGenie VCFs
+#        call Helper.MergePerChrVcfWithBcftools as PanGenieMergeAcrossSamples { input:
+#            vcf_input = LeaveOutEvaluation.pangenie_vcf_gzs,
+#            tbi_input = LeaveOutEvaluation.pangenie_vcf_gz_tbis,
+#            pref = output_prefix + ".pangenie.merged",
+#            threads_num = merge_num_threads
+#        }
+#        # summarize PanGenie metrics vs. panel
+#        # PanGenie VcfdistAndOverlapMetricsEvaluation vs. truth
+#    }
 
     # evaluate HiPhase short
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
@@ -229,15 +250,32 @@ workflow PhasedPanelEvaluation {
         overlap_metrics_docker = overlap_metrics_docker
     }
 
+    # evaluate GLIMPSE
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotyping { input:
+        samples = vcfdist_samples,
+        truth_vcf = vcfdist_truth_vcf,
+        eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf,
+        region = region,
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "NONE",
+        overlap_metrics_docker = overlap_metrics_docker
+    }
+
+    # summarize GLIMPSE metrics vs. panel
+
     call SummarizeEvaluations { input:
-        labels_per_vcf = ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel"],
+        labels_per_vcf = ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping"],
         vcfdist_outputs_per_vcf_and_sample = [
             EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
             EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
             EvaluateFiltered.vcfdist_outputs_per_sample,
             EvaluateShapeit4.vcfdist_outputs_per_sample,
             EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
-            EvaluatePanel.vcfdist_outputs_per_sample
+            EvaluatePanel.vcfdist_outputs_per_sample,
+            EvaluateGenotyping.vcfdist_outputs_per_sample
         ],
         overlap_metrics_outputs_per_vcf = [
             EvaluateHiPhaseShort.overlap_metrics_outputs,
@@ -245,7 +283,8 @@ workflow PhasedPanelEvaluation {
             EvaluateFiltered.overlap_metrics_outputs,
             EvaluateShapeit4.overlap_metrics_outputs,
             EvaluateFixVariantCollisions.overlap_metrics_outputs,
-            EvaluatePanel.overlap_metrics_outputs
+            EvaluatePanel.overlap_metrics_outputs,
+            EvaluateGenotyping.overlap_metrics_outputs
         ]
     }
 
