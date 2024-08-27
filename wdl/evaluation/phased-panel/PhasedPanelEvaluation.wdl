@@ -14,6 +14,7 @@ workflow PhasedPanelEvaluation {
         String region
         String gcs_out_root_dir
         String output_prefix
+        File? monitoring_script
 
         # inputs for PhysicalAndStatisticalPhasing
         Array[File] sample_bams
@@ -43,7 +44,6 @@ workflow PhasedPanelEvaluation {
         File merge_vcfs_script
         Float frac_missing
         String panel_creation_docker
-        File? panel_creation_monitoring_script
 
         # inputs for VcfdistAndOverlapMetricsEvaluation
         Array[String] vcfdist_samples
@@ -114,7 +114,7 @@ workflow PhasedPanelEvaluation {
         frac_missing = frac_missing,
         output_prefix = output_prefix,
         docker = panel_creation_docker,
-        monitoring_script = panel_creation_monitoring_script
+        monitoring_script = monitoring_script
     }
 
     call LeaveOutEvaluation.LeaveOutEvaluation { input:
@@ -138,6 +138,7 @@ workflow PhasedPanelEvaluation {
         docker = leave_out_docker,
         kage_docker = kage_docker,
         pangenie_docker = pangenie_docker,
+        monitoring_script = monitoring_script,
         runtime_attributes = leave_out_runtime_attributes,
         medium_runtime_attributes = leave_out_medium_runtime_attributes,
         large_runtime_attributes = leave_out_large_runtime_attributes,
