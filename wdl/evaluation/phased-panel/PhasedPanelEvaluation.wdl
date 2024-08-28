@@ -156,17 +156,17 @@ workflow PhasedPanelEvaluation {
         threads_num = merge_num_threads
     }
 
-#    if (do_pangenie) {
-#        # merge PanGenie VCFs
-#        call Helper.MergePerChrVcfWithBcftools as PanGenieMergeAcrossSamples { input:
-#            vcf_input = LeaveOutEvaluation.pangenie_vcf_gzs,
-#            tbi_input = LeaveOutEvaluation.pangenie_vcf_gz_tbis,
-#            pref = output_prefix + ".pangenie.merged",
-#            threads_num = merge_num_threads
-#        }
-#        # summarize PanGenie metrics vs. panel
-#        # PanGenie VcfdistAndOverlapMetricsEvaluation vs. truth
-#    }
+    if (do_pangenie) {
+        # merge PanGenie VCFs
+        call Helper.MergePerChrVcfWithBcftools as PanGenieMergeAcrossSamples { input:
+            vcf_input = LeaveOutEvaluation.pangenie_vcf_gzs,
+            tbi_input = LeaveOutEvaluation.pangenie_vcf_gz_tbis,
+            pref = output_prefix + ".pangenie.merged",
+            threads_num = merge_num_threads
+        }
+        # summarize PanGenie metrics vs. panel
+        # PanGenie VcfdistAndOverlapMetricsEvaluation vs. truth
+    }
 
     # evaluate HiPhase short
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
