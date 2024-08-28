@@ -689,7 +689,7 @@ task GLIMPSECaseLigate {
         chmod +x GLIMPSE_ligate_static
 
         ./GLIMPSE_ligate_static \
-            --input {~write_lines(chromosome_glimpse_vcf_gzs)} \
+            --input ~{write_lines(chromosome_glimpse_vcf_gzs)} \
             --output ~{output_prefix}.ligate.bcf \
             --log ~{output_prefix}.ligate.log
 
