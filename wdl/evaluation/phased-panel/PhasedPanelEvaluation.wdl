@@ -15,6 +15,7 @@ workflow PhasedPanelEvaluation {
         String region
         String gcs_out_root_dir
         String output_prefix
+        Int merge_num_threads
         File? monitoring_script
 
         # inputs for PhysicalAndStatisticalPhasing
@@ -27,7 +28,6 @@ workflow PhasedPanelEvaluation {
         File genetic_mapping_tsv_for_shapeit4
         String chromosome
         Int shapeit4_num_threads
-        Int merge_num_threads
         Int hiphase_memory
         Int shapeit4_memory
         String shapeit4_extra_args
