@@ -283,7 +283,7 @@ workflow PhasedPanelEvaluation {
     }
 
     Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping"]
-    call SummarizeEvaluations as SummarizeEvaluationsWithPanGenie { input:
+    call SummarizeEvaluations { input:
         labels_per_vcf = labels_per_vcf,
         vcfdist_outputs_per_vcf_and_sample = select_all([
             EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
