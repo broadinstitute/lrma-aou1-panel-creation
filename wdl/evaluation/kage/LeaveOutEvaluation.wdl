@@ -151,7 +151,7 @@ workflow LeaveOutEvaluation {
             }
         }
 
-        call GLIMPSECaseGather {
+        call GLIMPSECaseLigate {
             input:
                 chromosome_glimpse_vcf_gzs = GLIMPSECaseChromosome.chromosome_glimpse_vcf_gz,
                 chromosome_glimpse_vcf_gz_tbis = GLIMPSECaseChromosome.chromosome_glimpse_vcf_gz_tbi,
@@ -177,8 +177,8 @@ workflow LeaveOutEvaluation {
         # KAGE+GLIMPSE evaluation
         call CalculateMetrics as CalculateMetricsKAGEPlusGLIMPSE {
             input:
-                case_vcf_gz = GLIMPSECaseGather.glimpse_vcf_gz,
-                case_vcf_gz_tbi = GLIMPSECaseGather.glimpse_vcf_gz_tbi,
+                case_vcf_gz = GLIMPSECaseLigate.glimpse_vcf_gz,
+                case_vcf_gz_tbi = GLIMPSECaseLigate.glimpse_vcf_gz_tbi,
                 truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
                 truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
                 chromosomes = chromosomes,
@@ -223,8 +223,8 @@ workflow LeaveOutEvaluation {
     output {
         Array[File] kage_vcf_gzs = KAGECase.kage_vcf_gz
         Array[File] kage_vcf_gz_tbis = KAGECase.kage_vcf_gz_tbi
-        Array[File] glimpse_vcf_gzs = GLIMPSECaseGather.glimpse_vcf_gz
-        Array[File] glimpse_vcf_gz_tbis = GLIMPSECaseGather.glimpse_vcf_gz_tbi
+        Array[File] glimpse_vcf_gzs = GLIMPSECaseLigate.glimpse_vcf_gz
+        Array[File] glimpse_vcf_gz_tbis = GLIMPSECaseLigate.glimpse_vcf_gz_tbi
         Array[File?] pangenie_vcf_gzs = PanGenieCase.genotyping_vcf_gz
         Array[File?] pangenie_vcf_gz_tbis = PanGenieCase.genotyping_vcf_gz_tbi
 
@@ -656,6 +656,60 @@ task GLIMPSECaseGather {
 
     output {
         File monitoring_log = "monitoring.log"
+        File glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.vcf.gz"
+        File glimpse_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.vcf.gz.tbi"
+    }
+}
+
+task GLIMPSECaseLigate {
+    input {
+        Array[File] chromosome_glimpse_vcf_gzs
+        Array[File] chromosome_glimpse_vcf_gz_tbis
+        String output_prefix
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    File 
+
+    command {
+        set -e
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        # TODO update to GLIMPSE2
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_ligate_static
+        chmod +x GLIMPSE_ligate_static
+
+        ./GLIMPSE_ligate_static \
+            --input {~write_lines(chromosome_glimpse_vcf_gzs)} \
+            --output ~{output_prefix}.ligate.bcf \
+            --log ~{output_prefix}.ligate.log
+
+        bcftools view --no-version ~{output_prefix}.ligate.bcf -Oz -o ~{output_prefix}.kage.glimpse.vcf.gz
+        bcftools index -t ~{output_prefix}.kage.glimpse.vcf.gz
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        File ligate_log = "~{output_prefix}.ligate.log"
         File glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.vcf.gz"
         File glimpse_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.vcf.gz.tbi"
     }
