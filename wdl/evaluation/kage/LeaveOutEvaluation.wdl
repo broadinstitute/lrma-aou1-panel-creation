@@ -201,7 +201,7 @@ workflow LeaveOutEvaluation {
                     output_prefix = leave_out_sample_name,
                     docker = pangenie_docker,
                     monitoring_script = monitoring_script,
-                    pangenie_runtime_attributes = pangenie_runtime_attributes
+                    runtime_attributes = pangenie_runtime_attributes
             }
 
             # PanGenie evaluation

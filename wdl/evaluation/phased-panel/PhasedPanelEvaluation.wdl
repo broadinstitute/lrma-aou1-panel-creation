@@ -156,18 +156,6 @@ workflow PhasedPanelEvaluation {
         threads_num = merge_num_threads
     }
 
-    if (do_pangenie) {
-        # merge PanGenie VCFs
-        call Helper.MergePerChrVcfWithBcftools as PanGenieMergeAcrossSamples { input:
-            vcf_input = LeaveOutEvaluation.pangenie_vcf_gzs,
-            tbi_input = LeaveOutEvaluation.pangenie_vcf_gz_tbis,
-            pref = output_prefix + ".pangenie.merged",
-            threads_num = merge_num_threads
-        }
-        # summarize PanGenie metrics vs. panel
-        # PanGenie VcfdistAndOverlapMetricsEvaluation vs. truth
-    }
-
     # evaluate HiPhase short
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
         samples = vcfdist_samples,
@@ -268,26 +256,55 @@ workflow PhasedPanelEvaluation {
 
     # summarize GLIMPSE metrics vs. panel
 
-    call SummarizeEvaluations { input:
-        labels_per_vcf = ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping"],
-        vcfdist_outputs_per_vcf_and_sample = [
+    if (do_pangenie) {
+        # merge PanGenie VCFs
+        call Helper.MergePerChrVcfWithBcftools as PanGenieMergeAcrossSamples { input:
+            vcf_input = select_all(LeaveOutEvaluation.pangenie_vcf_gzs),
+            tbi_input = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
+            pref = output_prefix + ".pangenie.merged",
+            threads_num = merge_num_threads
+        }
+
+        # summarize PanGenie metrics vs. panel
+
+        # evaluate PanGenie
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanGenie { input:
+            samples = vcfdist_samples,
+            truth_vcf = vcfdist_truth_vcf,
+            eval_vcf = PanGenieMergeAcrossSamples.merged_vcf,
+            region = region,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            overlap_phase_tag = "NONE",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
+    }
+
+    Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping"]
+    call SummarizeEvaluations as SummarizeEvaluationsWithPanGenie { input:
+        labels_per_vcf = labels_per_vcf,
+        vcfdist_outputs_per_vcf_and_sample = select_all([
             EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
             EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
             EvaluateFiltered.vcfdist_outputs_per_sample,
             EvaluateShapeit4.vcfdist_outputs_per_sample,
             EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluatePanel.vcfdist_outputs_per_sample,
-            EvaluateGenotyping.vcfdist_outputs_per_sample
-        ],
-        overlap_metrics_outputs_per_vcf = [
+            EvaluateGenotyping.vcfdist_outputs_per_sample,
+            EvaluatePanGenie.vcfdist_outputs_per_sample
+        ]),
+        overlap_metrics_outputs_per_vcf = select_all([
             EvaluateHiPhaseShort.overlap_metrics_outputs,
             EvaluateHiPhaseSV.overlap_metrics_outputs,
             EvaluateFiltered.overlap_metrics_outputs,
             EvaluateShapeit4.overlap_metrics_outputs,
             EvaluateFixVariantCollisions.overlap_metrics_outputs,
             EvaluatePanel.overlap_metrics_outputs,
-            EvaluateGenotyping.overlap_metrics_outputs
-        ]
+            EvaluateGenotyping.overlap_metrics_outputs,
+            EvaluatePanGenie.overlap_metrics_outputs
+        ])
     }
 
     output {
