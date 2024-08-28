@@ -673,8 +673,6 @@ task GLIMPSECaseLigate {
         RuntimeAttributes runtime_attributes = {}
     }
 
-    File 
-
     command {
         set -e
 
