@@ -512,7 +512,7 @@ task KAGECase {
             -c ~{output_prefix}.kmer_counts.npy \
             --average-coverage ~{average_coverage} \
             -s ~{sample_name} \
-            ~{true='-I' false='' ignore_helper_model} \
+            ~{true='-I true' false='-I false' ignore_helper_model} \
             ~{kage_genotype_extra_args} \
             -o ~{output_prefix}.kage.bi.vcf
 
