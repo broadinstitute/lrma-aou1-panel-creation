@@ -156,6 +156,15 @@ workflow PhasedPanelEvaluation {
         threads_num = merge_num_threads
     }
 
+    call FixVariantCollisions as GenotypingFixVariantCollisions { input:
+        phased_bcf = GLIMPSEMergeAcrossSamples.merged_vcf,
+        fix_variant_collisions_java = fix_variant_collisions_java,
+        operation = operation,
+        weight_tag = weight_tag,
+        is_weight_format_field = is_weight_format_field,
+        output_prefix = output_prefix
+    }
+
     # evaluate HiPhase short
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
         samples = vcfdist_samples,
@@ -254,6 +263,20 @@ workflow PhasedPanelEvaluation {
         overlap_metrics_docker = overlap_metrics_docker
     }
 
+    # evaluate collisionless GLIMPSE
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotypingFixVariantCollisions { input:
+        samples = vcfdist_samples,
+        truth_vcf = vcfdist_truth_vcf,
+        eval_vcf = GenotypingFixVariantCollisions.phased_collisionless_bcf,
+        region = region,
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "NONE",
+        overlap_metrics_docker = overlap_metrics_docker
+    }
+
     # summarize GLIMPSE metrics vs. panel
 
     if (do_pangenie) {
@@ -282,7 +305,7 @@ workflow PhasedPanelEvaluation {
         }
     }
 
-    Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping"]
+    Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"]
     call SummarizeEvaluations { input:
         labels_per_vcf = labels_per_vcf,
         vcfdist_outputs_per_vcf_and_sample = select_all([
@@ -293,6 +316,7 @@ workflow PhasedPanelEvaluation {
             EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluatePanel.vcfdist_outputs_per_sample,
             EvaluateGenotyping.vcfdist_outputs_per_sample,
+            EvaluateGenotypingFixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluatePanGenie.vcfdist_outputs_per_sample
         ]),
         overlap_metrics_outputs_per_vcf = select_all([
@@ -303,6 +327,7 @@ workflow PhasedPanelEvaluation {
             EvaluateFixVariantCollisions.overlap_metrics_outputs,
             EvaluatePanel.overlap_metrics_outputs,
             EvaluateGenotyping.overlap_metrics_outputs,
+            EvaluateGenotypingFixVariantCollisions.overlap_metrics_outputs,
             EvaluatePanGenie.overlap_metrics_outputs
         ])
     }
