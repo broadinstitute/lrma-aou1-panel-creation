@@ -44,6 +44,7 @@ workflow LeaveOutEvaluation {
         RuntimeAttributes? runtime_attributes
         RuntimeAttributes? medium_runtime_attributes
         RuntimeAttributes? large_runtime_attributes
+        RuntimeAttributes? pangenie_runtime_attributes
         Int? cpu_make_count_model
     }
 
@@ -199,7 +200,8 @@ workflow LeaveOutEvaluation {
                     sample_name = leave_out_sample_name,
                     output_prefix = leave_out_sample_name,
                     docker = pangenie_docker,
-                    monitoring_script = monitoring_script
+                    monitoring_script = monitoring_script,
+                    pangenie_runtime_attributes = pangenie_runtime_attributes
             }
 
             # PanGenie evaluation

@@ -72,6 +72,7 @@ workflow PhasedPanelEvaluation {
         RuntimeAttributes? leave_out_runtime_attributes
         RuntimeAttributes? leave_out_medium_runtime_attributes
         RuntimeAttributes? leave_out_large_runtime_attributes
+        RuntimeAttributes? pangenie_runtime_attributes
         Int? cpu_make_count_model
     }
 
@@ -143,6 +144,7 @@ workflow PhasedPanelEvaluation {
         runtime_attributes = leave_out_runtime_attributes,
         medium_runtime_attributes = leave_out_medium_runtime_attributes,
         large_runtime_attributes = leave_out_large_runtime_attributes,
+        pangenie_runtime_attributes = pangenie_runtime_attributes,
         cpu_make_count_model = cpu_make_count_model
     }
 
