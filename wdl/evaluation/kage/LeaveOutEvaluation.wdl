@@ -151,7 +151,7 @@ workflow LeaveOutEvaluation {
             }
         }
 
-        call GLIMPSECaseLigate {
+        call GLIMPSECase {
             input:
                 chromosome_glimpse_vcf_gzs = GLIMPSECaseChromosome.chromosome_glimpse_vcf_gz,
                 chromosome_glimpse_vcf_gz_tbis = GLIMPSECaseChromosome.chromosome_glimpse_vcf_gz_tbi,
@@ -177,8 +177,8 @@ workflow LeaveOutEvaluation {
         # KAGE+GLIMPSE evaluation
         call CalculateMetrics as CalculateMetricsKAGEPlusGLIMPSE {
             input:
-                case_vcf_gz = GLIMPSECaseLigate.glimpse_vcf_gz,
-                case_vcf_gz_tbi = GLIMPSECaseLigate.glimpse_vcf_gz_tbi,
+                case_vcf_gz = GLIMPSECase.glimpse_vcf_gz,
+                case_vcf_gz_tbi = GLIMPSECase.glimpse_vcf_gz_tbi,
                 truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
                 truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
                 chromosomes = chromosomes,
@@ -223,8 +223,8 @@ workflow LeaveOutEvaluation {
     output {
         Array[File] kage_vcf_gzs = KAGECase.kage_vcf_gz
         Array[File] kage_vcf_gz_tbis = KAGECase.kage_vcf_gz_tbi
-        Array[File] glimpse_vcf_gzs = GLIMPSECaseLigate.glimpse_vcf_gz
-        Array[File] glimpse_vcf_gz_tbis = GLIMPSECaseLigate.glimpse_vcf_gz_tbi
+        Array[File] glimpse_vcf_gzs = GLIMPSECase.glimpse_vcf_gz
+        Array[File] glimpse_vcf_gz_tbis = GLIMPSECase.glimpse_vcf_gz_tbi
         Array[File?] pangenie_vcf_gzs = PanGenieCase.genotyping_vcf_gz
         Array[File?] pangenie_vcf_gz_tbis = PanGenieCase.genotyping_vcf_gz_tbi
 
@@ -619,6 +619,7 @@ task GLIMPSECaseChromosome {
     }
 }
 
+# unphased
 task GLIMPSECaseGather {
     input {
         Array[File] chromosome_glimpse_vcf_gzs
@@ -661,7 +662,7 @@ task GLIMPSECaseGather {
     }
 }
 
-task GLIMPSECaseLigate {
+task GLIMPSECase {
     input {
         Array[File] chromosome_glimpse_vcf_gzs
         Array[File] chromosome_glimpse_vcf_gz_tbis
@@ -691,7 +692,15 @@ task GLIMPSECaseLigate {
             --output ~{output_prefix}.ligate.bcf \
             --log ~{output_prefix}.ligate.log
 
-        bcftools view --no-version ~{output_prefix}.ligate.bcf -Oz -o ~{output_prefix}.kage.glimpse.vcf.gz
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
+        chmod +x GLIMPSE_sample_static
+
+        ./GLIMPSE_sample_static --input ~{output_prefix}.ligate.bcf \
+            --solve \
+            --output ~{output_prefix}.sample.bcf \
+            --log ~{output_prefix}.sample.log
+
+        bcftools view --no-version ~{output_prefix}.sample.bcf -Oz -o ~{output_prefix}.kage.glimpse.vcf.gz
         bcftools index -t ~{output_prefix}.kage.glimpse.vcf.gz
     }
 
