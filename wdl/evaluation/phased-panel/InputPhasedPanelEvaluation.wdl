@@ -56,15 +56,6 @@ workflow PhasedPanelEvaluation {
         Int? cpu_make_count_model
     }
 
-    call FixVariantCollisions { input:
-        phased_bcf = input_vcf_gz,
-        fix_variant_collisions_java = fix_variant_collisions_java,
-        operation = operation,
-        weight_tag = weight_tag,
-        is_weight_format_field = is_weight_format_field,
-        output_prefix = output_prefix
-    }
-
     call LeaveOutEvaluation.LeaveOutEvaluation { input:
         input_vcf_gz = input_vcf_gz,
         input_vcf_gz_tbi = input_vcf_gz_tbi,
