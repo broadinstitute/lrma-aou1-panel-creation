@@ -98,17 +98,8 @@ workflow PhasedPanelEvaluation {
         hiphase_extra_args = hiphase_extra_args
     }
 
-    call FixVariantCollisions { input:
-        phased_bcf = PhysicalAndStatisticalPhasing.phased_bcf,
-        fix_variant_collisions_java = fix_variant_collisions_java,
-        operation = operation,
-        weight_tag = weight_tag,
-        is_weight_format_field = is_weight_format_field,
-        output_prefix = output_prefix
-    }
-
     call PanGeniePanelCreation.PanGeniePanelCreation { input:
-        phased_bcf = FixVariantCollisions.phased_collisionless_bcf,
+        phased_bcf = PhysicalAndStatisticalPhasing.phased_bcf,
         reference_fasta = reference_fasta,
         prepare_vcf_script = prepare_vcf_script,
         add_ids_script = add_ids_script,
