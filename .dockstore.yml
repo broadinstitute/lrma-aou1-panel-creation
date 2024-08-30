@@ -15,6 +15,9 @@ workflows:
 - name: PhasedPanelEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluation.wdl
+- name: PhasedPanelEvaluationWithoutFixVariantCollisionsForPanel
+  subclass: wdl
+  primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluationWithoutFixVariantCollisionsForPanel.wdl
 - name: InputPhasedPanelEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/InputPhasedPanelEvaluation.wdl
