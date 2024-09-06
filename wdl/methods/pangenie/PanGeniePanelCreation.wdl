@@ -128,6 +128,6 @@ task PanGeniePanelCreation {
         File prepare_stats = "~{output_prefix}.prepare.stats.txt"
         File panel_stats = "~{output_prefix}.prepare.id.split.mergehap.stats.txt"
         File panel_vcf_gz = "~{output_prefix}.prepare.id.split.mergehap.vcf.gz"
-        File panel_vcf_gz_tbi = "~{output_prefix}.prepare.id.split.mergehap.vcf.gz"
+        File panel_vcf_gz_tbi = "~{output_prefix}.prepare.id.split.mergehap.vcf.gz.tbi"
     }
 }

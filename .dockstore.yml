@@ -15,6 +15,9 @@ workflows:
 - name: PhasedPanelEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluation.wdl
+- name: InputPhasedPanelEvaluation
+  subclass: wdl
+  primaryDescriptorPath: /wdl/evaluation/phased-panel/InputPhasedPanelEvaluation.wdl
 - name: LeaveOutEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/kage/LeaveOutEvaluation.wdl

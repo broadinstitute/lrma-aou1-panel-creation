@@ -10,6 +10,8 @@ workflow PhasedPanelEvaluation {
 
     input {
         # common inputs
+        File input_vcf_gz
+        File input_vcf_gz_tbi
         File reference_fasta
         File reference_fasta_fai
         String region
@@ -18,33 +20,11 @@ workflow PhasedPanelEvaluation {
         Int merge_num_threads
         File? monitoring_script
 
-        # inputs for PhysicalAndStatisticalPhasing
-        Array[File] sample_bams
-        Array[File] sample_bais
-        File joint_short_vcf
-        File joint_short_vcf_tbi
-        File joint_sv_vcf
-        File joint_sv_vcf_tbi
-        File genetic_mapping_tsv_for_shapeit4
-        String chromosome
-        Int shapeit4_num_threads
-        Int hiphase_memory
-        Int shapeit4_memory
-        String shapeit4_extra_args
-        String hiphase_extra_args
-
         # inputs for FixVariantCollisions
         File fix_variant_collisions_java
         Int operation
         String weight_tag
         Int is_weight_format_field
-
-        # inputs for PanGeniePanelCreation
-        File prepare_vcf_script
-        File add_ids_script
-        File merge_vcfs_script
-        Float frac_missing
-        String panel_creation_docker
 
         # inputs for VcfdistAndOverlapMetricsEvaluation
         Array[String] vcfdist_samples
@@ -76,52 +56,9 @@ workflow PhasedPanelEvaluation {
         Int? cpu_make_count_model
     }
 
-    call PhysicalAndStatisticalPhasing.PhysicalAndStatisticalPhasing { input:
-        sample_bams = sample_bams,
-        sample_bais = sample_bais,
-        joint_short_vcf = joint_short_vcf,
-        joint_short_vcf_tbi = joint_short_vcf_tbi,
-        joint_sv_vcf = joint_sv_vcf,
-        joint_sv_vcf_tbi = joint_sv_vcf_tbi,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        genetic_mapping_tsv_for_shapeit4 = genetic_mapping_tsv_for_shapeit4,
-        chromosome = chromosome,
-        region = region,
-        prefix = output_prefix,
-        gcs_out_root_dir = gcs_out_root_dir + "/Phasing",
-        shapeit4_num_threads = shapeit4_num_threads,
-        merge_num_threads = merge_num_threads,
-        hiphase_memory = hiphase_memory,
-        shapeit4_memory = shapeit4_memory,
-        shapeit4_extra_args = shapeit4_extra_args,
-        hiphase_extra_args = hiphase_extra_args
-    }
-
-    call FixVariantCollisions { input:
-        phased_bcf = PhysicalAndStatisticalPhasing.phased_bcf,
-        fix_variant_collisions_java = fix_variant_collisions_java,
-        operation = operation,
-        weight_tag = weight_tag,
-        is_weight_format_field = is_weight_format_field,
-        output_prefix = output_prefix
-    }
-
-    call PanGeniePanelCreation.PanGeniePanelCreation { input:
-        phased_bcf = FixVariantCollisions.phased_collisionless_bcf,
-        reference_fasta = reference_fasta,
-        prepare_vcf_script = prepare_vcf_script,
-        add_ids_script = add_ids_script,
-        merge_vcfs_script = merge_vcfs_script,
-        frac_missing = frac_missing,
-        output_prefix = output_prefix,
-        docker = panel_creation_docker,
-        monitoring_script = monitoring_script
-    }
-
     call LeaveOutEvaluation.LeaveOutEvaluation { input:
-        input_vcf_gz = PanGeniePanelCreation.panel_vcf_gz,
-        input_vcf_gz_tbi = PanGeniePanelCreation.panel_vcf_gz_tbi,
+        input_vcf_gz = input_vcf_gz,
+        input_vcf_gz_tbi = input_vcf_gz_tbi,
         case_reference_fasta = case_reference_fasta,
         case_reference_fasta_fai = case_reference_fasta_fai,
         reference_fasta = reference_fasta,
@@ -165,81 +102,11 @@ workflow PhasedPanelEvaluation {
         output_prefix = output_prefix
     }
 
-    # evaluate HiPhase short
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
-        samples = vcfdist_samples,
-        truth_vcf = vcfdist_truth_vcf,
-        eval_vcf = PhysicalAndStatisticalPhasing.hiphase_short_vcf,
-        region = region,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        overlap_phase_tag = "PS",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
-    # evaluate HiPhase SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseSV { input:
-        samples = vcfdist_samples,
-        truth_vcf = vcfdist_truth_vcf,
-        eval_vcf = PhysicalAndStatisticalPhasing.hiphase_sv_vcf,
-        region = region,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        overlap_phase_tag = "PS",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
-    # evaluate filtered short + SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFiltered { input:
-        samples = vcfdist_samples,
-        truth_vcf = vcfdist_truth_vcf,
-        eval_vcf = PhysicalAndStatisticalPhasing.filtered_vcf,
-        region = region,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        overlap_phase_tag = "PS",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
-    # evaluate Shapeit4 short + SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
-        samples = vcfdist_samples,
-        truth_vcf = vcfdist_truth_vcf,
-        eval_vcf = PhysicalAndStatisticalPhasing.phased_bcf,
-        region = region,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        overlap_phase_tag = "NONE",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
-    # evaluate collisionless short + SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFixVariantCollisions { input:
-        samples = vcfdist_samples,
-        truth_vcf = vcfdist_truth_vcf,
-        eval_vcf = FixVariantCollisions.phased_collisionless_bcf,
-        region = region,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        overlap_phase_tag = "NONE",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
     # evaluate panel short + SV
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
-        eval_vcf = PanGeniePanelCreation.panel_vcf_gz,
+        eval_vcf = input_vcf_gz,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -305,26 +172,16 @@ workflow PhasedPanelEvaluation {
         }
     }
 
-    Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"]
+    Array[String] labels_per_vcf = if do_pangenie then ["Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["Panel", "Genotyping", "GenotypingFixVariantCollisions"]
     call SummarizeEvaluations { input:
         labels_per_vcf = labels_per_vcf,
         vcfdist_outputs_per_vcf_and_sample = select_all([
-            EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
-            EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
-            EvaluateFiltered.vcfdist_outputs_per_sample,
-            EvaluateShapeit4.vcfdist_outputs_per_sample,
-            EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluatePanel.vcfdist_outputs_per_sample,
             EvaluateGenotyping.vcfdist_outputs_per_sample,
             EvaluateGenotypingFixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluatePanGenie.vcfdist_outputs_per_sample
         ]),
         overlap_metrics_outputs_per_vcf = select_all([
-            EvaluateHiPhaseShort.overlap_metrics_outputs,
-            EvaluateHiPhaseSV.overlap_metrics_outputs,
-            EvaluateFiltered.overlap_metrics_outputs,
-            EvaluateShapeit4.overlap_metrics_outputs,
-            EvaluateFixVariantCollisions.overlap_metrics_outputs,
             EvaluatePanel.overlap_metrics_outputs,
             EvaluateGenotyping.overlap_metrics_outputs,
             EvaluateGenotypingFixVariantCollisions.overlap_metrics_outputs,
