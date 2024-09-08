@@ -124,8 +124,8 @@ task Vcfdist {
         Int verbosity = 1
 
         Int disk_size_gb = ceil(size(truth_vcf, "GiB") + 10)
-        Int mem_gb = 16
-        Int cpu = 2
+        Int mem_gb = 32
+        Int cpu = 4
         Int preemptible = 1
     }
 
@@ -176,7 +176,7 @@ task CalculateOverlapMetrics {
         # docker needs bcftools, scikit-allel, and pandas
         String docker
         Int disk_size_gb = ceil(size(vcf, "GiB") + 10)
-        Int mem_gb = 8
+        Int mem_gb = 32
         Int cpu = 2
         Int preemptible = 1
     }

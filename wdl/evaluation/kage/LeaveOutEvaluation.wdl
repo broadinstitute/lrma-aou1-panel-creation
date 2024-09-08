@@ -41,11 +41,15 @@ workflow LeaveOutEvaluation {
         String pangenie_docker
         File? monitoring_script
 
+        Int? cpu_make_count_model
         RuntimeAttributes? runtime_attributes
         RuntimeAttributes? medium_runtime_attributes
         RuntimeAttributes? large_runtime_attributes
         RuntimeAttributes? pangenie_runtime_attributes
-        Int? cpu_make_count_model
+        RuntimeAttributes? kage_runtime_attributes
+        RuntimeAttributes? glimpse_chromosome_runtime_attributes
+        RuntimeAttributes? glimpse_gather_runtime_attributes
+        RuntimeAttributes? calculate_metrics_runtime_attributes
     }
 
     call PreprocessPanelVCF {
@@ -132,7 +136,8 @@ workflow LeaveOutEvaluation {
                 sample_name = leave_out_sample_name,
                 average_coverage = case_average_coverage,
                 docker = kage_docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = kage_runtime_attributes
         }
 
         scatter (k in range(length(chromosomes))) {
@@ -147,7 +152,8 @@ workflow LeaveOutEvaluation {
                     genetic_map = genetic_maps[k],
                     output_prefix = leave_out_sample_name,
                     docker = kage_docker,
-                    monitoring_script = monitoring_script
+                    monitoring_script = monitoring_script,
+                    runtime_attributes = glimpse_chromosome_runtime_attributes
             }
         }
 
@@ -157,7 +163,8 @@ workflow LeaveOutEvaluation {
                 chromosome_glimpse_vcf_gz_tbis = GLIMPSECaseChromosome.chromosome_glimpse_vcf_gz_tbi,
                 output_prefix = leave_out_sample_name,
                 docker = kage_docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = glimpse_gather_runtime_attributes
         }
 
         # KAGE evaluation
@@ -171,7 +178,8 @@ workflow LeaveOutEvaluation {
                 label = "KAGE",
                 sample_name = leave_out_sample_name,
                 docker = docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = calculate_metrics_runtime_attributes
         }
 
         # KAGE+GLIMPSE evaluation
@@ -185,7 +193,8 @@ workflow LeaveOutEvaluation {
                 label = "KAGE+GLIMPSE",
                 sample_name = leave_out_sample_name,
                 docker = docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = calculate_metrics_runtime_attributes
         }
 
         if (do_pangenie) {
@@ -215,7 +224,8 @@ workflow LeaveOutEvaluation {
                     label = "PanGenie",
                     sample_name = leave_out_sample_name,
                     docker = docker,
-                    monitoring_script = monitoring_script
+                    monitoring_script = monitoring_script,
+                    runtime_attributes = calculate_metrics_runtime_attributes
             }
         }
     }

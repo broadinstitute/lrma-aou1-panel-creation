@@ -69,11 +69,15 @@ workflow PhasedPanelEvaluation {
         String leave_out_docker
         String kage_docker
         String pangenie_docker
+        Int? cpu_make_count_model
         RuntimeAttributes? leave_out_runtime_attributes
         RuntimeAttributes? leave_out_medium_runtime_attributes
         RuntimeAttributes? leave_out_large_runtime_attributes
         RuntimeAttributes? pangenie_runtime_attributes
-        Int? cpu_make_count_model
+        RuntimeAttributes? kage_runtime_attributes
+        RuntimeAttributes? glimpse_chromosome_runtime_attributes
+        RuntimeAttributes? glimpse_gather_runtime_attributes
+        RuntimeAttributes? calculate_metrics_runtime_attributes
     }
 
     call PhysicalAndStatisticalPhasing.PhysicalAndStatisticalPhasing { input:
@@ -141,11 +145,15 @@ workflow PhasedPanelEvaluation {
         kage_docker = kage_docker,
         pangenie_docker = pangenie_docker,
         monitoring_script = monitoring_script,
+        cpu_make_count_model = cpu_make_count_model,
         runtime_attributes = leave_out_runtime_attributes,
         medium_runtime_attributes = leave_out_medium_runtime_attributes,
         large_runtime_attributes = leave_out_large_runtime_attributes,
         pangenie_runtime_attributes = pangenie_runtime_attributes,
-        cpu_make_count_model = cpu_make_count_model
+        kage_runtime_attributes = kage_runtime_attributes,
+        glimpse_chromosome_runtime_attributes = glimpse_chromosome_runtime_attributes,
+        glimpse_gather_runtime_attributes = glimpse_gather_runtime_attributes,
+        calculate_metrics_runtime_attributes = calculate_metrics_runtime_attributes
     }
 
     # merge GLIMPSE VCFs
