@@ -26,6 +26,7 @@ workflow PhasedPanelEvaluation {
         File joint_sv_vcf
         File joint_sv_vcf_tbi
         File genetic_mapping_tsv_for_shapeit4
+        File chunk_file_for_shapeit4
         String chromosome
         Int shapeit4_num_threads
         Int hiphase_memory
@@ -86,6 +87,7 @@ workflow PhasedPanelEvaluation {
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         genetic_mapping_tsv_for_shapeit4 = genetic_mapping_tsv_for_shapeit4,
+        chunk_file_for_shapeit4 = chunk_file_for_shapeit4,
         chromosome = chromosome,
         region = region,
         prefix = output_prefix,
@@ -99,7 +101,7 @@ workflow PhasedPanelEvaluation {
     }
 
     call FixVariantCollisions { input:
-        phased_bcf = PhysicalAndStatisticalPhasing.phased_bcf,
+        phased_bcf = PhysicalAndStatisticalPhasing.phased_vcf,
         fix_variant_collisions_java = fix_variant_collisions_java,
         operation = operation,
         weight_tag = weight_tag,
@@ -211,7 +213,7 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
-        eval_vcf = PhysicalAndStatisticalPhasing.phased_bcf,
+        eval_vcf = PhysicalAndStatisticalPhasing.phased_vcf,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
