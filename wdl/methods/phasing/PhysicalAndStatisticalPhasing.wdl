@@ -66,21 +66,21 @@ workflow PhysicalAndStatisticalPhasing {
 
         String sample_id = InferSampleName.sample_name
 
-        # call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-        #     joint_vcf = joint_short_vcf,
-        #     region = region,
-        #     samplename = sample_id
-        # }
+        call H.SplitVCFbySample as SplitVcfbySampleShort { input:
+            joint_vcf = joint_short_vcf,
+            region = region,
+            samplename = sample_id
+        }
 
-        # call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-        #     joint_vcf = UnphaseSVGenotypes.unphased_vcf,
-        #     region = region,
-        #     samplename = sample_id
-        # }
+        call H.SplitVCFbySample as SplitVcfbySampleSV { input:
+            joint_vcf = UnphaseSVGenotypes.unphased_vcf,
+            region = region,
+            samplename = sample_id
+        }
 
         call ConvertLowerCase {
             input:
-                vcf = UnphaseSVGenotypes.unphased_vcf,
+                vcf = SplitVcfbySampleSV.single_sample_vcf,
                 prefix = sample_id + ".uppercased_sv_cleaned"
                 
         }
@@ -88,8 +88,8 @@ workflow PhysicalAndStatisticalPhasing {
         call H.HiPhase { input:
             bam = all_chr_bam,
             bai = all_chr_bai,
-            unphased_snp_vcf = joint_short_vcf,
-            unphased_snp_tbi = joint_short_vcf_tbi,
+            unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
+            unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
             unphased_sv_vcf = ConvertLowerCase.subset_vcf,
             unphased_sv_tbi = ConvertLowerCase.subset_tbi,
             ref_fasta = reference_fasta,
@@ -122,16 +122,16 @@ workflow PhysicalAndStatisticalPhasing {
         prefix = prefix + ".filter_and_concat"
     }
 
-    call H.Shapeit4 { input:
-        vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
-        vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-        mappingfile = genetic_mapping_dict[chromosome],
-        region = region,
-        prefix = prefix + ".filter_and_concat.phased",
-        num_threads = shapeit4_num_threads,
-        memory = shapeit4_memory,
-        extra_args = shapeit4_extra_args
-    }
+    # call H.Shapeit4 { input:
+    #     vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
+    #     vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+    #     mappingfile = genetic_mapping_dict[chromosome],
+    #     region = region,
+    #     prefix = prefix + ".filter_and_concat.phased",
+    #     num_threads = shapeit4_num_threads,
+    #     memory = shapeit4_memory,
+    #     extra_args = shapeit4_extra_args
+    # }
 
     output {
         File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
@@ -140,7 +140,7 @@ workflow PhysicalAndStatisticalPhasing {
         File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
         File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
         File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
-        File phased_bcf = Shapeit4.phased_bcf
+        # File phased_bcf = Shapeit4.phased_bcf
     }
 }
 
