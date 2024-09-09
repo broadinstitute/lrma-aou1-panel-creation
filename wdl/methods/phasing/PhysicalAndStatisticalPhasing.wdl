@@ -15,6 +15,7 @@ workflow PhysicalAndStatisticalPhasing {
         File reference_fasta
         File reference_fasta_fai
         File genetic_mapping_tsv_for_shapeit4
+        File chunk_file_for_shapeit4
         String chromosome
         String region
         String prefix
@@ -122,16 +123,25 @@ workflow PhysicalAndStatisticalPhasing {
         prefix = prefix + ".filter_and_concat"
     }
 
-    # call H.Shapeit4 { input:
-    #     vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
-    #     vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-    #     mappingfile = genetic_mapping_dict[chromosome],
-    #     region = region,
-    #     prefix = prefix + ".filter_and_concat.phased",
-    #     num_threads = shapeit4_num_threads,
-    #     memory = shapeit4_memory,
-    #     extra_args = shapeit4_extra_args
-    # }
+    Array[String] region_list = read_lines(chunk_file_for_shapeit4)
+    scatter (region in region_list) {
+        call H.Shapeit4 as Shapeit4 { input:
+            vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
+            vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+            mappingfile = genetic_mapping_dict[chromosome],
+            region = region,
+            prefix = prefix + ".filter_and_concat.phased",
+            num_threads = shapeit4_num_threads,
+            memory = shapeit4_memory,
+            extra_args = shapeit4_extra_args
+        }
+    }
+
+    call LigateVcfs{ input:
+        vcfs = Shapeit4.phased_bcf,
+        prefix = prefix + ".phased.ligated"
+    }
+
 
     output {
         File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
@@ -140,7 +150,8 @@ workflow PhysicalAndStatisticalPhasing {
         File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
         File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
         File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
-        # File phased_bcf = Shapeit4.phased_bcf
+        File phased_vcf = LigateVcfs.ligated_vcf
+        File phased_vcf_tbi = LigateVcfs.ligated_vcf_tbi
     }
 }
 
@@ -248,6 +259,35 @@ task UnphaseGenotypes {
     output {
         File unphased_vcf = "~{prefix}.vcf.gz"
         File unphased_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+    }
+}
+
+task LigateVcfs {
+
+    input {
+        Array[File] vcfs
+        String prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+        bcftools concat --ligate  ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File ligated_vcf = "~{prefix}.vcf.gz"
+        File ligated_vcf_tbi = "~{prefix}.vcf.gz.tbi"
     }
     ###################
     runtime {
