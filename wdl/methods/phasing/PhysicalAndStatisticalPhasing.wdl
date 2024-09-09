@@ -281,9 +281,8 @@ task LigateVcfs {
 
     command <<<
         set -euxo pipefail
-        scatter (vcf in vcfs){
-            bcftools index vcf
-        }
+        ~{sep=' ' vcfs} | xargs -n 1 bcftools index
+
         bcftools concat --ligate  ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     >>>
