@@ -60,9 +60,9 @@ workflow PhysicalAndStatisticalPhasing {
         joint_vcf_tbi = joint_sv_vcf_tbi
     }
 
-    # scatter (idx in indexes)  {
-    #     File all_chr_bam = sample_bams[idx]
-    #     File all_chr_bai = sample_bais[idx]
+    scatter (idx in indexes)  {
+        File all_chr_bam = sample_bams[idx]
+        File all_chr_bai = sample_bais[idx]
 
     #     # call H.SubsetBam { input:
     #     #     bam = all_chr_bam,
@@ -70,12 +70,17 @@ workflow PhysicalAndStatisticalPhasing {
     #     #     locus = region
     #     # }
 
-    #     call H.InferSampleName { input: 
-    #         bam = all_chr_bam, 
-    #         bai = all_chr_bai
-    #     }
+        call H.InferSampleName { input: 
+            bam = all_chr_bam, 
+            bai = all_chr_bai
+        }
 
-    #     String sample_id = InferSampleName.sample_name
+        String sample_id = InferSampleName.sample_name
+
+        call FindMatch as find_small_vcf { input:
+            vcfs = splitsmall.vcf_by_sample,
+            sample_id = sample_id
+        }
 
     #     # call H.SplitVCFbySample as SplitVcfbySampleShort { input:
     #     #     joint_vcf = joint_short_vcf,
@@ -109,7 +114,7 @@ workflow PhysicalAndStatisticalPhasing {
     #         memory = hiphase_memory,
     #         extra_args = hiphase_extra_args
     #     }
-    # }
+    }
 
     # call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesShort { input:
     #     vcf_input = HiPhase.phased_snp_vcf,
@@ -154,6 +159,7 @@ workflow PhysicalAndStatisticalPhasing {
 
 
     output {
+        String output = find_small_vcf.out
         # File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
         # File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
         # File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
@@ -343,5 +349,26 @@ task SplitVcf {
         preemptible_tries:     3
         max_retries:           2
         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+    }
+}
+
+task FindMatch {
+    input {
+        Array[File] vcfs
+        String sample_id
+    }
+
+    command <<<
+       for ff in ~{sep=' ' vcfs}; do 
+            basename=$(basename "$ff" .vcf.gz)
+            if [[ "$basename" == ~{sample_id}]]; then
+                 echo $ff 
+            fi
+        done
+
+    >>>
+
+    output {
+        String out = read_lines(stdout())
     }
 }
