@@ -330,7 +330,9 @@ task SplitVcf {
         mkdir output
         bcftools +split -Oz -o output ~{joint_vcf}
         cd output
-        for vcf in `find . *vcf.gz`; do tabix -p vcf $vcf; done
+        for vcf in $(find . -name "*.vcf.gz"); do
+            tabix -p vcf "$vcf"
+        done
         cd -
 
     >>>
