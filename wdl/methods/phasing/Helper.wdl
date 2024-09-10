@@ -308,7 +308,7 @@ task SplitVCFbySample {
 
     runtime {
         cpu: 1
-        memory: "64 GiB"
+        memory: "4 GiB"
         disks: "local-disk " + disk_size + " HDD" #"local-disk 100 HDD"
         bootDiskSizeGb: 10
         preemptible: 0
