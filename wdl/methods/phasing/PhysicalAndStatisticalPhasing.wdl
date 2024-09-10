@@ -371,7 +371,7 @@ task FindMatch {
     >>>
 
     output {
-        String out = read_lines(stdout())
+        Array[String] out = read_lines(stdout())
     }
         ###################
     runtime {
