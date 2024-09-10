@@ -371,5 +371,15 @@ task FindMatch {
     output {
         String out = read_lines(stdout())
     }
+        ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+    }
 }
 
