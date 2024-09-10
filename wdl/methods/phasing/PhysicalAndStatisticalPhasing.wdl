@@ -50,108 +50,118 @@ workflow PhysicalAndStatisticalPhasing {
         prefix = prefix + ".unphased"
     }
 
-    scatter (idx in indexes)  {
-        File all_chr_bam = sample_bams[idx]
-        File all_chr_bai = sample_bais[idx]
+    call SplitVcf as splitsmall { input:
+        joint_vcf = joint_short_vcf,
+        joint_vcf_tbi = joint_short_vcf_tbi,
+    }
 
-        # call H.SubsetBam { input:
-        #     bam = all_chr_bam,
-        #     bai = all_chr_bai,
-        #     locus = region
-        # }
+    call SplitVcf as splitSV { input:
+        joint_vcf = joint_sv_vcf,
+        joint_vcf_tbi = joint_sv_vcf_tbi
+    }
 
-        call H.InferSampleName { input: 
-            bam = all_chr_bam, 
-            bai = all_chr_bai
-        }
+    # scatter (idx in indexes)  {
+    #     File all_chr_bam = sample_bams[idx]
+    #     File all_chr_bai = sample_bais[idx]
 
-        String sample_id = InferSampleName.sample_name
+    #     # call H.SubsetBam { input:
+    #     #     bam = all_chr_bam,
+    #     #     bai = all_chr_bai,
+    #     #     locus = region
+    #     # }
 
-        call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-            joint_vcf = joint_short_vcf,
-            region = region,
-            samplename = sample_id
-        }
+    #     call H.InferSampleName { input: 
+    #         bam = all_chr_bam, 
+    #         bai = all_chr_bai
+    #     }
 
-        call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-            joint_vcf = UnphaseSVGenotypes.unphased_vcf,
-            region = region,
-            samplename = sample_id
-        }
+    #     String sample_id = InferSampleName.sample_name
 
-        call ConvertLowerCase {
-            input:
-                vcf = SplitVcfbySampleSV.single_sample_vcf,
-                prefix = sample_id + ".uppercased_sv_cleaned"
+    #     # call H.SplitVCFbySample as SplitVcfbySampleShort { input:
+    #     #     joint_vcf = joint_short_vcf,
+    #     #     region = region,
+    #     #     samplename = sample_id
+    #     # }
+
+    #     # call H.SplitVCFbySample as SplitVcfbySampleSV { input:
+    #     #     joint_vcf = UnphaseSVGenotypes.unphased_vcf,
+    #     #     region = region,
+    #     #     samplename = sample_id
+    #     # }
+
+    #     call ConvertLowerCase {
+    #         input:
+    #             vcf = SplitVcfbySampleSV.single_sample_vcf,
+    #             prefix = sample_id + ".uppercased_sv_cleaned"
                 
-        }
+    #     }
 
-        call H.HiPhase { input:
-            bam = all_chr_bam,
-            bai = all_chr_bai,
-            unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
-            unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
-            unphased_sv_vcf = ConvertLowerCase.subset_vcf,
-            unphased_sv_tbi = ConvertLowerCase.subset_tbi,
-            ref_fasta = reference_fasta,
-            ref_fasta_fai = reference_fasta_fai,
-            samplename = sample_id,
-            memory = hiphase_memory,
-            extra_args = hiphase_extra_args
-        }
-    }
+    #     call H.HiPhase { input:
+    #         bam = all_chr_bam,
+    #         bai = all_chr_bai,
+    #         unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
+    #         unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
+    #         unphased_sv_vcf = ConvertLowerCase.subset_vcf,
+    #         unphased_sv_tbi = ConvertLowerCase.subset_tbi,
+    #         ref_fasta = reference_fasta,
+    #         ref_fasta_fai = reference_fasta_fai,
+    #         samplename = sample_id,
+    #         memory = hiphase_memory,
+    #         extra_args = hiphase_extra_args
+    #     }
+    # }
 
-    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesShort { input:
-        vcf_input = HiPhase.phased_snp_vcf,
-        tbi_input = HiPhase.phased_snp_vcf_tbi,
-        pref = prefix + ".short",
-        threads_num = merge_num_threads
-    }
+    # call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesShort { input:
+    #     vcf_input = HiPhase.phased_snp_vcf,
+    #     tbi_input = HiPhase.phased_snp_vcf_tbi,
+    #     pref = prefix + ".short",
+    #     threads_num = merge_num_threads
+    # }
 
-    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
-        vcf_input = HiPhase.phased_sv_vcf,
-        tbi_input = HiPhase.phased_sv_vcf_tbi,
-        pref = prefix + ".SV",
-        threads_num = merge_num_threads
-    }
+    # call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
+    #     vcf_input = HiPhase.phased_sv_vcf,
+    #     tbi_input = HiPhase.phased_sv_vcf_tbi,
+    #     pref = prefix + ".SV",
+    #     threads_num = merge_num_threads
+    # }
 
-    call FilterAndConcatVcfs { input:
-        short_vcf = MergeAcrossSamplesShort.merged_vcf,
-        short_vcf_tbi = MergeAcrossSamplesShort.merged_tbi,
-        sv_vcf = MergeAcrossSamplesSV.merged_vcf,
-        sv_vcf_tbi = MergeAcrossSamplesSV.merged_tbi,
-        prefix = prefix + ".filter_and_concat"
-    }
+    # call FilterAndConcatVcfs { input:
+    #     short_vcf = MergeAcrossSamplesShort.merged_vcf,
+    #     short_vcf_tbi = MergeAcrossSamplesShort.merged_tbi,
+    #     sv_vcf = MergeAcrossSamplesSV.merged_vcf,
+    #     sv_vcf_tbi = MergeAcrossSamplesSV.merged_tbi,
+    #     prefix = prefix + ".filter_and_concat"
+    # }
 
-    Array[String] region_list = read_lines(chunk_file_for_shapeit4)
-    scatter (region in region_list) {
-        call H.Shapeit4 as Shapeit4 { input:
-            vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
-            vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-            mappingfile = genetic_mapping_dict[chromosome],
-            region = region,
-            prefix = prefix + ".filter_and_concat.phased",
-            num_threads = shapeit4_num_threads,
-            memory = shapeit4_memory,
-            extra_args = shapeit4_extra_args
-        }
-    }
+    # Array[String] region_list = read_lines(chunk_file_for_shapeit4)
+    # scatter (region in region_list) {
+    #     call H.Shapeit4 as Shapeit4 { input:
+    #         vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
+    #         vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+    #         mappingfile = genetic_mapping_dict[chromosome],
+    #         region = region,
+    #         prefix = prefix + ".filter_and_concat.phased",
+    #         num_threads = shapeit4_num_threads,
+    #         memory = shapeit4_memory,
+    #         extra_args = shapeit4_extra_args
+    #     }
+    # }
 
-    call LigateVcfs{ input:
-        vcfs = Shapeit4.phased_bcf,
-        prefix = prefix + ".phased.ligated"
-    }
+    # call LigateVcfs{ input:
+    #     vcfs = Shapeit4.phased_bcf,
+    #     prefix = prefix + ".phased.ligated"
+    # }
 
 
     output {
-        File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
-        File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
-        File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
-        File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
-        File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
-        File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
-        File phased_vcf = LigateVcfs.ligated_vcf
-        File phased_vcf_tbi = LigateVcfs.ligated_vcf_tbi
+        # File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
+        # File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
+        # File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
+        # File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
+        # File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
+        # File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
+        # File phased_vcf = LigateVcfs.ligated_vcf
+        # File phased_vcf_tbi = LigateVcfs.ligated_vcf_tbi
     }
 }
 
@@ -289,6 +299,40 @@ task LigateVcfs {
     output {
         File ligated_vcf = "~{prefix}.vcf.gz"
         File ligated_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+    }
+}
+
+task SplitVcf {
+
+    input {
+        File joint_vcf
+        File joint_vcf_tbi
+    }
+
+    command <<<
+        set -euxo pipefail
+        mkdir output
+        bcftools +split -Oz -o output ~{joint_vcf}
+        cd output
+        for vcf in `find . *vcf.gz`; do tabix -p vcf $vcf; done
+        cd -
+
+    >>>
+
+    output {
+        Array[File] vcf_by_sample = glob("output/*vcf.gz")
+        Array[File] vcf_by_sample_tbi = glob("output/*vcf.gz.tbi")
+
     }
     ###################
     runtime {

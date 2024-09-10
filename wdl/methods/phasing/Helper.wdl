@@ -292,7 +292,7 @@ task SplitVCFbySample {
 
         bcftools index ~{joint_vcf}
 
-        bcftools view -s ~{samplename} ~{joint_vcf} -o ~{samplename}.subset.g.vcf.gz
+        bcftools view -s ~{samplename} ~{joint_vcf} -r ~{region} -o ~{samplename}.subset.g.vcf.gz
 
         tabix -p vcf ~{samplename}.subset.g.vcf.gz
 
