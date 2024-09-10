@@ -159,7 +159,7 @@ workflow PhysicalAndStatisticalPhasing {
 
 
     output {
-        Array[String] output_name = find_small_vcf.out
+        Array[Array[String]] output_name = find_small_vcf.out
         # File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
         # File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
         # File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
@@ -373,6 +373,7 @@ task FindMatch {
     output {
         Array[String] out = read_lines(stdout())
     }
+
         ###################
     runtime {
         cpu: 1
