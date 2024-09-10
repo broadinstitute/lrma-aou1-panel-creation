@@ -363,7 +363,7 @@ task FindMatch {
     command <<<
        for ff in ~{sep=' ' vcfs}; do 
             basename=$(basename "$ff" .vcf.gz)
-            if [[ "$basename" == ~{sample_id}]]; then
+            if [[ "$basename" == "~{sample_id}" ]]; then
                  echo $ff 
             fi
         done
