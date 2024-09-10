@@ -8,6 +8,7 @@ workflow PhysicalAndStatisticalPhasing {
     input {
         Array[File] sample_bams
         Array[File] sample_bais
+        Array[String] sample_ids
         File joint_short_vcf
         File joint_short_vcf_tbi
         File joint_sv_vcf
@@ -60,9 +61,18 @@ workflow PhysicalAndStatisticalPhasing {
         joint_vcf_tbi = joint_sv_vcf_tbi
     }
 
+    call process_vcfs { input:
+            small_vcfs = splitsmall.vcf_by_sample,
+            sv_vcfs = splitSV.vcf_by_sample,
+            sample_ids = sample_ids
+    }
+
     scatter (idx in indexes)  {
+        String sample_id = sample_ids[idx]
         File all_chr_bam = sample_bams[idx]
         File all_chr_bai = sample_bais[idx]
+        File all_chr_small = process_vcfs.matched_small_vcfs[idx]
+        File all_chr_sv = process_vcfs.matched_sv_vcfs[idx]
 
     #     # call H.SubsetBam { input:
     #     #     bam = all_chr_bam,
@@ -70,17 +80,24 @@ workflow PhysicalAndStatisticalPhasing {
     #     #     locus = region
     #     # }
 
-        call H.InferSampleName { input: 
-            bam = all_chr_bam, 
-            bai = all_chr_bai
-        }
+        # call H.InferSampleName { input: 
+        #     bam = all_chr_bam, 
+        #     bai = all_chr_bai
+        # }
 
-        String sample_id = InferSampleName.sample_name
+        # String sample_id = InferSampleName.sample_name
 
-        call FindMatch as find_small_vcf { input:
-            vcfs = splitsmall.vcf_by_sample,
-            sample_id = sample_id
-        }
+
+
+        # call FindMatch as find_small_vcf { input:
+        #     vcfs = splitsmall.vcf_by_sample,
+        #     sample_id = sample_id
+        # }
+
+        # call FindMatch as find_sv { input:
+        #     vcfs = splitSV.vcf_by_sample,
+        #     sample_id = sample_id
+        # }
 
     #     # call H.SplitVCFbySample as SplitVcfbySampleShort { input:
     #     #     joint_vcf = joint_short_vcf,
@@ -94,41 +111,39 @@ workflow PhysicalAndStatisticalPhasing {
     #     #     samplename = sample_id
     #     # }
 
-    #     call ConvertLowerCase {
-    #         input:
-    #             vcf = SplitVcfbySampleSV.single_sample_vcf,
-    #             prefix = sample_id + ".uppercased_sv_cleaned"
-                
-    #     }
+        call ConvertLowerCase {
+            input:
+                vcf = all_chr_sv,
+                prefix = sample_id + ".uppercased_sv_cleaned"
+        }
 
-    #     call H.HiPhase { input:
-    #         bam = all_chr_bam,
-    #         bai = all_chr_bai,
-    #         unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
-    #         unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
-    #         unphased_sv_vcf = ConvertLowerCase.subset_vcf,
-    #         unphased_sv_tbi = ConvertLowerCase.subset_tbi,
-    #         ref_fasta = reference_fasta,
-    #         ref_fasta_fai = reference_fasta_fai,
-    #         samplename = sample_id,
-    #         memory = hiphase_memory,
-    #         extra_args = hiphase_extra_args
-    #     }
+        call H.HiPhase { input:
+            bam = all_chr_bam,
+            bai = all_chr_bai,
+            unphased_snp_vcf = all_chr_small,
+            unphased_sv_vcf = ConvertLowerCase.subset_vcf,
+            unphased_sv_tbi = ConvertLowerCase.subset_tbi,
+            ref_fasta = reference_fasta,
+            ref_fasta_fai = reference_fasta_fai,
+            samplename = sample_id,
+            memory = hiphase_memory,
+            extra_args = hiphase_extra_args
+        }
     }
 
-    # call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesShort { input:
-    #     vcf_input = HiPhase.phased_snp_vcf,
-    #     tbi_input = HiPhase.phased_snp_vcf_tbi,
-    #     pref = prefix + ".short",
-    #     threads_num = merge_num_threads
-    # }
+    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesShort { input:
+        vcf_input = HiPhase.phased_snp_vcf,
+        tbi_input = HiPhase.phased_snp_vcf_tbi,
+        pref = prefix + ".short",
+        threads_num = merge_num_threads
+    }
 
-    # call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
-    #     vcf_input = HiPhase.phased_sv_vcf,
-    #     tbi_input = HiPhase.phased_sv_vcf_tbi,
-    #     pref = prefix + ".SV",
-    #     threads_num = merge_num_threads
-    # }
+    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
+        vcf_input = HiPhase.phased_sv_vcf,
+        tbi_input = HiPhase.phased_sv_vcf_tbi,
+        pref = prefix + ".SV",
+        threads_num = merge_num_threads
+    }
 
     # call FilterAndConcatVcfs { input:
     #     short_vcf = MergeAcrossSamplesShort.merged_vcf,
@@ -159,11 +174,11 @@ workflow PhysicalAndStatisticalPhasing {
 
 
     output {
-        Array[Array[String]] output_name = find_small_vcf.out
-        # File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
-        # File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
-        # File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
-        # File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
+        
+        File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
+        File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
+        File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
+        File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
         # File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
         # File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
         # File phased_vcf = LigateVcfs.ligated_vcf
@@ -354,27 +369,42 @@ task SplitVcf {
     }
 }
 
-task FindMatch {
-    input {
-        Array[File] vcfs
-        String sample_id
+task process_vcfs {
+    input{
+        Array[File] small_vcfs
+        Array[File] sv_vcfs         # Input: Array of VCF files
+        Array[String] sample_ids      # Input: Array of sample IDs
     }
 
-    command <<<
-        for ff in ~{sep=' ' vcfs}; do
-            basename=$(basename "$ff" .vcf.gz)
-            if [[ "$basename" == "~{sample_id}" ]]; then
-                echo "$ff"
-            fi
-        done
+    command {
+        # Create a single output file to store matched files for all sample_ids
+        touch all_matched_smalls.txt
+        touch all_matched_svs.txt
+        
+        # Loop through each sample_id and check against each file's basename
+        for sample_id in ~{sep=' ' sample_ids}; do
+            for ff in ~{sep=' ' small_vcfs}; do
+                basename=$(basename "$ff" .vcf.gz)
+                if [[ "$basename" == "$sample_id" ]]; then
+                    echo "$sample_id: $ff" >> all_matched_smalls.txt
+                fi
+            done
 
-    >>>
+            for ff in ~{sep=' ' sv_vcfs}; do
+                basename=$(basename "$ff" .vcf.gz)
+                if [[ "$basename" == "$sample_id" ]]; then
+                    echo "$sample_id: $ff" >> all_matched_svs.txt
+                fi
+            done
+        done
+    }
 
     output {
-        Array[String] out = read_lines(stdout())
+        # Output the single file with all matched results
+        Array[File] matched_small_vcfs = read_lines("all_matched_smalls.txt")
+        Array[File] matched_sv_vcfs = read_lines("all_matched_svs.txt")
     }
-
-        ###################
+            ###################
     runtime {
         cpu: 1
         memory:  "4 GiB"
@@ -384,5 +414,38 @@ task FindMatch {
         max_retries:           2
         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
     }
+
 }
+
+# task FindMatch {
+#     input {
+#         Array[File] vcfs
+#         String sample_id
+#     }
+
+#     command <<<
+#         for ff in ~{sep=' ' vcfs}; do
+#             basename=$(basename "$ff" .vcf.gz)
+#             if [[ "$basename" == "~{sample_id}" ]]; then
+#                 echo "$ff"
+#             fi
+#         done
+
+#     >>>
+
+#     output {
+#         Array[String] out = read_lines(stdout())
+#     }
+
+#         ###################
+#     runtime {
+#         cpu: 1
+#         memory:  "4 GiB"
+#         disks: "local-disk 50 HDD"
+#         bootDiskSizeGb: 10
+#         preemptible_tries:     3
+#         max_retries:           2
+#         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+#     }
+# }
 

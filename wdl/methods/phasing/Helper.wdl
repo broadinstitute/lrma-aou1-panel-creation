@@ -27,7 +27,7 @@ task HiPhase {
         File bai
 
         File unphased_snp_vcf
-        File unphased_snp_tbi
+
         File unphased_sv_vcf
         File unphased_sv_tbi
 
@@ -51,6 +51,8 @@ task HiPhase {
         set -euxo pipefail
 
         touch ~{bai}
+        tabix -p vcf ~{unphased_snp_vcf}
+
 
         hiphase \
         --threads ~{thread_num} \
