@@ -8,7 +8,7 @@ workflow PhysicalAndStatisticalPhasing {
     input {
         Array[File] sample_bams
         Array[File] sample_bais
-        Array[String] sample_ids
+        Array[String] sample_id_list
         File joint_short_vcf
         File joint_short_vcf_tbi
         File joint_sv_vcf
@@ -64,15 +64,20 @@ workflow PhysicalAndStatisticalPhasing {
     call process_vcfs { input:
             small_vcfs = splitsmall.vcf_by_sample,
             sv_vcfs = splitSV.vcf_by_sample,
-            sample_ids = sample_ids
+            sample_id_l = sample_id_list
     }
 
-    scatter (idx in indexes)  {
-        String sample_id = sample_ids[idx]
+    Array[Pair[Int, Pair[Int, Int]]] index_list = zip(indexes, 
+                                                     zip(process_vcfs.index_into_small_vcfs, process_vcfs.index_into_sv_vcfs))
+    scatter (t3 in index_list) {
+        Int idx = t3.left
+        Int idy = t3.right.left
+        Int idz = t3.right.right
+        String sample_id = sample_id_list[idx]
         File all_chr_bam = sample_bams[idx]
         File all_chr_bai = sample_bais[idx]
-        File all_chr_small = process_vcfs.matched_small_vcfs[idx]
-        File all_chr_sv = process_vcfs.matched_sv_vcfs[idx]
+        File all_chr_small = splitsmall.vcf_by_sample[idy]
+        File all_chr_sv = splitSV.vcf_by_sample[idz]
 
     #     # call H.SubsetBam { input:
     #     #     bam = all_chr_bam,
@@ -373,36 +378,43 @@ task process_vcfs {
     input{
         Array[File] small_vcfs
         Array[File] sv_vcfs         # Input: Array of VCF files
-        Array[String] sample_ids      # Input: Array of sample IDs
+        Array[String] sample_id_l      # Input: Array of sample IDs
+    }
+    parameter_meta {
+        small_vcfs: {localization_optional: true}
+        sv_vcfs:  {localization_optional: true}
     }
 
     command {
+
+        set -eu
+
+        for ff in ~{sep=' ' small_vcfs}; do
+            basename "$ff" .vcf.gz >> snp.sampleids.txt
+        done
+        for ff in ~{sep=' ' sv_vcfs}; do
+            basename "$ff" .vcf.gz >> sv.sampleids.txt
+        done
+        wc -l  *txt
+
         # Create a single output file to store matched files for all sample_ids
         touch all_matched_smalls.txt
         touch all_matched_svs.txt
         
         # Loop through each sample_id and check against each file's basename
-        for sample_id in ~{sep=' ' sample_ids}; do
-            for ff in ~{sep=' ' small_vcfs}; do
-                basename=$(basename "$ff" .vcf.gz)
-                if [[ "$basename" == "$sample_id" ]]; then
-                    echo "$sample_id: $ff" >> all_matched_smalls.txt
-                fi
-            done
+        for sample_id in ~{sep=' ' sample_id_l}; do
+            grep -nF -m1 "$sample_id" snp.sampleids.txt | cut -d: -f1 >> all_matched_smalls.txt || echo "0" >> all_matched_smalls.txt
+            grep -nF -m1 "$sample_id" sv.sampleids.txt | cut -d: -f1 >> all_matched_svs.txt || echo "0" >> all_matched_svs.txt
 
-            for ff in ~{sep=' ' sv_vcfs}; do
-                basename=$(basename "$ff" .vcf.gz)
-                if [[ "$basename" == "$sample_id" ]]; then
-                    echo "$sample_id: $ff" >> all_matched_svs.txt
-                fi
-            done
         done
+        wc -l  *txt
+
     }
 
     output {
-        # Output the single file with all matched results
-        Array[File] matched_small_vcfs = read_lines("all_matched_smalls.txt")
-        Array[File] matched_sv_vcfs = read_lines("all_matched_svs.txt")
+
+        Array[Int] index_into_small_vcfs = read_lines("all_matched_smalls.txt")
+        Array[Int] index_into_sv_vcfs    = read_lines("all_matched_svs.txt")
     }
             ###################
     runtime {
