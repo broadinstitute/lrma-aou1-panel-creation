@@ -29,7 +29,6 @@ task HiPhase {
         File unphased_snp_vcf
 
         File unphased_sv_vcf
-        File unphased_sv_tbi
 
         File ref_fasta
         File ref_fasta_fai
@@ -52,7 +51,7 @@ task HiPhase {
 
         touch ~{bai}
         tabix -p vcf ~{unphased_snp_vcf}
-
+        tabix -p vcf ~{unphased_sv_vcf}
 
         hiphase \
         --threads ~{thread_num} \

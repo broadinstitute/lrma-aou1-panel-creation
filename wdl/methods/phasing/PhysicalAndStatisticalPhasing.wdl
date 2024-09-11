@@ -51,6 +51,11 @@ workflow PhysicalAndStatisticalPhasing {
         prefix = prefix + ".unphased"
     }
 
+    call ConvertLowerCase { input:
+        vcf = UnphaseSVGenotypes.unphased_vcf,
+        prefix = prefix + ".uppercased_sv_cleaned"
+    }
+
     call SplitVcf as splitsmall { input:
         joint_vcf = joint_short_vcf,
         joint_vcf_tbi = joint_short_vcf_tbi,
@@ -116,18 +121,11 @@ workflow PhysicalAndStatisticalPhasing {
     #     #     samplename = sample_id
     #     # }
 
-        call ConvertLowerCase {
-            input:
-                vcf = all_chr_sv,
-                prefix = sample_id + ".uppercased_sv_cleaned"
-        }
-
         call H.HiPhase { input:
             bam = all_chr_bam,
             bai = all_chr_bai,
             unphased_snp_vcf = all_chr_small,
-            unphased_sv_vcf = ConvertLowerCase.subset_vcf,
-            unphased_sv_tbi = ConvertLowerCase.subset_tbi,
+            unphased_sv_vcf = all_chr_sv,
             ref_fasta = reference_fasta,
             ref_fasta_fai = reference_fasta_fai,
             samplename = sample_id,
