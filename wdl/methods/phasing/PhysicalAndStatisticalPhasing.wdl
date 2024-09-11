@@ -403,8 +403,8 @@ task process_vcfs {
         
         # Loop through each sample_id and check against each file's basename
         for sample_id in ~{sep=' ' sample_id_l}; do
-            grep -nF -m1 "$sample_id" snp.sampleids.txt | cut -d: -f1 >> all_matched_smalls.txt || echo "0" >> all_matched_smalls.txt
-            grep -nF -m1 "$sample_id" sv.sampleids.txt | cut -d: -f1 >> all_matched_svs.txt || echo "0" >> all_matched_svs.txt
+            grep -nF -m1 "$sample_id" snp.sampleids.txt | cut -d: -f1 | awk '{print $1-1}' >> all_matched_smalls.txt || echo "0" >> all_matched_smalls.txt
+            grep -nF -m1 "$sample_id" sv.sampleids.txt | cut -d: -f1 | awk '{print $1-1}' >> all_matched_svs.txt || echo "0" >> all_matched_svs.txt
 
         done
         wc -l  *txt
