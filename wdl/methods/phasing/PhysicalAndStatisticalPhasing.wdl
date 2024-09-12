@@ -84,11 +84,11 @@ workflow PhysicalAndStatisticalPhasing {
         File all_chr_small = splitsmall.vcf_by_sample[idy]
         File all_chr_sv = splitSV.vcf_by_sample[idz]
 
-        # call H.SubsetBam { input:
-        #     bam = all_chr_bam,
-        #     bai = all_chr_bai,
-        #     locus = region
-        # }
+        call H.SubsetBam { input:
+            bam = all_chr_bam,
+            bai = all_chr_bai,
+            locus = region
+        }
 
         # call H.InferSampleName { input: 
         #     bam = all_chr_bam, 
@@ -122,8 +122,8 @@ workflow PhysicalAndStatisticalPhasing {
     #     # }
 
         call H.HiPhase { input:
-            bam = all_chr_bam,
-            bai = all_chr_bai,
+            bam = SubsetBam.subset_bam,
+            bai = SubsetBam.subset_bai,
             unphased_snp_vcf = all_chr_small,
             unphased_sv_vcf = all_chr_sv,
             ref_fasta = reference_fasta,
