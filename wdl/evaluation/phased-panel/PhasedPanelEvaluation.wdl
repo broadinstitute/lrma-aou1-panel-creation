@@ -56,6 +56,7 @@ workflow PhasedPanelEvaluation {
         # inputs for LeaveOutEvaluation
         File case_reference_fasta
         File case_reference_fasta_fai
+        File case_reference_dict
         Array[File] genetic_maps
         File repeat_mask_bed
         File segmental_duplications_bed
@@ -128,6 +129,7 @@ workflow PhasedPanelEvaluation {
         input_vcf_gz_tbi = PanGeniePanelCreation.panel_vcf_gz_tbi,
         case_reference_fasta = case_reference_fasta,
         case_reference_fasta_fai = case_reference_fasta_fai,
+        case_reference_dict = case_reference_dict,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         genetic_maps = genetic_maps,

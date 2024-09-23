@@ -1,6 +1,7 @@
 version 1.0
 
 import "../../methods/kage/KAGEPanelWithPreprocessing.wdl" as KAGEPanelWithPreprocessing
+import "../../methods/kage/KAGEPlusGLIMPSECase.wdl" as KAGEPlusGLIMPSECase
 import "../../methods/pangenie/PanGenieCase.wdl" as PanGenieCase
 
 struct RuntimeAttributes {
@@ -20,6 +21,7 @@ workflow LeaveOutEvaluation {
         File input_vcf_gz_tbi
         File case_reference_fasta
         File case_reference_fasta_fai
+        File case_reference_dict
         File reference_fasta
         File reference_fasta_fai
         Array[File] genetic_maps
@@ -102,76 +104,32 @@ workflow LeaveOutEvaluation {
         String leave_out_sample_name = leave_out_sample_names[j]
         File leave_out_cram = leave_out_crams[leave_out_sample_name]
 
-        call IndexCaseReads {
-            # TODO we require the alignments to subset by chromosome; change to start from raw reads
+        call KAGEPlusGLIMPSECase.KAGEPlusGLIMPSECase as KAGEPlusGLIMPSECase {
             input:
                 input_cram = leave_out_cram,
-                docker = docker,
-                monitoring_script = monitoring_script
-        }
-
-        call PreprocessCaseReads {
-            # TODO we require the alignments to subset by chromosome; change to start from raw reads
-            input:
-                input_cram = leave_out_cram,
-                input_cram_idx = IndexCaseReads.cram_idx,
-                reference_fasta = case_reference_fasta,
-                reference_fasta_fai = case_reference_fasta_fai,
-                output_prefix = leave_out_sample_name,
-                chromosomes = chromosomes,
-                docker = docker,
-                monitoring_script = monitoring_script
-        }
-
-        # KAGE+GLIMPSE case
-        call KAGECase {
-            input:
-                input_fasta = PreprocessCaseReads.preprocessed_fasta,
                 panel_index = KAGELeaveOneOutPanel.index,
                 panel_kmer_index_only_variants_with_revcomp = KAGELeaveOneOutPanel.kmer_index_only_variants_with_revcomp,
+                panel_split_vcf_gz = CreateLeaveOneOutPanelVCF.leave_out_panel_split_vcf_gz,
+                panel_split_vcf_gz_tbi = CreateLeaveOneOutPanelVCF.leave_out_panel_split_vcf_gz_tbi,
                 panel_multi_split_vcf_gz = CreateLeaveOneOutPanelVCF.leave_out_panel_multi_split_vcf_gz,
                 panel_multi_split_vcf_gz_tbi = CreateLeaveOneOutPanelVCF.leave_out_panel_multi_split_vcf_gz_tbi,
-                reference_fasta_fai = reference_fasta_fai,
-                output_prefix = leave_out_sample_name,
+                reference_fasta = case_reference_fasta,
+                reference_fasta_fai = case_reference_fasta_fai,
+                reference_dict = case_reference_dict,
+                chromosomes = chromosomes,
+                subset_reads = true,
                 sample_name = leave_out_sample_name,
                 average_coverage = case_average_coverage,
-                docker = kage_docker,
-                monitoring_script = monitoring_script,
-                runtime_attributes = kage_runtime_attributes
-        }
-
-        scatter (k in range(length(chromosomes))) {
-            call GLIMPSECaseChromosome {
-                input:
-                    kage_vcf_gz = KAGECase.kage_vcf_gz,
-                    kage_vcf_gz_tbi = KAGECase.kage_vcf_gz_tbi,
-                    panel_split_vcf_gz = CreateLeaveOneOutPanelVCF.leave_out_panel_split_vcf_gz,
-                    panel_split_vcf_gz_tbi = CreateLeaveOneOutPanelVCF.leave_out_panel_split_vcf_gz_tbi,
-                    reference_fasta_fai = reference_fasta_fai,
-                    chromosome = chromosomes[k],
-                    genetic_map = genetic_maps[k],
-                    output_prefix = leave_out_sample_name,
-                    docker = kage_docker,
-                    monitoring_script = monitoring_script,
-                    runtime_attributes = glimpse_chromosome_runtime_attributes
-            }
-        }
-
-        call GLIMPSECase {
-            input:
-                chromosome_glimpse_vcf_gzs = GLIMPSECaseChromosome.chromosome_glimpse_vcf_gz,
-                chromosome_glimpse_vcf_gz_tbis = GLIMPSECaseChromosome.chromosome_glimpse_vcf_gz_tbi,
-                output_prefix = leave_out_sample_name,
-                docker = kage_docker,
-                monitoring_script = monitoring_script,
-                runtime_attributes = glimpse_gather_runtime_attributes
+                docker = docker,
+                kage_docker = kage_docker,
+                monitoring_script = monitoring_script
         }
 
         # KAGE evaluation
         call CalculateMetrics as CalculateMetricsKAGE {
             input:
-                case_vcf_gz = KAGECase.kage_vcf_gz,
-                case_vcf_gz_tbi = KAGECase.kage_vcf_gz_tbi,
+                case_vcf_gz = KAGEPlusGLIMPSECase.kage_vcf_gz,
+                case_vcf_gz_tbi = KAGEPlusGLIMPSECase.kage_vcf_gz_tbi,
                 truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
                 truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
                 chromosomes = chromosomes,
@@ -185,8 +143,8 @@ workflow LeaveOutEvaluation {
         # KAGE+GLIMPSE evaluation
         call CalculateMetrics as CalculateMetricsKAGEPlusGLIMPSE {
             input:
-                case_vcf_gz = GLIMPSECase.glimpse_vcf_gz,
-                case_vcf_gz_tbi = GLIMPSECase.glimpse_vcf_gz_tbi,
+                case_vcf_gz = KAGEPlusGLIMPSECase.glimpse_vcf_gz,
+                case_vcf_gz_tbi = KAGEPlusGLIMPSECase.glimpse_vcf_gz_tbi,
                 truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
                 truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
                 chromosomes = chromosomes,
@@ -199,6 +157,19 @@ workflow LeaveOutEvaluation {
 
         if (do_pangenie) {
             # PanGenie case
+
+            call PreprocessCaseReads {
+                input:
+                    input_cram = leave_out_cram,
+                    input_cram_idx = KAGEPlusGLIMPSECase.cram_idx,
+                    reference_fasta = case_reference_fasta,
+                    reference_fasta_fai = case_reference_fasta_fai,
+                    chromosomes = chromosomes,
+                    output_prefix = leave_out_sample_name,
+                    docker = docker,
+                    monitoring_script = monitoring_script
+            }
+
             call PanGenieCase.PanGenie as PanGenieCase {
                 input:
                     panel_vcf_gz = CreateLeaveOneOutPanelVCF.leave_out_panel_vcf_gz,
@@ -231,16 +202,70 @@ workflow LeaveOutEvaluation {
     }
 
     output {
-        Array[File] kage_vcf_gzs = KAGECase.kage_vcf_gz
-        Array[File] kage_vcf_gz_tbis = KAGECase.kage_vcf_gz_tbi
-        Array[File] glimpse_vcf_gzs = GLIMPSECase.glimpse_vcf_gz
-        Array[File] glimpse_vcf_gz_tbis = GLIMPSECase.glimpse_vcf_gz_tbi
+        Array[File] kage_vcf_gzs = KAGEPlusGLIMPSECase.kage_vcf_gz
+        Array[File] kage_vcf_gz_tbis = KAGEPlusGLIMPSECase.kage_vcf_gz_tbi
+        Array[File] glimpse_unphased_vcf_gzs = KAGEPlusGLIMPSECase.glimpse_unphased_vcf_gz
+        Array[File] glimpse_unphased_vcf_gz_tbis = KAGEPlusGLIMPSECase.glimpse_unphased_vcf_gz_tbi
+        Array[File] glimpse_vcf_gzs = KAGEPlusGLIMPSECase.glimpse_vcf_gz
+        Array[File] glimpse_vcf_gz_tbis = KAGEPlusGLIMPSECase.glimpse_vcf_gz_tbi
         Array[File?] pangenie_vcf_gzs = PanGenieCase.genotyping_vcf_gz
         Array[File?] pangenie_vcf_gz_tbis = PanGenieCase.genotyping_vcf_gz_tbi
 
         Array[File] kage_metrics_tsvs = CalculateMetricsKAGE.metrics_tsv
         Array[File] glimpse_metrics_tsvs = CalculateMetricsKAGEPlusGLIMPSE.metrics_tsv
         Array[File?] pangenie_metrics_tsvs = CalculateMetricsPanGenie.metrics_tsv
+    }
+}
+
+task PreprocessCaseReads {
+    input {
+        File input_cram
+        File input_cram_idx
+        File reference_fasta
+        File reference_fasta_fai
+        Array[String] chromosomes
+        String output_prefix
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    String filter_N_regex = "/^>/{N;/^>.*\\n.*N.*/d}"
+
+    command {
+        set -e
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        # hacky way to get chromosomes into bed file
+        grep -P '~{sep="\\t|" chromosomes}\t' ~{reference_fasta_fai} | cut -f 1,2 | sed -e 's/\t/\t1\t/g' > chromosomes.bed
+
+        # filter out read pairs containing N nucleotides
+        # TODO move functionality into KAGE code
+        samtools view --reference ~{reference_fasta} -@ $(nproc) -L chromosomes.bed -u ~{input_cram} | \
+            samtools fasta --reference ~{reference_fasta} -@ $(nproc) | \
+            sed -E '~{filter_N_regex}' > ~{output_prefix}.preprocessed.fasta
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 2])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 500]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        File preprocessed_fasta = "~{output_prefix}.preprocessed.fasta"
     }
 }
 
@@ -313,101 +338,6 @@ task PreprocessPanelVCF {
     }
 }
 
-# some 1000G CRAM indices have issues due to htsjdk version, so we reindex; see e.g. https://github.com/broadinstitute/gatk/issues/7076
-task IndexCaseReads {
-    input {
-        File input_cram
-
-        String docker
-        File? monitoring_script
-
-        RuntimeAttributes runtime_attributes = {}
-    }
-
-    # if we instead simply use File cram_idx = "~{input_cram}.crai" in the output block,
-    # Terra tries to localize an index adjacent to the CRAM in PreprocessCaseReads???
-    String output_prefix = basename(input_cram, ".cram")
-
-    command {
-        set -e
-
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
-
-        samtools index -@ $(nproc) ~{input_cram} ~{output_prefix}.cram.crai
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 2])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 500]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-
-    output {
-        File monitoring_log = "monitoring.log"
-        File cram_idx = "~{output_prefix}.cram.crai"
-    }
-}
-
-task PreprocessCaseReads {
-    input {
-        File input_cram
-        File input_cram_idx
-        File reference_fasta
-        File reference_fasta_fai
-        Array[String] chromosomes
-        String output_prefix
-
-        String docker
-        File? monitoring_script
-
-        RuntimeAttributes runtime_attributes = {}
-    }
-
-    String filter_N_regex = "/^>/{N;/^>.*\\n.*N.*/d}"
-
-    command {
-        set -e
-
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
-
-        # hacky way to get chromosomes into bed file
-        grep -P '~{sep="\\t|" chromosomes}\t' ~{reference_fasta_fai} | cut -f 1,2 | sed -e 's/\t/\t1\t/g' > chromosomes.bed
-
-        # filter out read pairs containing N nucleotides
-        # TODO move functionality into KAGE code
-        samtools view --reference ~{reference_fasta} -@ $(nproc) -L chromosomes.bed -u ~{input_cram} | \
-            samtools fasta --reference ~{reference_fasta} -@ $(nproc) | \
-            sed -E '~{filter_N_regex}' > ~{output_prefix}.preprocessed.fasta
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 2])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 500]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-
-    output {
-        File monitoring_log = "monitoring.log"
-        File preprocessed_fasta = "~{output_prefix}.preprocessed.fasta"
-    }
-}
-
 task CreateLeaveOneOutPanelVCF {
     input {
         File input_vcf_gz
@@ -474,261 +404,6 @@ task CreateLeaveOneOutPanelVCF {
         File leave_out_panel_bi_vcf_gz_tbi = "~{output_prefix}.preprocessed.LO.bi.vcf.gz.tbi"
         File leave_out_panel_multi_split_vcf_gz = "~{output_prefix}.preprocessed.LO.multi.split.vcf.gz"
         File leave_out_panel_multi_split_vcf_gz_tbi = "~{output_prefix}.preprocessed.LO.multi.split.vcf.gz.tbi"
-    }
-}
-
-task KAGECase {
-    input {
-        File input_fasta
-        File panel_index
-        File panel_kmer_index_only_variants_with_revcomp
-        File panel_multi_split_vcf_gz # for filling in biallelic-only VCFs produced by KAGE
-        File panel_multi_split_vcf_gz_tbi
-        File reference_fasta_fai
-        String output_prefix
-        String sample_name
-        Float average_coverage
-
-        String docker
-        File? monitoring_script
-
-        String kmer_mapper_args = "-c 100000000"
-        Boolean? ignore_helper_model = true
-        String? kage_genotype_extra_args
-
-
-        RuntimeAttributes runtime_attributes = {}
-        Int? cpu = 8
-    }
-
-    Int cpu_resolved = select_first([runtime_attributes.cpu, cpu])
-
-    command {
-        set -e
-
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
-
-        kmer_mapper map \
-            ~{kmer_mapper_args} \
-            -t ~{cpu_resolved} \
-            -i ~{panel_kmer_index_only_variants_with_revcomp} \
-            -f ~{input_fasta} \
-            -o ~{output_prefix}.kmer_counts.npy
-
-        kage genotype \
-            -i ~{panel_index} \
-            -c ~{output_prefix}.kmer_counts.npy \
-            --average-coverage ~{average_coverage} \
-            -s ~{sample_name} \
-            ~{true='-I true' false='-I false' ignore_helper_model} \
-            ~{kage_genotype_extra_args} \
-            -o ~{output_prefix}.kage.bi.vcf
-
-        # we need to add split multiallelics to biallelic-only KAGE VCF
-        # create single-sample header from LO panel w/ split multiallelics
-        bcftools view --no-version -h -G ~{panel_multi_split_vcf_gz} | \
-            sed 's/##fileformat=VCFv4.2/##fileformat=VCFv4.2\n##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n##FORMAT=<ID=GL,Number=G,Type=Float,Description="Genotype likelihoods.">/g' | \
-            sed 's/INFO$/INFO\tFORMAT\t~{sample_name}/g' > ~{output_prefix}.multi.split.header.txt
-        # create single-sample missing genotypes from LO panel w/ split multiallelics
-        bcftools view --no-version -H -G ~{panel_multi_split_vcf_gz} | \
-            sed 's/$/\tGT:GL\t.\/.:nan,nan,nan/g' > ~{output_prefix}.multi.split.GT.txt
-        # create single-sample VCF w/ split multiallelics
-        bgzip -c <(cat ~{output_prefix}.multi.split.header.txt ~{output_prefix}.multi.split.GT.txt) > ~{output_prefix}.multi.split.vcf.gz
-        bcftools index -t ~{output_prefix}.multi.split.vcf.gz
-
-        bgzip -c ~{output_prefix}.kage.bi.vcf > ~{output_prefix}.kage.bi.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.bi.vcf.gz
-
-        bcftools concat --no-version -a ~{output_prefix}.kage.bi.vcf.gz ~{output_prefix}.multi.split.vcf.gz -Oz -o ~{output_prefix}.kage.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.vcf.gz
-    }
-
-    runtime {
-        docker: docker
-        cpu: cpu_resolved
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-
-    output {
-        File monitoring_log = "monitoring.log"
-        File kmer_counts = "~{output_prefix}.kmer_counts.npy"
-        File kage_vcf_gz = "~{output_prefix}.kage.vcf.gz"
-        File kage_vcf_gz_tbi = "~{output_prefix}.kage.vcf.gz.tbi"
-    }
-}
-
-task GLIMPSECaseChromosome {
-    input {
-        File kage_vcf_gz
-        File kage_vcf_gz_tbi
-        File panel_split_vcf_gz       # for GLIMPSE
-        File panel_split_vcf_gz_tbi
-        File reference_fasta_fai
-        String chromosome
-        File genetic_map
-        String output_prefix
-
-        String docker
-        File? monitoring_script
-
-        RuntimeAttributes runtime_attributes = {}
-    }
-
-    command {
-        set -e
-
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
-
-        bcftools view --no-version -r ~{chromosome} ~{kage_vcf_gz} | \
-            sed -e 's/nan/-1000000.0/g' | sed -e 's/-inf/-1000000.0/g' | sed -e 's/inf/-1000000.0/g' | bgzip > ~{output_prefix}.kage.nonan.~{chromosome}.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.nonan.~{chromosome}.vcf.gz
-
-        # TODO update to GLIMPSE2; first figure out why it complains about AC/AN and GT being inconsistent?
-        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_phase_static
-        chmod +x GLIMPSE_phase_static
-
-        CHROMOSOME_LENGTH=$(grep -P "~{chromosome}\t" ~{reference_fasta_fai} | cut -f 2)
-        ./GLIMPSE_phase_static \
-            -I ~{output_prefix}.kage.nonan.~{chromosome}.vcf.gz \
-            -R ~{panel_split_vcf_gz} \
-            --input-region ~{chromosome}:1-$CHROMOSOME_LENGTH \
-            --output-region ~{chromosome}:1-$CHROMOSOME_LENGTH \
-            --map ~{genetic_map} \
-            --input-GL \
-            --thread $(nproc) \
-            --output ~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-
-    output {
-        File monitoring_log = "monitoring.log"
-        File chromosome_glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz"
-        File chromosome_glimpse_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz.tbi"
-    }
-}
-
-# unphased
-task GLIMPSECaseGather {
-    input {
-        Array[File] chromosome_glimpse_vcf_gzs
-        Array[File] chromosome_glimpse_vcf_gz_tbis
-        String output_prefix
-
-        String docker
-        File? monitoring_script
-
-        RuntimeAttributes runtime_attributes = {}
-    }
-
-    command {
-        set -e
-
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
-
-        bcftools concat --no-version ~{sep=" " chromosome_glimpse_vcf_gzs} -Oz -o ~{output_prefix}.kage.glimpse.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.glimpse.vcf.gz
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-
-    output {
-        File monitoring_log = "monitoring.log"
-        File glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.vcf.gz"
-        File glimpse_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.vcf.gz.tbi"
-    }
-}
-
-task GLIMPSECase {
-    input {
-        Array[File] chromosome_glimpse_vcf_gzs
-        Array[File] chromosome_glimpse_vcf_gz_tbis
-        String output_prefix
-
-        String docker
-        File? monitoring_script
-
-        RuntimeAttributes runtime_attributes = {}
-    }
-
-    command {
-        set -e
-
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
-
-        # TODO update to GLIMPSE2
-        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_ligate_static
-        chmod +x GLIMPSE_ligate_static
-
-        ./GLIMPSE_ligate_static \
-            --input ~{write_lines(chromosome_glimpse_vcf_gzs)} \
-            --output ~{output_prefix}.ligate.bcf \
-            --log ~{output_prefix}.ligate.log
-
-        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
-        chmod +x GLIMPSE_sample_static
-
-        ./GLIMPSE_sample_static --input ~{output_prefix}.ligate.bcf \
-            --solve \
-            --output ~{output_prefix}.sample.bcf \
-            --log ~{output_prefix}.sample.log
-
-        bcftools view --no-version ~{output_prefix}.sample.bcf -Oz -o ~{output_prefix}.kage.glimpse.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.glimpse.vcf.gz
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-
-    output {
-        File monitoring_log = "monitoring.log"
-        File ligate_log = "~{output_prefix}.ligate.log"
-        File glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.vcf.gz"
-        File glimpse_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.vcf.gz.tbi"
     }
 }
 
