@@ -85,13 +85,21 @@ workflow PhysicalAndStatisticalPhasing {
                 
         }
 
+        call FilterVcfs { input:
+            short_vcf = SplitVcfbySampleShort.single_sample_vcf,
+            short_vcf_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
+            sv_vcf = ConvertLowerCase.subset_vcf,
+            sv_vcf_tbi = ConvertLowerCase.subset_tbi,
+            prefix = prefix + ".filter"
+        }
+
         call H.HiPhase { input:
             bam = SubsetBam.subset_bam,
             bai = SubsetBam.subset_bai,
-            unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
-            unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
-            unphased_sv_vcf = ConvertLowerCase.subset_vcf,
-            unphased_sv_tbi = ConvertLowerCase.subset_tbi,
+            unphased_snp_vcf = FilterVcfs.filter_small_vcf,
+            unphased_snp_tbi = FilterVcfs.filter_small_vcf_tbi,
+            unphased_sv_vcf = FilterVcfs.filter_SV_vcf,
+            unphased_sv_tbi = FilterVcfs.filter_SV_vcf_tbi,
             ref_fasta = reference_fasta,
             ref_fasta_fai = reference_fasta_fai,
             samplename = sample_id,
@@ -114,7 +122,7 @@ workflow PhysicalAndStatisticalPhasing {
         threads_num = merge_num_threads
     }
 
-    call FilterAndConcatVcfs { input:
+    call ConcatVcfs { input:
         short_vcf = MergeAcrossSamplesShort.merged_vcf,
         short_vcf_tbi = MergeAcrossSamplesShort.merged_tbi,
         sv_vcf = MergeAcrossSamplesSV.merged_vcf,
@@ -123,8 +131,8 @@ workflow PhysicalAndStatisticalPhasing {
     }
 
     call H.Shapeit4 { input:
-        vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
-        vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+        vcf_input = ConcatVcfs.filter_and_concat_vcf,
+        vcf_index = ConcatVcfs.filter_and_concat_vcf_tbi,
         mappingfile = genetic_mapping_dict[chromosome],
         region = region,
         prefix = prefix + ".filter_and_concat.phased",
@@ -138,8 +146,8 @@ workflow PhysicalAndStatisticalPhasing {
         File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
         File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
         File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
-        File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
-        File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
+        File filtered_vcf = ConcatVcfs.filter_and_concat_vcf
+        File filtered_tbi = ConcatVcfs.filter_and_concat_vcf_tbi
         File phased_bcf = Shapeit4.phased_bcf
     }
 }
@@ -181,8 +189,7 @@ task ConvertLowerCase {
     }
 }
 
-# filter out singletons (i.e., keep MAC >= 2) and concatenate with deduplication
-task FilterAndConcatVcfs {
+task FilterVcfs {
 
     input {
         File short_vcf         # multiallelic
@@ -204,10 +211,46 @@ task FilterAndConcatVcfs {
             bcftools norm -m-any --do-not-normalize \
             --write-index -Oz -o ~{prefix}.short.vcf.gz
 
+        bcftools index -t ~{prefix}.SV.vcf.gz
+        bcftools index -t ~{prefix}.short.vcf.gz
+    >>>
+
+    output {
+        File filter_SV_vcf = "~{prefix}.SV.vcf.gz"
+        File filter_SV_vcf_tbi = "~{prefix}.SV.vcf.gz.tbi"
+        File filter_small_vcf = "~{prefix}.short.vcf.gz"
+        File filter_small_vcf_tbi = "~{prefix}.short.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+}
+
+# concatenate with deduplication
+task ConcatVcfs {
+
+    input {
+        File short_vcf         # multiallelic
+        File short_vcf_tbi
+        File sv_vcf            # biallelic
+        File sv_vcf_tbi
+        String prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
         bcftools concat \
-            ~{prefix}.SV.vcf.gz \
-            ~{prefix}.short.vcf.gz \
+            ~{sv_vcf} \
+            ~{short_vcf} \
             --allow-overlaps --remove-duplicates \
             -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
