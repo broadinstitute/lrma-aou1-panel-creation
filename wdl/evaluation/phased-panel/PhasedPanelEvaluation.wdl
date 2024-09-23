@@ -175,6 +175,34 @@ workflow PhasedPanelEvaluation {
         output_prefix = output_prefix
     }
 
+    # evaluate joint short
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateJointShort { input:
+        samples = vcfdist_samples,
+        truth_vcf = vcfdist_truth_vcf,
+        eval_vcf = joint_short_vcf,
+        region = region,
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "NONE",
+        overlap_metrics_docker = overlap_metrics_docker
+    }
+
+    # evaluate integrated SV
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateIntegratedSV { input:
+        samples = vcfdist_samples,
+        truth_vcf = vcfdist_truth_vcf,
+        eval_vcf = joint_sv_vcf,
+        region = region,
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "NONE",
+        overlap_metrics_docker = overlap_metrics_docker
+    }
+
     # evaluate HiPhase short
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
         samples = vcfdist_samples,
@@ -315,10 +343,12 @@ workflow PhasedPanelEvaluation {
         }
     }
 
-    Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"]
+    Array[String] labels_per_vcf = if do_pangenie then ["JointShort", "IntegratedSV", "HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["JointShort", "IntegratedSV", "HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"]
     call SummarizeEvaluations { input:
         labels_per_vcf = labels_per_vcf,
         vcfdist_outputs_per_vcf_and_sample = select_all([
+            EvaluateJointShort.vcfdist_outputs_per_sample,
+            EvaluateIntegratedSV.vcfdist_outputs_per_sample,
             EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
             EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
             EvaluateFiltered.vcfdist_outputs_per_sample,
@@ -330,6 +360,8 @@ workflow PhasedPanelEvaluation {
             EvaluatePanGenie.vcfdist_outputs_per_sample
         ]),
         overlap_metrics_outputs_per_vcf = select_all([
+            EvaluateJointShort.overlap_metrics_outputs,
+            EvaluateIntegratedSV.overlap_metrics_outputs,
             EvaluateHiPhaseShort.overlap_metrics_outputs,
             EvaluateHiPhaseSV.overlap_metrics_outputs,
             EvaluateFiltered.overlap_metrics_outputs,
