@@ -49,6 +49,14 @@ workflow PhysicalAndStatisticalPhasing {
         prefix = prefix + ".unphased"
     }
 
+    call FilterVcfs { input:
+        short_vcf = SubsetVcfShort.subset_vcf,
+        short_vcf_tbi = SubsetVcfShort.subset_tbi,
+        sv_vcf = UnphaseSVGenotypes.unphased_vcf,
+        sv_vcf_tbi = UnphaseSVGenotypes.unphased_vcf_tbi,
+        prefix = prefix + ".filter"
+    }
+
     scatter (idx in indexes)  {
         File all_chr_bam = sample_bams[idx]
         File all_chr_bai = sample_bais[idx]
@@ -67,13 +75,13 @@ workflow PhysicalAndStatisticalPhasing {
         String sample_id = InferSampleName.sample_name
 
         call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-            joint_vcf = SubsetVcfShort.subset_vcf,
+            joint_vcf = FilterVcfs.filter_small_vcf,
             region = region,
             samplename = sample_id
         }
 
         call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-            joint_vcf = UnphaseSVGenotypes.unphased_vcf,
+            joint_vcf = FilterVcfs.filter_SV_vcf,
             region = region,
             samplename = sample_id
         }
@@ -85,21 +93,13 @@ workflow PhysicalAndStatisticalPhasing {
                 
         }
 
-        call FilterVcfs { input:
-            short_vcf = SplitVcfbySampleShort.single_sample_vcf,
-            short_vcf_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
-            sv_vcf = ConvertLowerCase.subset_vcf,
-            sv_vcf_tbi = ConvertLowerCase.subset_tbi,
-            prefix = prefix + ".filter"
-        }
-
         call H.HiPhase { input:
             bam = SubsetBam.subset_bam,
             bai = SubsetBam.subset_bai,
-            unphased_snp_vcf = FilterVcfs.filter_small_vcf,
-            unphased_snp_tbi = FilterVcfs.filter_small_vcf_tbi,
-            unphased_sv_vcf = FilterVcfs.filter_SV_vcf,
-            unphased_sv_tbi = FilterVcfs.filter_SV_vcf_tbi,
+            unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
+            unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
+            unphased_sv_vcf = ConvertLowerCase.subset_vcf,
+            unphased_sv_tbi = ConvertLowerCase.subset_tbi,
             ref_fasta = reference_fasta,
             ref_fasta_fai = reference_fasta_fai,
             samplename = sample_id,
