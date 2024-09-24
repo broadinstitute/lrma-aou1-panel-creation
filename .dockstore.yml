@@ -3,6 +3,12 @@ workflows:
 - name: PhysicalAndStatisticalPhasing
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/PhysicalAndStatisticalPhasing.wdl
+- name: KAGEPanelWithPreprocessing
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/kage/KAGEPanelWithPreprocessing.wdl
+- name: KAGEPlusGLIMPSECase
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/kage/KAGEPlusGLIMPSECase.wdl
 - name: PanGenieCase
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/pangenie/PanGenieCase.wdl
