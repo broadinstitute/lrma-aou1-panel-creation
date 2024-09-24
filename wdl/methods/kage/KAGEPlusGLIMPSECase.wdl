@@ -235,7 +235,7 @@ task KAGEGenotype {
         String docker
         File? monitoring_script
 
-        Boolean? ignore_helper_model = false
+        Boolean? ignore_helper_model = true
         String? kage_genotype_extra_args
 
         RuntimeAttributes runtime_attributes = {}
@@ -260,7 +260,7 @@ task KAGEGenotype {
             -c ~{kmer_counts} \
             --average-coverage ~{average_coverage} \
             -s ~{sample_name} \
-            ~{true='-I' false='' ignore_helper_model} \
+            ~{true='-I true' false='-I false' ignore_helper_model} \
             ~{kage_genotype_extra_args} \
             -o ~{output_prefix}.kage.bi.vcf
 
