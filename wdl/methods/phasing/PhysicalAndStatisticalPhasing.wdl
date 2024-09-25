@@ -175,13 +175,16 @@ task ConvertLowerCase {
         cd ~{work_dir}
 
         python convert_lower_case.py -i ~{vcf} -o ~{prefix}.vcf
-        bgzip ~{prefix}.vcf ~{prefix}.vcf.gz
-        tabix -p vcf ~{prefix}.vcf.gz
+        # bgzip ~{prefix}.vcf ~{prefix}.vcf.gz
+        # tabix -p vcf ~{prefix}.vcf.gz
+
+        bcftools view ~{prefix}.vcf -Ob -o ~{prefix}.bcf
+        bcftools index ~{prefix}.bcf
     >>>
 
     output {
-        File subset_vcf = "~{work_dir}/~{prefix}.vcf.gz"
-        File subset_tbi = "~{work_dir}/~{prefix}.vcf.gz.tbi"
+        File subset_vcf = "~{prefix}.bcf"
+        File subset_tbi = "~{prefix}.bcf.csi"
     }
     ###################
     runtime {
@@ -211,25 +214,25 @@ task FilterAndConcatVcfs {
 
         # filter SV singletons
         bcftools view -i 'MAC>=2' ~{sv_vcf} \
-            --write-index -Oz -o ~{prefix}.SV.vcf.gz
+            --write-index -Ob -o ~{prefix}.SV.bcf
 
         # filter short singletons and split to biallelic
         bcftools view -i 'MAC>=2' ~{short_vcf} | \
             bcftools norm -m-any --do-not-normalize \
-            --write-index -Oz -o ~{prefix}.short.vcf.gz
+            --write-index -Ob -o ~{prefix}.short.bcf
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
         bcftools concat \
             ~{prefix}.SV.vcf.gz \
             ~{prefix}.short.vcf.gz \
             --allow-overlaps --remove-duplicates \
-            -Oz -o ~{prefix}.vcf.gz
-        bcftools index -t ~{prefix}.vcf.gz
+            -Ob -o ~{prefix}.bcf
+        bcftools index ~{prefix}.bcf
     >>>
 
     output {
-        File filter_and_concat_vcf = "~{prefix}.vcf.gz"
-        File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+        File filter_and_concat_vcf = "~{prefix}.bcf"
+        File filter_and_concat_vcf_tbi = "~{prefix}.bcf.csi"
     }
     ###################
     runtime {
@@ -315,7 +318,7 @@ task SplitVcf {
     command <<<
         set -euxo pipefail
         mkdir output
-        bcftools +split -Oz -o output ~{joint_vcf}
+        bcftools +split -Ob -o output ~{joint_vcf}
         # cd output
         # for vcf in $(find . -name "*.vcf.gz"); do
         #     tabix -p vcf "$vcf"
@@ -325,7 +328,7 @@ task SplitVcf {
     >>>
 
     output {
-        Array[File] vcf_by_sample = glob("output/*vcf.gz")
+        Array[File] vcf_by_sample = glob("output/*bcf")
         # Array[File] vcf_by_sample_tbi = glob("output/*vcf.gz.tbi")
 
     }
@@ -357,10 +360,10 @@ task reorder_vcf {
         set -eu
 
         for ff in ~{sep=' ' small_vcfs}; do
-            basename "$ff" .vcf.gz >> snp.sampleids.txt
+            basename "$ff" .bcf >> snp.sampleids.txt
         done
         for ff in ~{sep=' ' sv_vcfs}; do
-            basename "$ff" .vcf.gz >> sv.sampleids.txt
+            basename "$ff" .bcf >> sv.sampleids.txt
         done
         wc -l  *txt
 

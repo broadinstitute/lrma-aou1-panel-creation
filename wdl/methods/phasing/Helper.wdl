@@ -69,19 +69,19 @@ task HiPhase {
         --sample-name ~{samplename} \
         ~{extra_args}
 
-        bcftools sort ~{samplename}_phased_snp.vcf.gz -O z -o ~{samplename}_phased_snp.sorted.vcf.gz
-        tabix -p vcf ~{samplename}_phased_snp.sorted.vcf.gz
+        bcftools sort ~{samplename}_phased_snp.vcf.gz -O b -o ~{samplename}_phased_snp.sorted.bcf
+        bcftools index ~{samplename}_phased_snp.sorted.bcf
 
-        bcftools sort ~{samplename}_phased_sv.vcf.gz -O z -o ~{samplename}_phased_sv.sorted.vcf.gz
-        tabix -p vcf ~{samplename}_phased_sv.sorted.vcf.gz
+        bcftools sort ~{samplename}_phased_sv.vcf.gz -O b -o ~{samplename}_phased_sv.sorted.bcf
+        bcftools index ~{samplename}_phased_sv.sorted.bcf
         
     >>>
 
     output {
-        File phased_snp_vcf = "~{samplename}_phased_snp.sorted.vcf.gz"
-        File phased_snp_vcf_tbi = "~{samplename}_phased_snp.sorted.vcf.gz.tbi"
-        File phased_sv_vcf   = "~{samplename}_phased_sv.sorted.vcf.gz"
-        File phased_sv_vcf_tbi = "~{samplename}_phased_sv.sorted.vcf.gz.tbi"
+        File phased_snp_vcf = "~{samplename}_phased_snp.sorted.bcf"
+        File phased_snp_vcf_tbi = "~{samplename}_phased_snp.sorted.bcf.csi"
+        File phased_sv_vcf   = "~{samplename}_phased_sv.sorted.bcf"
+        File phased_sv_vcf_tbi = "~{samplename}_phased_sv.sorted.bcf.csi"
         File haplotag_file = "~{samplename}_phased_sv_haplotag.tsv"
     }
 
@@ -137,13 +137,13 @@ task SubsetVCF {
     command <<<
         set -euxo pipefail
 
-        bcftools view ~{vcf_gz} --regions ~{locus} | bgzip > ~{prefix}.vcf.gz
-        tabix -p vcf ~{prefix}.vcf.gz
+        bcftools view ~{vcf_gz} --regions ~{locus} -Ob -o ~{prefix}.bcf
+        bcftools index ~{prefix}.bcf
     >>>
 
     output {
-        File subset_vcf = "~{prefix}.vcf.gz"
-        File subset_tbi = "~{prefix}.vcf.gz.tbi"
+        File subset_vcf = "~{prefix}.bcf"
+        File subset_tbi = "~{prefix}.bcf.csi"
     }
 
     #########################
@@ -349,18 +349,18 @@ task MergePerChrVcfWithBcftools {
             --threads ~{threads_num} \
             --merge none \
             -l my_vcfs.txt \
-            -O z \
-            -o ~{pref}.AllSamples.vcf.gz
+            -O b \
+            -o ~{pref}.AllSamples.bcf
 
-        tabix -@ ~{threads_num} -p vcf ~{pref}.AllSamples.vcf.gz
+        bcftools index ~{pref}.AllSamples.bcf
 
         # move result files to the correct location for cromwell to de-localize
-        mv ~{pref}.AllSamples.vcf.gz ~{pref}.AllSamples.vcf.gz.tbi /cromwell_root/
+        mv ~{pref}.AllSamples.bcf ~{pref}.AllSamples.bcf.csi /cromwell_root/
     >>>
 
     output{
-        File merged_vcf = "~{pref}.AllSamples.vcf.gz"
-        File merged_tbi = "~{pref}.AllSamples.vcf.gz.tbi"
+        File merged_vcf = "~{pref}.AllSamples.bcf"
+        File merged_tbi = "~{pref}.AllSamples.bcf.csi"
     }
 
     runtime {
