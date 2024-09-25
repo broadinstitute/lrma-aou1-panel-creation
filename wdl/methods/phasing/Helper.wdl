@@ -343,7 +343,7 @@ task MergePerChrVcfWithBcftools {
 
         # then merge, and safely assume all ssp-VCFs are sorted in the same order, on one chr
         cd ssp_vcfs
-        ls *.vcf.gz > my_vcfs.txt
+        ls *.bcf > my_vcfs.txt
 
         bcftools merge \
             --threads ~{threads_num} \
