@@ -223,8 +223,8 @@ task FilterAndConcatVcfs {
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
         bcftools concat \
-            ~{prefix}.SV.vcf.gz \
-            ~{prefix}.short.vcf.gz \
+            ~{prefix}.SV.bcf \
+            ~{prefix}.short.bcf \
             --allow-overlaps --remove-duplicates \
             -Ob -o ~{prefix}.bcf
         bcftools index ~{prefix}.bcf
