@@ -318,7 +318,7 @@ task SplitVcf {
     command <<<
         set -euxo pipefail
         mkdir output
-        bcftools +split -Ob -o output ~{joint_vcf}
+        bcftools +split -Oz -o output ~{joint_vcf}
         # cd output
         # for vcf in $(find . -name "*.vcf.gz"); do
         #     tabix -p vcf "$vcf"
@@ -328,7 +328,7 @@ task SplitVcf {
     >>>
 
     output {
-        Array[File] vcf_by_sample = glob("output/*bcf")
+        Array[File] vcf_by_sample = glob("output/*vcf.gz")
         # Array[File] vcf_by_sample_tbi = glob("output/*vcf.gz.tbi")
 
     }
