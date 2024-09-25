@@ -183,8 +183,8 @@ task ConvertLowerCase {
     >>>
 
     output {
-        File subset_vcf = "~{prefix}.bcf"
-        File subset_tbi = "~{prefix}.bcf.csi"
+        File subset_vcf = "~{work_dir}/~{prefix}.bcf"
+        File subset_tbi = "~{work_dir}/~{prefix}.bcf.csi"
     }
     ###################
     runtime {
