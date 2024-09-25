@@ -81,8 +81,8 @@ workflow PhysicalAndStatisticalPhasing {
         String sample_id = sample_id_list[idx]
         File all_chr_bam = sample_bams[idx]
         File all_chr_bai = sample_bais[idx]
-        File all_chr_small = splitsmall.vcf_by_sample[idy]
-        File all_chr_sv = splitSV.vcf_by_sample[idz]
+        File one_chr_small = splitsmall.vcf_by_sample[idy]
+        File one_chr_sv = splitSV.vcf_by_sample[idz]
 
         call H.SubsetBam { input:
             bam = all_chr_bam,
@@ -90,42 +90,11 @@ workflow PhysicalAndStatisticalPhasing {
             locus = region
         }
 
-        # call H.InferSampleName { input: 
-        #     bam = all_chr_bam, 
-        #     bai = all_chr_bai
-        # }
-
-        # String sample_id = InferSampleName.sample_name
-
-
-
-        # call FindMatch as find_small_vcf { input:
-        #     vcfs = splitsmall.vcf_by_sample,
-        #     sample_id = sample_id
-        # }
-
-        # call FindMatch as find_sv { input:
-        #     vcfs = splitSV.vcf_by_sample,
-        #     sample_id = sample_id
-        # }
-
-    #     # call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-    #     #     joint_vcf = joint_short_vcf,
-    #     #     region = region,
-    #     #     samplename = sample_id
-    #     # }
-
-    #     # call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-    #     #     joint_vcf = UnphaseSVGenotypes.unphased_vcf,
-    #     #     region = region,
-    #     #     samplename = sample_id
-    #     # }
-
         call H.HiPhase { input:
             bam = SubsetBam.subset_bam,
             bai = SubsetBam.subset_bai,
-            unphased_snp_vcf = all_chr_small,
-            unphased_sv_vcf = all_chr_sv,
+            unphased_snp_vcf = one_chr_small,
+            unphased_sv_vcf = one_chr_sv,
             ref_fasta = reference_fasta,
             ref_fasta_fai = reference_fasta_fai,
             samplename = sample_id,
@@ -347,17 +316,17 @@ task SplitVcf {
         set -euxo pipefail
         mkdir output
         bcftools +split -Oz -o output ~{joint_vcf}
-        cd output
-        for vcf in $(find . -name "*.vcf.gz"); do
-            tabix -p vcf "$vcf"
-        done
-        cd -
+        # cd output
+        # for vcf in $(find . -name "*.vcf.gz"); do
+        #     tabix -p vcf "$vcf"
+        # done
+        # cd -
 
     >>>
 
     output {
         Array[File] vcf_by_sample = glob("output/*vcf.gz")
-        Array[File] vcf_by_sample_tbi = glob("output/*vcf.gz.tbi")
+        # Array[File] vcf_by_sample_tbi = glob("output/*vcf.gz.tbi")
 
     }
     ###################
@@ -436,36 +405,3 @@ task reorder_vcf {
     }
 
 }
-
-# task FindMatch {
-#     input {
-#         Array[File] vcfs
-#         String sample_id
-#     }
-
-#     command <<<
-#         for ff in ~{sep=' ' vcfs}; do
-#             basename=$(basename "$ff" .vcf.gz)
-#             if [[ "$basename" == "~{sample_id}" ]]; then
-#                 echo "$ff"
-#             fi
-#         done
-
-#     >>>
-
-#     output {
-#         Array[String] out = read_lines(stdout())
-#     }
-
-#         ###################
-#     runtime {
-#         cpu: 1
-#         memory:  "4 GiB"
-#         disks: "local-disk 50 HDD"
-#         bootDiskSizeGb: 10
-#         preemptible_tries:     3
-#         max_retries:           2
-#         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
-#     }
-# }
-
