@@ -24,6 +24,7 @@ workflow KAGEPlusGLIMPSECase {
         File reference_fasta_fai
         File reference_dict
         Array[String]+ chromosomes
+        Array[File]+ genetic_maps
         Boolean subset_reads = true
         String sample_name
         Float average_coverage
@@ -78,6 +79,7 @@ workflow KAGEPlusGLIMPSECase {
                 panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi,
                 reference_fasta_fai = reference_fasta_fai,
                 chromosome = chromosomes[j],
+                genetic_map = genetic_maps[j],
                 output_prefix = sample_name,
                 docker = kage_docker,
                 monitoring_script = monitoring_script
@@ -308,6 +310,7 @@ task GLIMPSECaseChromosome {
         File panel_split_vcf_gz_tbi
         File reference_fasta_fai
         String chromosome
+        File genetic_map
         String output_prefix
 
         String docker
@@ -339,6 +342,7 @@ task GLIMPSECaseChromosome {
             -R ~{panel_split_vcf_gz} \
             --input-region ~{chromosome}:1-$CHROMOSOME_LENGTH \
             --output-region ~{chromosome}:1-$CHROMOSOME_LENGTH \
+            --map ~{genetic_map} \
             --input-GL \
             --thread $(nproc) \
             --output ~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz

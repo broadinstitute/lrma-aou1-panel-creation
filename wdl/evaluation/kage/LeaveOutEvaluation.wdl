@@ -117,6 +117,7 @@ workflow LeaveOutEvaluation {
                 reference_fasta_fai = case_reference_fasta_fai,
                 reference_dict = case_reference_dict,
                 chromosomes = chromosomes,
+                genetic_maps = genetic_maps,
                 subset_reads = true,
                 sample_name = leave_out_sample_name,
                 average_coverage = case_average_coverage,
