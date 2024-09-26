@@ -328,6 +328,7 @@ task MergePerChrVcfWithBcftools {
         Array[File] tbi_input
         String pref
         Int threads_num
+        Int batch_size
     }
 
     command <<<
@@ -343,17 +344,27 @@ task MergePerChrVcfWithBcftools {
 
         # then merge, and safely assume all ssp-VCFs are sorted in the same order, on one chr
         cd ssp_vcfs
-        ls *.vcf.gz > my_vcfs.txt
+        ls *.vcf.gz | split -l ~{batch_size} - subset_vcfs
+
+        for i in subset_vcfs*;
+            do
+            bcftools merge \
+                --threads ~{threads_num} \
+                --merge none \
+                -l $i \
+                -O z \
+                -o ~{pref}.merge.$i.vcf.gz
+            bcftools index -t ~{pref}.merge.$i.vcf.gz
+            done
+        ls ~{pref}.merge.*.vcf.gz > merge.txt
 
         bcftools merge \
-            --threads ~{threads_num} \
-            --merge none \
-            -l my_vcfs.txt \
-            -O z \
-            -o ~{pref}.AllSamples.vcf.gz
-
+                --threads ~{threads_num} \
+                --merge none \
+                -l merge.txt \
+                -O z \
+                -o ~{pref}.AllSamples.vcf.gz
         bcftools index -t ~{pref}.AllSamples.vcf.gz
-
         # move result files to the correct location for cromwell to de-localize
         mv ~{pref}.AllSamples.vcf.gz ~{pref}.AllSamples.vcf.gz.tbi /cromwell_root/
     >>>
