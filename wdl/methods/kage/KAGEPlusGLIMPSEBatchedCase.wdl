@@ -75,8 +75,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
 
     call MergeSamples {
         input:
-            input_vcfs = KAGEGenotype.kage_vcf_gz,
-            input_tbis = KAGEGenotype.kage_vcf_gz_tbi,
+            input_bcfs = KAGEGenotype.kage_bcf,
             output_prefix = output_prefix,
             monitoring_script = monitoring_script
     }
@@ -84,8 +83,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
     scatter (j in range(length(chromosomes))) {
         call GLIMPSECaseChromosome as GLIMPSEBatchedCaseChromosome {
             input:
-                kage_vcf_gz = MergeSamples.merged_vcf_gz,
-                kage_vcf_gz_tbi = MergeSamples.merged_vcf_gz_tbi,
+                kage_bcf = MergeSamples.merged_bcf,
                 panel_split_vcf_gz = panel_split_vcf_gz,
                 panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi,
                 reference_fasta_fai = reference_fasta_fai,
@@ -109,13 +107,11 @@ workflow KAGEPlusGLIMPSEBatchedCase {
     output {
         Array[File] cram_idxs = IndexCaseReads.cram_idx
         Array[File] kmer_counts = KAGECountKmers.kmer_counts
-        Array[File] kage_vcf_gzs = KAGEGenotype.kage_vcf_gz
-        Array[File] kage_vcf_gz_tbis = KAGEGenotype.kage_vcf_gz_tbi
-        File kage_vcf_gz = MergeSamples.merged_vcf_gz
-        File kage_vcf_gz_tbi = MergeSamples.merged_vcf_gz_tbi
+        Array[File] kage_bcfs = KAGEGenotype.kage_bcf
+        File kage_bcf = MergeSamples.merged_bcf
         File glimpse_unphased_vcf_gz = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz
         File glimpse_unphased_vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi
-        File glimpse_vcf_gz = GLIMPSEBatchedCase.glimpse_vcf_gz
+        File glimpse_bcf = GLIMPSEBatchedCase.glimpse_vcf_gz
         File glimpse_vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi
     }
 }
@@ -294,8 +290,7 @@ task KAGEGenotype {
         bgzip -c ~{output_prefix}.kage.bi.vcf > ~{output_prefix}.kage.bi.vcf.gz
         bcftools index -t ~{output_prefix}.kage.bi.vcf.gz
 
-        bcftools concat --no-version -a ~{output_prefix}.kage.bi.vcf.gz ~{output_prefix}.multi.split.vcf.gz -Oz -o ~{output_prefix}.kage.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.vcf.gz
+        bcftools concat --no-version -a ~{output_prefix}.kage.bi.vcf.gz ~{output_prefix}.multi.split.vcf.gz -Ob -o ~{output_prefix}.kage.bcf
     }
 
     runtime {
@@ -310,20 +305,17 @@ task KAGEGenotype {
 
     output {
         File monitoring_log = "monitoring.log"
-        File kage_vcf_gz = "~{output_prefix}.kage.vcf.gz"
-        File kage_vcf_gz_tbi = "~{output_prefix}.kage.vcf.gz.tbi"
+        File kage_bcf = "~{output_prefix}.kage.bcf"
     }
 }
 
 task MergeSamples {
     parameter_meta {
-        input_vcfs: {localization_optional: true}
-        input_tbis: {localization_optional: true}
+        input_bcfs: {localization_optional: true}
     }
 
     input {
-        Array[File] input_vcfs
-        Array[File] input_tbis
+        Array[File] input_bcfs
         String output_prefix
 
         File? monitoring_script
@@ -338,30 +330,24 @@ task MergeSamples {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        # we do single-sample VCFs localization ourselves
-        mkdir -p input_vcfs
+        # we do single-sample BCF localization ourselves
+        mkdir -p input_bcfs
         time \
-        gcloud storage cp ~{sep=" " input_vcfs} /cromwell_root/input_vcfs/
-
-        time \
-        gcloud storage cp ~{sep=" " input_tbis} /cromwell_root/input_vcfs/
+        gcloud storage cp ~{sep=" " input_bcfs} /cromwell_root/input_bcfs/
 
         # then merge, and safely assume all single-sample VCFs are sorted in the same order, on one chr
-        ls /cromwell_root/input_vcfs/*.vcf.gz > input_vcfs.txt
+        ls /cromwell_root/input_bcfs/*.bcf > input_bcfs.txt
 
         bcftools merge \
             --threads $(nproc) \
             --merge none \
-            -l input_vcfs.txt \
-            -Oz -o ~{output_prefix}.merged.vcf.gz
-
-        tabix -@ $(nproc) -p vcf ~{output_prefix}.merged.vcf.gz
+            -l input_bcfs.txt \
+            -Ob -o ~{output_prefix}.merged.bcf
     >>>
 
     output {
         File monitoring_log = "monitoring.log"
-        File merged_vcf_gz = "~{output_prefix}.merged.vcf.gz"
-        File merged_vcf_gz_tbi = "~{output_prefix}.merged.vcf.gz.tbi"
+        File merged_bcf = "~{output_prefix}.merged.bcf"
     }
 
     runtime {
@@ -376,8 +362,7 @@ task MergeSamples {
 
 task GLIMPSECaseChromosome {
     input {
-        File kage_vcf_gz
-        File kage_vcf_gz_tbi
+        File kage_bcf
         File panel_split_vcf_gz       # for GLIMPSE
         File panel_split_vcf_gz_tbi
         File reference_fasta_fai
@@ -400,7 +385,7 @@ task GLIMPSECaseChromosome {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools view --no-version -r ~{chromosome} ~{kage_vcf_gz} | \
+        bcftools view --no-version -r ~{chromosome} ~{kage_bcf} | \
             sed -e 's/nan/-1000000.0/g' | sed -e 's/-inf/-1000000.0/g' | sed -e 's/inf/-1000000.0/g' | bgzip > ~{output_prefix}.kage.nonan.~{chromosome}.vcf.gz
         bcftools index -t ~{output_prefix}.kage.nonan.~{chromosome}.vcf.gz
 
