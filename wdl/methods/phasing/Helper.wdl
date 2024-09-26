@@ -69,19 +69,19 @@ task HiPhase {
         --sample-name ~{samplename} \
         ~{extra_args}
 
-        bcftools sort ~{samplename}_phased_snp.vcf.gz -O b -o ~{samplename}_phased_snp.sorted.bcf
-        bcftools index ~{samplename}_phased_snp.sorted.bcf
+        bcftools sort ~{samplename}_phased_snp.vcf.gz -O z -o ~{samplename}_phased_snp.sorted.vcf.gz
+        bcftools index -t ~{samplename}_phased_snp.sorted.vcf.gz
 
-        bcftools sort ~{samplename}_phased_sv.vcf.gz -O b -o ~{samplename}_phased_sv.sorted.bcf
-        bcftools index ~{samplename}_phased_sv.sorted.bcf
+        bcftools sort ~{samplename}_phased_sv.vcf.gz -O z -o ~{samplename}_phased_sv.sorted.vcf.gz
+        bcftools index -t ~{samplename}_phased_sv.sorted.vcf.gz
         
     >>>
 
     output {
-        File phased_snp_vcf = "~{samplename}_phased_snp.sorted.bcf"
-        File phased_snp_vcf_tbi = "~{samplename}_phased_snp.sorted.bcf.csi"
-        File phased_sv_vcf   = "~{samplename}_phased_sv.sorted.bcf"
-        File phased_sv_vcf_tbi = "~{samplename}_phased_sv.sorted.bcf.csi"
+        File phased_snp_vcf = "~{samplename}_phased_snp.sorted.vcf.gz"
+        File phased_snp_vcf_tbi = "~{samplename}_phased_snp.sorted.vcf.gz.tbi"
+        File phased_sv_vcf   = "~{samplename}_phased_sv.sorted.vcf.gz"
+        File phased_sv_vcf_tbi = "~{samplename}_phased_sv.sorted.vcf.gz.tbi"
         File haplotag_file = "~{samplename}_phased_sv_haplotag.tsv"
     }
 
@@ -343,24 +343,24 @@ task MergePerChrVcfWithBcftools {
 
         # then merge, and safely assume all ssp-VCFs are sorted in the same order, on one chr
         cd ssp_vcfs
-        ls *.bcf > my_vcfs.txt
+        ls *.vcf.gz > my_vcfs.txt
 
         bcftools merge \
             --threads ~{threads_num} \
             --merge none \
             -l my_vcfs.txt \
-            -O b \
-            -o ~{pref}.AllSamples.bcf
+            -O z \
+            -o ~{pref}.AllSamples.vcf.gz
 
-        bcftools index ~{pref}.AllSamples.bcf
+        bcftools index -t ~{pref}.AllSamples.vcf.gz
 
         # move result files to the correct location for cromwell to de-localize
-        mv ~{pref}.AllSamples.bcf ~{pref}.AllSamples.bcf.csi /cromwell_root/
+        mv ~{pref}.AllSamples.vcf.gz ~{pref}.AllSamples.vcf.gz.tbi /cromwell_root/
     >>>
 
     output{
-        File merged_vcf = "~{pref}.AllSamples.bcf"
-        File merged_tbi = "~{pref}.AllSamples.bcf.csi"
+        File merged_vcf = "~{pref}.AllSamples.vcf.gz"
+        File merged_tbi = "~{pref}.AllSamples.vcf.gz.tbi"
     }
 
     runtime {
