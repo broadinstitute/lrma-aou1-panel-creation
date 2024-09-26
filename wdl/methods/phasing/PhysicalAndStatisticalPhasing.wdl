@@ -27,6 +27,7 @@ workflow PhysicalAndStatisticalPhasing {
         Int shapeit4_memory
         String shapeit4_extra_args = "--use-PS 0.0001" # expected error rate in phase sets derived from physical phasing
         String hiphase_extra_args
+        Int batch_size
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
@@ -107,14 +108,16 @@ workflow PhysicalAndStatisticalPhasing {
         vcf_input = HiPhase.phased_snp_vcf,
         tbi_input = HiPhase.phased_snp_vcf_tbi,
         pref = prefix + ".short",
-        threads_num = merge_num_threads
+        threads_num = merge_num_threads,
+        batch_size = batch_size
     }
 
     call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
         vcf_input = HiPhase.phased_sv_vcf,
         tbi_input = HiPhase.phased_sv_vcf_tbi,
         pref = prefix + ".SV",
-        threads_num = merge_num_threads
+        threads_num = merge_num_threads,
+        batch_size = batch_size
     }
 
     call FilterAndConcatVcfs { input:

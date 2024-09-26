@@ -70,6 +70,7 @@ workflow PhasedPanelEvaluation {
         String leave_out_docker
         String kage_docker
         String pangenie_docker
+        Int batch_size # Merge vcf batch size
         RuntimeAttributes? leave_out_runtime_attributes
         RuntimeAttributes? leave_out_medium_runtime_attributes
         RuntimeAttributes? leave_out_large_runtime_attributes
@@ -97,7 +98,8 @@ workflow PhasedPanelEvaluation {
         hiphase_memory = hiphase_memory,
         shapeit4_memory = shapeit4_memory,
         shapeit4_extra_args = shapeit4_extra_args,
-        hiphase_extra_args = hiphase_extra_args
+        hiphase_extra_args = hiphase_extra_args,
+        batch_size = batch_size
     }
 
     call FixVariantCollisions { input:
@@ -155,7 +157,8 @@ workflow PhasedPanelEvaluation {
         vcf_input = LeaveOutEvaluation.glimpse_vcf_gzs,
         tbi_input = LeaveOutEvaluation.glimpse_vcf_gz_tbis,
         pref = output_prefix + ".glimpse.merged",
-        threads_num = merge_num_threads
+        threads_num = merge_num_threads,
+        batch_size = batch_size
     }
 
     call FixVariantCollisions as GenotypingFixVariantCollisions { input:
@@ -287,7 +290,8 @@ workflow PhasedPanelEvaluation {
             vcf_input = select_all(LeaveOutEvaluation.pangenie_vcf_gzs),
             tbi_input = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
             pref = output_prefix + ".pangenie.merged",
-            threads_num = merge_num_threads
+            threads_num = merge_num_threads,
+            batch_size = batch_size
         }
 
         # summarize PanGenie metrics vs. panel
