@@ -351,6 +351,7 @@ task MergePerChrVcfWithBcftools {
             bcftools merge \
                 --threads ~{threads_num} \
                 --merge none \
+                --force-single \
                 -l $i \
                 -O z \
                 -o ~{pref}.merge.$i.vcf.gz
@@ -360,6 +361,7 @@ task MergePerChrVcfWithBcftools {
 
         bcftools merge \
                 --threads ~{threads_num} \
+                --force-single \
                 --merge none \
                 -l merge.txt \
                 -O z \
