@@ -76,6 +76,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
     call MergeSamples {
         input:
             input_bcfs = KAGEGenotype.kage_bcf,
+            input_bcf_csis = KAGEGenotype.kage_bcf_csi,
             output_prefix = output_prefix,
             monitoring_script = monitoring_script
     }
@@ -84,6 +85,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
         call GLIMPSECaseChromosome as GLIMPSEBatchedCaseChromosome {
             input:
                 kage_bcf = MergeSamples.merged_bcf,
+                kage_bcf_csi = MergeSamples.merged_bcf_csi,
                 panel_split_vcf_gz = panel_split_vcf_gz,
                 panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi,
                 reference_fasta_fai = reference_fasta_fai,
@@ -97,8 +99,8 @@ workflow KAGEPlusGLIMPSEBatchedCase {
 
     call GLIMPSECase as GLIMPSEBatchedCase {
         input:
-            chromosome_glimpse_vcf_gzs = GLIMPSEBatchedCaseChromosome.chromosome_glimpse_vcf_gz,
-            chromosome_glimpse_vcf_gz_tbis = GLIMPSEBatchedCaseChromosome.chromosome_glimpse_vcf_gz_tbi,
+            chromosome_glimpse_bcfs = GLIMPSEBatchedCaseChromosome.chromosome_glimpse_bcf,
+            chromosome_glimpse_bcf_csis = GLIMPSEBatchedCaseChromosome.chromosome_glimpse_bcf_csi,
             output_prefix = output_prefix,
             docker = kage_docker,
             monitoring_script = monitoring_script
@@ -108,11 +110,13 @@ workflow KAGEPlusGLIMPSEBatchedCase {
         Array[File] cram_idxs = IndexCaseReads.cram_idx
         Array[File] kmer_counts = KAGECountKmers.kmer_counts
         Array[File] kage_bcfs = KAGEGenotype.kage_bcf
+        Array[File] kage_bcf_csis = KAGEGenotype.kage_bcf_csi
         File kage_bcf = MergeSamples.merged_bcf
-        File glimpse_unphased_vcf_gz = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz
-        File glimpse_unphased_vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi
-        File glimpse_bcf = GLIMPSEBatchedCase.glimpse_vcf_gz
-        File glimpse_vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi
+        File kage_bcf_csi = MergeSamples.merged_bcf_csi
+        File glimpse_unphased_bcf = GLIMPSEBatchedCase.glimpse_unphased_bcf
+        File glimpse_unphased_bcf_csi = GLIMPSEBatchedCase.glimpse_unphased_bcf_csi
+        File glimpse_bcf = GLIMPSEBatchedCase.glimpse_bcf
+        File glimpse_bcf_csi = GLIMPSEBatchedCase.glimpse_bcf_csi
     }
 }
 
@@ -274,8 +278,9 @@ task KAGEGenotype {
             ~{true='-I true' false='-I false' ignore_helper_model} \
             ~{kage_genotype_extra_args} \
             -o ~{output_prefix}.kage.bi.vcf
+        bcftools view ~{output_prefix}.kage.bi.vcf --write-index -Ob -o ~{output_prefix}.kage.bi.bcf
 
-        # we need to add split multiallelics to biallelic-only KAGE VCF
+        # we need to add split multiallelics to biallelic-only KAGE BCF
         # create single-sample header from LOO panel w/ split multiallelics
         bcftools view --no-version -h -G ~{panel_multi_split_vcf_gz} | \
             sed 's/##fileformat=VCFv4.2/##fileformat=VCFv4.2\n##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n##FORMAT=<ID=GL,Number=G,Type=Float,Description="Genotype likelihoods.">/g' | \
@@ -283,14 +288,10 @@ task KAGEGenotype {
         # create single-sample missing genotypes from LOO panel w/ split multiallelics
         bcftools view --no-version -H -G ~{panel_multi_split_vcf_gz} | \
             sed 's/$/\tGT:GL\t.\/.:nan,nan,nan/g' > ~{output_prefix}.multi.split.GT.txt
-        # create single-sample VCF w/ split multiallelics
-        bgzip -c <(cat ~{output_prefix}.multi.split.header.txt ~{output_prefix}.multi.split.GT.txt) > ~{output_prefix}.multi.split.vcf.gz
-        bcftools index -t ~{output_prefix}.multi.split.vcf.gz
+        # create single-sample BCF w/ split multiallelics
+        bcftools view <(cat ~{output_prefix}.multi.split.header.txt ~{output_prefix}.multi.split.GT.txt) --write-index -Ob -o ~{output_prefix}.multi.split.bcf
 
-        bgzip -c ~{output_prefix}.kage.bi.vcf > ~{output_prefix}.kage.bi.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.bi.vcf.gz
-
-        bcftools concat --no-version -a ~{output_prefix}.kage.bi.vcf.gz ~{output_prefix}.multi.split.vcf.gz -Ob -o ~{output_prefix}.kage.bcf
+        bcftools concat --no-version -a ~{output_prefix}.kage.bi.bcf ~{output_prefix}.multi.split.bcf --write-index -Ob -o ~{output_prefix}.kage.bcf
     }
 
     runtime {
@@ -306,16 +307,19 @@ task KAGEGenotype {
     output {
         File monitoring_log = "monitoring.log"
         File kage_bcf = "~{output_prefix}.kage.bcf"
+        File kage_bcf_csi = "~{output_prefix}.kage.bcf.csi"
     }
 }
 
 task MergeSamples {
     parameter_meta {
         input_bcfs: {localization_optional: true}
+        input_bcf_csis: {localization_optional: true}
     }
 
     input {
         Array[File] input_bcfs
+        Array[File] input_bcf_csis
         String output_prefix
 
         File? monitoring_script
@@ -332,22 +336,22 @@ task MergeSamples {
 
         # we do single-sample BCF localization ourselves
         mkdir -p input_bcfs
-        time \
-        gcloud storage cp ~{sep=" " input_bcfs} /cromwell_root/input_bcfs/
+        time gcloud storage cp ~{sep=" " input_bcfs} ~{sep=" " input_bcf_csis} /cromwell_root/input_bcfs/
 
-        # then merge, and safely assume all single-sample VCFs are sorted in the same order, on one chr
+        # then merge, and safely assume all single-sample BCFs are sorted in the same order, on one chr
         ls /cromwell_root/input_bcfs/*.bcf > input_bcfs.txt
 
         bcftools merge \
             --threads $(nproc) \
             --merge none \
             -l input_bcfs.txt \
-            -Ob -o ~{output_prefix}.merged.bcf
+            --write-index -Ob -o ~{output_prefix}.merged.bcf
     >>>
 
     output {
         File monitoring_log = "monitoring.log"
         File merged_bcf = "~{output_prefix}.merged.bcf"
+        File merged_bcf_csi = "~{output_prefix}.merged.bcf.csi"
     }
 
     runtime {
@@ -363,6 +367,7 @@ task MergeSamples {
 task GLIMPSECaseChromosome {
     input {
         File kage_bcf
+        File kage_bcf_csi
         File panel_split_vcf_gz       # for GLIMPSE
         File panel_split_vcf_gz_tbi
         File reference_fasta_fai
@@ -386,8 +391,8 @@ task GLIMPSECaseChromosome {
         fi
 
         bcftools view --no-version -r ~{chromosome} ~{kage_bcf} | \
-            sed -e 's/nan/-1000000.0/g' | sed -e 's/-inf/-1000000.0/g' | sed -e 's/inf/-1000000.0/g' | bgzip > ~{output_prefix}.kage.nonan.~{chromosome}.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.nonan.~{chromosome}.vcf.gz
+            sed -e 's/nan/-1000000.0/g' | sed -e 's/-inf/-1000000.0/g' | sed -e 's/inf/-1000000.0/g' | \
+            bcftools view --write-index -Ob -o ~{output_prefix}.kage.nonan.~{chromosome}.bcf
 
         # TODO update to GLIMPSE2; first figure out why it complains about AC/AN and GT being inconsistent?
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_phase_static
@@ -395,15 +400,15 @@ task GLIMPSECaseChromosome {
 
         CHROMOSOME_LENGTH=$(grep -P "~{chromosome}\t" ~{reference_fasta_fai} | cut -f 2)
         ./GLIMPSE_phase_static \
-            -I ~{output_prefix}.kage.nonan.~{chromosome}.vcf.gz \
+            -I ~{output_prefix}.kage.nonan.~{chromosome}.bcf \
             -R ~{panel_split_vcf_gz} \
             --input-region ~{chromosome}:1-$CHROMOSOME_LENGTH \
             --output-region ~{chromosome}:1-$CHROMOSOME_LENGTH \
             --map ~{genetic_map} \
             --input-GL \
             --thread $(nproc) \
-            --output ~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz
+            --output ~{output_prefix}.kage.glimpse.~{chromosome}.bcf
+        bcftools index ~{output_prefix}.kage.glimpse.~{chromosome}.bcf
     }
 
     runtime {
@@ -418,15 +423,15 @@ task GLIMPSECaseChromosome {
 
     output {
         File monitoring_log = "monitoring.log"
-        File chromosome_glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz"
-        File chromosome_glimpse_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz.tbi"
+        File chromosome_glimpse_bcf = "~{output_prefix}.kage.glimpse.~{chromosome}.bcf"
+        File chromosome_glimpse_bcf_csi = "~{output_prefix}.kage.glimpse.~{chromosome}.bcf.csi"
     }
 }
 
 task GLIMPSECase {
     input {
-        Array[File] chromosome_glimpse_vcf_gzs
-        Array[File] chromosome_glimpse_vcf_gz_tbis
+        Array[File] chromosome_glimpse_bcfs
+        Array[File] chromosome_glimpse_bcf_csis
         String output_prefix
 
         String docker
@@ -449,23 +454,19 @@ task GLIMPSECase {
         chmod +x GLIMPSE_ligate_static
 
         ./GLIMPSE_ligate_static \
-            --input ~{write_lines(chromosome_glimpse_vcf_gzs)} \
-            --output ~{output_prefix}.ligate.bcf \
+            --input ~{write_lines(chromosome_glimpse_bcfs)} \
+            --output ~{output_prefix}.kage.glimpse.unphased.bcf \
             --log ~{output_prefix}.ligate.log
+        bcftools index ~{output_prefix}.kage.glimpse.unphased.bcf
 
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
         chmod +x GLIMPSE_sample_static
 
         ./GLIMPSE_sample_static --input ~{output_prefix}.ligate.bcf \
             --solve \
-            --output ~{output_prefix}.sample.bcf \
+            --output ~{output_prefix}.kage.glimpse.bcf \
             --log ~{output_prefix}.sample.log
-
-        bcftools view --no-version ~{output_prefix}.ligate.bcf -Oz -o ~{output_prefix}.kage.glimpse.unphased.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.glimpse.unphased.vcf.gz
-
-        bcftools view --no-version ~{output_prefix}.sample.bcf -Oz -o ~{output_prefix}.kage.glimpse.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.glimpse.vcf.gz
+        bcftools index ~{output_prefix}.kage.glimpse.bcf
     }
 
     runtime {
@@ -481,9 +482,9 @@ task GLIMPSECase {
     output {
         File monitoring_log = "monitoring.log"
         File ligate_log = "~{output_prefix}.ligate.log"
-        File glimpse_unphased_vcf_gz = "~{output_prefix}.kage.glimpse.unphased.vcf.gz"
-        File glimpse_unphased_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.unphased.vcf.gz.tbi"
-        File glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.vcf.gz"
-        File glimpse_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.vcf.gz.tbi"
+        File glimpse_unphased_bcf = "~{output_prefix}.kage.glimpse.unphased.bcf"
+        File glimpse_unphased_bcf_csi = "~{output_prefix}.kage.glimpse.unphased.bcf.csi"
+        File glimpse_bcf = "~{output_prefix}.kage.glimpse.bcf"
+        File glimpse_bcf_csi = "~{output_prefix}.kage.glimpse.bcf.csi"
     }
 }
