@@ -465,7 +465,7 @@ task GLIMPSECase {
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
         chmod +x GLIMPSE_sample_static
 
-        ./GLIMPSE_sample_static --input ~{output_prefix}.ligate.bcf \
+        ./GLIMPSE_sample_static --input ~{output_prefix}.kage.glimpse.unphased.bcf \
             --solve \
             --output ~{output_prefix}.kage.glimpse.bcf \
             --log ~{output_prefix}.sample.log
