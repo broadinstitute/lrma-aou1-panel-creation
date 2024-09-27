@@ -457,7 +457,6 @@ task GLIMPSECase {
             --input ~{write_lines(chromosome_glimpse_bcfs)} \
             --output ~{output_prefix}.kage.glimpse.unphased.bcf \
             --log ~{output_prefix}.ligate.log
-        bcftools index ~{output_prefix}.kage.glimpse.unphased.bcf
 
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
         chmod +x GLIMPSE_sample_static
@@ -466,7 +465,6 @@ task GLIMPSECase {
             --solve \
             --output ~{output_prefix}.kage.glimpse.bcf \
             --log ~{output_prefix}.sample.log
-        bcftools index ~{output_prefix}.kage.glimpse.bcf
     }
 
     runtime {
