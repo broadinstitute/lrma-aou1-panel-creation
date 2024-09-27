@@ -323,6 +323,9 @@ task MergeSamples {
         String output_prefix
 
         File? monitoring_script
+
+        String docker = "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+        RuntimeAttributes runtime_attributes = {}
     }
 
     command <<<
@@ -348,19 +351,20 @@ task MergeSamples {
             --write-index -Ob -o ~{output_prefix}.merged.bcf
     >>>
 
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, true]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+
     output {
         File monitoring_log = "monitoring.log"
         File merged_bcf = "~{output_prefix}.merged.bcf"
         File merged_bcf_csi = "~{output_prefix}.merged.bcf.csi"
-    }
-
-    runtime {
-        cpu: 8
-        memory: "32 GiB"
-        disks: "local-disk 250 LOCAL"
-        preemptible: 2
-        maxRetries: 0
-        docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
     }
 }
 
