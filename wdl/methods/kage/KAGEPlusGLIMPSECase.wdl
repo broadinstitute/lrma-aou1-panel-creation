@@ -212,7 +212,7 @@ task KAGECountKmers {
         docker: docker
         cpu: cpu_resolved
         memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, true]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
         preemptible: select_first([runtime_attributes.preemptible, 2])
         maxRetries: select_first([runtime_attributes.max_retries, 1])
