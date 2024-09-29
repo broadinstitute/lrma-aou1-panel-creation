@@ -3,6 +3,9 @@ workflows:
 - name: PhysicalAndStatisticalPhasing
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/PhysicalAndStatisticalPhasing.wdl
+- name: FixVariantCollisions
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/FixVariantCollisions.wdl
 - name: KAGEPanelWithPreprocessing
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/KAGEPanelWithPreprocessing.wdl
