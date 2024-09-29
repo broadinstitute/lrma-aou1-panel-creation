@@ -46,7 +46,7 @@ task FixVariantCollisions {
         set -euxo pipefail
 
         java ~{fix_variant_collisions_java} \
-            phased.vcf.gz \
+            ~{phased_vcf_gz} \
             ~{operation} \
             ~{weight_tag} \
             ~{is_weight_format_field} \
