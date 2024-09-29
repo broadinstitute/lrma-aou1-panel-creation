@@ -14,6 +14,7 @@ workflow FixVariantCollisions {
     call FixVariantCollisions {
         input:
             phased_vcf_gz = phased_vcf_gz,
+            phased_vcf_gz_tbi = phased_vcf_gz_tbi,
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,
             weight_tag = weight_tag,
