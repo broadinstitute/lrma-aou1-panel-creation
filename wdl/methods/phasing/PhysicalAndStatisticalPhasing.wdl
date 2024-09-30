@@ -17,6 +17,8 @@ workflow PhysicalAndStatisticalPhasing {
         File genetic_mapping_tsv_for_shapeit4
         String chromosome
         String region
+        Boolean subset_short_to_sv_windows
+        Int window_padding
         String prefix
         String gcs_out_root_dir
         Int shapeit4_num_threads
@@ -34,13 +36,27 @@ workflow PhysicalAndStatisticalPhasing {
     call H.SubsetVCF as SubsetVcfShort { input:
         vcf_gz = joint_short_vcf,
         vcf_tbi = joint_short_vcf_tbi,
-        locus = region
+        locus = region,
+        prefix = prefix + ".short.subset",
     }
 
     call H.SubsetVCF as SubsetVcfSV { input:
         vcf_gz = joint_sv_vcf,
         vcf_tbi = joint_sv_vcf_tbi,
-        locus = region
+        locus = region,
+        prefix = prefix + ".sv.subset",
+    }
+
+    if (subset_short_to_sv_windows) {
+        call SubsetVcfShortInSVWindows { input:
+            short_vcf_gz = SubsetVcfShort.subset_vcf,
+            short_vcf_tbi = SubsetVcfShort.subset_tbi,
+            sv_vcf_gz = SubsetVcfSV.subset_vcf,
+            sv_vcf_tbi = SubsetVcfSV.subset_tbi,
+            reference_fasta = reference_fasta,
+            prefix = prefix + ".short.subset.windowed",
+            window_padding = window_padding
+        }
     }
 
     call UnphaseGenotypes as UnphaseSVGenotypes { input:
@@ -67,7 +83,7 @@ workflow PhysicalAndStatisticalPhasing {
         String sample_id = InferSampleName.sample_name
 
         call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-            joint_vcf = SubsetVcfShort.subset_vcf,
+            joint_vcf = select_first([SubsetVcfShortInSVWindows.subset_vcf, SubsetVcfShort.subset_vcf]),
             region = region,
             samplename = sample_id
         }
@@ -226,6 +242,70 @@ task FilterAndConcatVcfs {
         preemptible_tries:     3
         max_retries:           2
         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+}
+
+task SubsetVcfShortInSVWindows {
+
+    input {
+        File short_vcf_gz
+        File short_vcf_tbi
+        File sv_vcf_gz
+        File sv_vcf_tbi
+        File reference_fasta
+        String prefix
+        Int window_padding
+        Float af_threshold
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Int disk_size = 2*ceil(size([short_vcf_gz, short_vcf_tbi], "GB")) + 2*ceil(size([sv_vcf_gz, sv_vcf_tbi], "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+
+        gatk PreprocessIntervals \
+            -L ~{sv_vcf_gz} \
+            --reference ~{reference_fasta} \
+            --padding ~{window_padding} \
+            --bin-length 0 \
+            --interval-merging-rule OVERLAPPING_ONLY \
+            --output ~{prefix}.windows.interval_list
+        gatk IntervalListToBed \
+            -I ~{prefix}.windows.interval_list \
+            -O ~{prefix}.windows.bed
+        bcftools view ~{short_vcf_gz} \
+            -R ~{prefix}.windows.bed \
+            -i 'AF>=~{af_threshold}' \
+            -Oz -o ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File subset_vcf = "~{prefix}.vcf.gz"
+        File subset_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          1,
+        mem_gb:             16,
+        disk_gb:            disk_size,
+        boot_disk_gb:       10,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:"us.gcr.io/broad-gatk/gatk:4.6.0.0"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
     }
 }
 
