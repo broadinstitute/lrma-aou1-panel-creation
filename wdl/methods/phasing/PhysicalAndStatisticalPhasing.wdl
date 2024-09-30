@@ -19,6 +19,7 @@ workflow PhysicalAndStatisticalPhasing {
         String region
         Boolean subset_short_to_sv_windows
         Int window_padding
+        Float af_threshold
         String prefix
         String gcs_out_root_dir
         Int shapeit4_num_threads
@@ -55,7 +56,8 @@ workflow PhysicalAndStatisticalPhasing {
             sv_vcf_tbi = SubsetVcfSV.subset_tbi,
             reference_fasta = reference_fasta,
             prefix = prefix + ".short.subset.windowed",
-            window_padding = window_padding
+            window_padding = window_padding,
+            af_threshold = af_threshold
         }
     }
 

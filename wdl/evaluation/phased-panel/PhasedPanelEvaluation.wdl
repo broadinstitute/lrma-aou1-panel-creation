@@ -27,6 +27,9 @@ workflow PhasedPanelEvaluation {
         File joint_sv_vcf_tbi
         File genetic_mapping_tsv_for_shapeit4
         String chromosome
+        Boolean subset_short_to_sv_windows
+        Int window_padding
+        Float af_threshold
         Int shapeit4_num_threads
         Int hiphase_memory
         Int shapeit4_memory
@@ -93,6 +96,9 @@ workflow PhasedPanelEvaluation {
         genetic_mapping_tsv_for_shapeit4 = genetic_mapping_tsv_for_shapeit4,
         chromosome = chromosome,
         region = region,
+        subset_short_to_sv_windows = subset_short_to_sv_windows,
+        window_padding = window_padding,
+        af_threshold = af_threshold,
         prefix = output_prefix,
         gcs_out_root_dir = gcs_out_root_dir + "/Phasing",
         shapeit4_num_threads = shapeit4_num_threads,
