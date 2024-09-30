@@ -12,6 +12,7 @@ workflow PhasedPanelEvaluation {
         # common inputs
         File reference_fasta
         File reference_fasta_fai
+        File reference_fasta_dict
         String region
         String gcs_out_root_dir
         String output_prefix
@@ -93,6 +94,7 @@ workflow PhasedPanelEvaluation {
         joint_sv_vcf_tbi = joint_sv_vcf_tbi,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
+        reference_fasta_dict = reference_fasta_dict,
         genetic_mapping_tsv_for_shapeit4 = genetic_mapping_tsv_for_shapeit4,
         chromosome = chromosome,
         region = region,

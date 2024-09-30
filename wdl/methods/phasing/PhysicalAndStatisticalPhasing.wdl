@@ -14,6 +14,7 @@ workflow PhysicalAndStatisticalPhasing {
         File joint_sv_vcf_tbi
         File reference_fasta
         File reference_fasta_fai
+        File reference_fasta_dict
         File genetic_mapping_tsv_for_shapeit4
         String chromosome
         String region
@@ -56,6 +57,7 @@ workflow PhysicalAndStatisticalPhasing {
             sv_vcf_tbi = SubsetVcfSV.subset_tbi,
             reference_fasta = reference_fasta,
             reference_fasta_fai = reference_fasta_fai,
+            reference_fasta_dict = reference_fasta_dict,
             prefix = prefix + ".short.subset.windowed",
             window_padding = window_padding,
             af_threshold = af_threshold
@@ -257,6 +259,7 @@ task SubsetVcfShortInSVWindows {
         File sv_vcf_tbi
         File reference_fasta
         File reference_fasta_fai
+        File reference_fasta_dict
         String prefix
         Int window_padding
         Float af_threshold
