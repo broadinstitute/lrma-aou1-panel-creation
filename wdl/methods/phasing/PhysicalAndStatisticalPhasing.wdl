@@ -55,7 +55,7 @@ workflow PhysicalAndStatisticalPhasing {
             sv_vcf_gz = SubsetVcfSV.subset_vcf,
             sv_vcf_tbi = SubsetVcfSV.subset_tbi,
             reference_fasta = reference_fasta,
-            reference_fasta = reference_fasta_fai,
+            reference_fasta_fai = reference_fasta_fai,
             prefix = prefix + ".short.subset.windowed",
             window_padding = window_padding,
             af_threshold = af_threshold
