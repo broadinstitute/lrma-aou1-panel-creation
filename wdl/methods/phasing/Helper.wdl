@@ -136,7 +136,7 @@ task SubsetVCF {
     command <<<
         set -euxo pipefail
 
-        bcftools view ~{vcf_gz} --regions ~{locus} | bgzip > ~{prefix}.vcf.gz
+        bcftools view ~{vcf_gz} --regions ~{locus} -O z -o ~{prefix}.vcf.gz
         tabix -p vcf ~{prefix}.vcf.gz
     >>>
 
