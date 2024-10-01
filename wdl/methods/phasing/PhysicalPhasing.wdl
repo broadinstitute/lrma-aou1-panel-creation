@@ -28,8 +28,6 @@ workflow PhysicalAndStatisticalPhasing {
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
-    Int data_length = length(sample_bams)
-    Array[Int] indexes= range(data_length)
 
     call H.SubsetVCF as SubsetVcfShort { input:
         vcf_gz = joint_short_vcf,
