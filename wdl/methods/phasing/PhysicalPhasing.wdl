@@ -14,7 +14,6 @@ workflow PhysicalAndStatisticalPhasing {
         File joint_sv_vcf_tbi
         File reference_fasta
         File reference_fasta_fai
-        String region
         String prefix
         Int hiphase_memory
         String hiphase_extra_args
@@ -55,14 +54,12 @@ workflow PhysicalAndStatisticalPhasing {
     call H.SplitVCFbySample as SplitVcfbySampleShort { input:
         joint_vcf = joint_short_vcf,
         joint_vcf_tbi = joint_short_vcf_tbi,
-        region = region,
         samplename = sample_id
     }
 
     call H.SplitVCFbySample as SplitVcfbySampleSV { input:
         joint_vcf = UnphaseSVGenotypes.unphased_vcf,
         joint_vcf_tbi = UnphaseSVGenotypes.unphased_vcf_tbi,
-        region = region,
         samplename = sample_id
     }
 

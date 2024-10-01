@@ -284,14 +284,13 @@ task SplitVCFbySample {
     input{       
         File joint_vcf
         File joint_vcf_tbi
-        String region
         String samplename
     }
     
     command <<<
         set -x pipefail
 
-        bcftools view -s ~{samplename} ~{joint_vcf} -r ~{region} -Oz -o ~{samplename}.subset.g.vcf.gz
+        bcftools view -s ~{samplename} ~{joint_vcf} -Oz -o ~{samplename}.subset.g.vcf.gz
 
         tabix -p vcf ~{samplename}.subset.g.vcf.gz
 
