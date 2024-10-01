@@ -8,6 +8,7 @@ workflow PhysicalAndStatisticalPhasing {
     input {
         Array[File] sample_bams
         Array[File] sample_bais
+        Array[String] sample_id_list
         File joint_short_vcf
         File joint_short_vcf_tbi
         File joint_sv_vcf
@@ -15,6 +16,7 @@ workflow PhysicalAndStatisticalPhasing {
         File reference_fasta
         File reference_fasta_fai
         File genetic_mapping_tsv_for_shapeit4
+        File chunk_file_for_shapeit4
         String chromosome
         String region
         String prefix
@@ -25,6 +27,7 @@ workflow PhysicalAndStatisticalPhasing {
         Int shapeit4_memory
         String shapeit4_extra_args = "--use-PS 0.0001" # expected error rate in phase sets derived from physical phasing
         String hiphase_extra_args
+        Int batch_size
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
@@ -49,9 +52,38 @@ workflow PhysicalAndStatisticalPhasing {
         prefix = prefix + ".unphased"
     }
 
-    scatter (idx in indexes)  {
+    call ConvertLowerCase { input:
+        vcf = UnphaseSVGenotypes.unphased_vcf,
+        prefix = prefix + ".uppercased_sv_cleaned"
+    }
+
+    call SplitVcf as splitsmall { input:
+        joint_vcf = SubsetVcfShort.subset_vcf,
+        joint_vcf_tbi = SubsetVcfShort.subset_tbi,
+    }
+
+    call SplitVcf as splitSV { input:
+        joint_vcf = ConvertLowerCase.subset_vcf,
+        joint_vcf_tbi = ConvertLowerCase.subset_tbi
+    }
+
+    call reorder_vcf { input:
+            small_vcfs = splitsmall.vcf_by_sample,
+            sv_vcfs = splitSV.vcf_by_sample,
+            sample_id_l = sample_id_list
+    }
+
+    Array[Pair[Int, Pair[Int, Int]]] index_list = zip(indexes, 
+                                                     zip(reorder_vcf.index_into_small_vcfs, reorder_vcf.index_into_sv_vcfs))
+    scatter (t3 in index_list) {
+        Int idx = t3.left
+        Int idy = t3.right.left
+        Int idz = t3.right.right
+        String sample_id = sample_id_list[idx]
         File all_chr_bam = sample_bams[idx]
         File all_chr_bai = sample_bais[idx]
+        File one_chr_small = splitsmall.vcf_by_sample[idy]
+        File one_chr_sv = splitSV.vcf_by_sample[idz]
 
         call H.SubsetBam { input:
             bam = all_chr_bam,
@@ -59,39 +91,11 @@ workflow PhysicalAndStatisticalPhasing {
             locus = region
         }
 
-        call H.InferSampleName { input: 
-            bam = all_chr_bam, 
-            bai = all_chr_bai
-        }
-
-        String sample_id = InferSampleName.sample_name
-
-        call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-            joint_vcf = SubsetVcfShort.subset_vcf,
-            region = region,
-            samplename = sample_id
-        }
-
-        call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-            joint_vcf = UnphaseSVGenotypes.unphased_vcf,
-            region = region,
-            samplename = sample_id
-        }
-
-        call ConvertLowerCase {
-            input:
-                vcf = SplitVcfbySampleSV.single_sample_vcf,
-                prefix = sample_id + ".uppercased_sv_cleaned"
-                
-        }
-
         call H.HiPhase { input:
             bam = SubsetBam.subset_bam,
             bai = SubsetBam.subset_bai,
-            unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
-            unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
-            unphased_sv_vcf = ConvertLowerCase.subset_vcf,
-            unphased_sv_tbi = ConvertLowerCase.subset_tbi,
+            unphased_snp_vcf = one_chr_small,
+            unphased_sv_vcf = one_chr_sv,
             ref_fasta = reference_fasta,
             ref_fasta_fai = reference_fasta_fai,
             samplename = sample_id,
@@ -104,14 +108,16 @@ workflow PhysicalAndStatisticalPhasing {
         vcf_input = HiPhase.phased_snp_vcf,
         tbi_input = HiPhase.phased_snp_vcf_tbi,
         pref = prefix + ".short",
-        threads_num = merge_num_threads
+        threads_num = merge_num_threads,
+        batch_size = batch_size
     }
 
     call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
         vcf_input = HiPhase.phased_sv_vcf,
         tbi_input = HiPhase.phased_sv_vcf_tbi,
         pref = prefix + ".SV",
-        threads_num = merge_num_threads
+        threads_num = merge_num_threads,
+        batch_size = batch_size
     }
 
     call FilterAndConcatVcfs { input:
@@ -122,25 +128,36 @@ workflow PhysicalAndStatisticalPhasing {
         prefix = prefix + ".filter_and_concat"
     }
 
-    call H.Shapeit4 { input:
-        vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
-        vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-        mappingfile = genetic_mapping_dict[chromosome],
-        region = region,
-        prefix = prefix + ".filter_and_concat.phased",
-        num_threads = shapeit4_num_threads,
-        memory = shapeit4_memory,
-        extra_args = shapeit4_extra_args
+    Array[String] region_list = read_lines(chunk_file_for_shapeit4)
+    scatter (region in region_list) {
+        call H.Shapeit4 as Shapeit4 { input:
+            vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
+            vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+            mappingfile = genetic_mapping_dict[chromosome],
+            region = region,
+            prefix = prefix + ".filter_and_concat.phased",
+            num_threads = shapeit4_num_threads,
+            memory = shapeit4_memory,
+            extra_args = shapeit4_extra_args
+        }
     }
 
+    call LigateVcfs{ input:
+        vcfs = Shapeit4.phased_bcf,
+        prefix = prefix + ".phased.ligated"
+    }
+
+
     output {
+        
         File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
         File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
         File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
         File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
         File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
         File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
-        File phased_bcf = Shapeit4.phased_bcf
+        File phased_vcf = LigateVcfs.ligated_vcf
+        File phased_vcf_tbi = LigateVcfs.ligated_vcf_tbi
     }
 }
 
@@ -161,18 +178,21 @@ task ConvertLowerCase {
         cd ~{work_dir}
 
         python convert_lower_case.py -i ~{vcf} -o ~{prefix}.vcf
-        bgzip ~{prefix}.vcf ~{prefix}.vcf.gz
-        tabix -p vcf ~{prefix}.vcf.gz
+        # bgzip ~{prefix}.vcf ~{prefix}.vcf.gz
+        # tabix -p vcf ~{prefix}.vcf.gz
+
+        bcftools view ~{prefix}.vcf -Ob -o ~{prefix}.bcf
+        bcftools index ~{prefix}.bcf
     >>>
 
     output {
-        File subset_vcf = "~{work_dir}/~{prefix}.vcf.gz"
-        File subset_tbi = "~{work_dir}/~{prefix}.vcf.gz.tbi"
+        File subset_vcf = "~{work_dir}/~{prefix}.bcf"
+        File subset_tbi = "~{work_dir}/~{prefix}.bcf.csi"
     }
     ###################
     runtime {
         cpu: 2
-        memory:  "32 GiB"
+        memory:  "16 GiB"
         disks: "local-disk 50 HDD"
         bootDiskSizeGb: 10
         preemptible_tries:     3
@@ -197,25 +217,25 @@ task FilterAndConcatVcfs {
 
         # filter SV singletons
         bcftools view -i 'MAC>=2' ~{sv_vcf} \
-            --write-index -Oz -o ~{prefix}.SV.vcf.gz
+            --write-index -Ob -o ~{prefix}.SV.bcf
 
         # filter short singletons and split to biallelic
         bcftools view -i 'MAC>=2' ~{short_vcf} | \
             bcftools norm -m-any --do-not-normalize \
-            --write-index -Oz -o ~{prefix}.short.vcf.gz
+            --write-index -Ob -o ~{prefix}.short.bcf
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
         bcftools concat \
-            ~{prefix}.SV.vcf.gz \
-            ~{prefix}.short.vcf.gz \
+            ~{prefix}.SV.bcf \
+            ~{prefix}.short.bcf \
             --allow-overlaps --remove-duplicates \
-            -Oz -o ~{prefix}.vcf.gz
-        bcftools index -t ~{prefix}.vcf.gz
+            -Ob -o ~{prefix}.bcf
+        bcftools index ~{prefix}.bcf
     >>>
 
     output {
-        File filter_and_concat_vcf = "~{prefix}.vcf.gz"
-        File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+        File filter_and_concat_vcf = "~{prefix}.bcf"
+        File filter_and_concat_vcf_tbi = "~{prefix}.bcf.csi"
     }
     ###################
     runtime {
@@ -259,4 +279,135 @@ task UnphaseGenotypes {
         max_retries:           2
         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
     }
+}
+
+task LigateVcfs {
+
+    input {
+        Array[File] vcfs
+        String prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+        for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
+        bcftools concat --ligate  ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File ligated_vcf = "~{prefix}.vcf.gz"
+        File ligated_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+    }
+}
+
+task SplitVcf {
+
+    input {
+        File joint_vcf
+        File joint_vcf_tbi
+    }
+
+    command <<<
+        set -euxo pipefail
+        mkdir output
+        bcftools +split -Oz -o output ~{joint_vcf}
+        # cd output
+        # for vcf in $(find . -name "*.vcf.gz"); do
+        #     tabix -p vcf "$vcf"
+        # done
+        # cd -
+
+    >>>
+
+    output {
+        Array[File] vcf_by_sample = glob("output/*vcf.gz")
+        # Array[File] vcf_by_sample_tbi = glob("output/*vcf.gz.tbi")
+
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 375 LOCAL"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+    }
+}
+
+task reorder_vcf {
+    input{
+        Array[File] small_vcfs
+        Array[File] sv_vcfs         # Input: Array of VCF files
+        Array[String] sample_id_l      # Input: Array of sample IDs
+    }
+    parameter_meta {
+        small_vcfs: {localization_optional: true}
+        sv_vcfs:  {localization_optional: true}
+    }
+
+    command {
+
+        set -eu
+
+        for ff in ~{sep=' ' small_vcfs}; do
+            basename "$ff" .bcf >> snp.sampleids.txt
+        done
+        for ff in ~{sep=' ' sv_vcfs}; do
+            basename "$ff" .bcf >> sv.sampleids.txt
+        done
+        wc -l  *txt
+
+        # Create a single output file to store matched files for all sample_ids
+        touch all_matched_smalls.txt
+        touch all_matched_svs.txt
+        
+        # Loop through each sample_id and check against each file's basename
+        for sample_id in ~{sep=' ' sample_id_l}; do
+            match=$(grep -nF -m1 "$sample_id" snp.sampleids.txt | cut -d: -f1 || echo "0")
+            if [ "$match" -ne 0 ]; then
+                echo $((match - 1)) >> all_matched_smalls.txt  # Adjust to 0-based index
+            else
+                echo "-1" >> all_matched_smalls.txt  # Fallback for no match
+            fi
+            match=$(grep -nF -m1 "$sample_id" sv.sampleids.txt | cut -d: -f1 || echo "0")
+            if [ "$match" -ne 0 ]; then
+                echo $((match - 1)) >> all_matched_svs.txt  # Adjust to 0-based index
+            else
+                echo "-1" >> all_matched_svs.txt  # Fallback for no match
+            fi
+
+        done
+        wc -l  *txt
+
+    }
+
+    output {
+
+        Array[Int] index_into_small_vcfs = read_lines("all_matched_smalls.txt")
+        Array[Int] index_into_sv_vcfs    = read_lines("all_matched_svs.txt")
+    }
+            ###################
+    runtime {
+        cpu: 1
+        memory:  "4 GiB"
+        disks: "local-disk 50 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+    }
+
 }
