@@ -337,17 +337,19 @@ task MergePerChrVcfWithBcftools {
         # we do single-sample phased VCFs localization ourselves
         mkdir -p ssp_vcfs
         time \
-        gcloud storage cp ~{sep=" " vcf_input} /cromwell_root/ssp_vcfs/
+        gcloud storage cp ~{sep=" " vcf_input} /cromwell_root/ssp_vcfs/ &
 
         time \
-        gcloud storage cp ~{sep=" " tbi_input} /cromwell_root/ssp_vcfs/
+        gcloud storage cp ~{sep=" " tbi_input} /cromwell_root/ssp_vcfs/ &
+        wait
 
         # then merge, and safely assume all ssp-VCFs are sorted in the same order, on one chr
         cd ssp_vcfs
         ls *.vcf.gz | split -l ~{batch_size} - subset_vcfs
 
         for i in subset_vcfs*;
-            do
+        do
+            time \
             bcftools merge \
                 --threads ~{threads_num} \
                 --merge none \
@@ -355,18 +357,19 @@ task MergePerChrVcfWithBcftools {
                 -l $i \
                 -O z \
                 -o ~{pref}.merge.$i.vcf.gz
-            bcftools index -t ~{pref}.merge.$i.vcf.gz
-            done
+            bcftools index --threads ~{threads_num} -t ~{pref}.merge.$i.vcf.gz
+        done
         ls ~{pref}.merge.*.vcf.gz > merge.txt
 
+        time \
         bcftools merge \
-                --threads ~{threads_num} \
-                --force-single \
-                --merge none \
-                -l merge.txt \
-                -O z \
-                -o ~{pref}.AllSamples.vcf.gz
-        bcftools index -t ~{pref}.AllSamples.vcf.gz
+            --threads ~{threads_num} \
+            --force-single \
+            --merge none \
+            -l merge.txt \
+            -O z \
+            -o ~{pref}.AllSamples.vcf.gz
+        bcftools index --threads ~{threads_num} -t ~{pref}.AllSamples.vcf.gz
         # move result files to the correct location for cromwell to de-localize
         mv ~{pref}.AllSamples.vcf.gz ~{pref}.AllSamples.vcf.gz.tbi /cromwell_root/
     >>>
@@ -378,7 +381,7 @@ task MergePerChrVcfWithBcftools {
 
     runtime {
         cpu: 16
-        memory: "32 GiB"
+        memory: "64 GiB"
         disks: "local-disk 375 LOCAL"
         preemptible: 1
         maxRetries: 0
