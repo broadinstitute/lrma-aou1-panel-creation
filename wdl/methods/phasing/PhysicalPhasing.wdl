@@ -14,20 +14,11 @@ workflow PhysicalAndStatisticalPhasing {
         File joint_sv_vcf_tbi
         File reference_fasta
         File reference_fasta_fai
-        File genetic_mapping_tsv_for_shapeit4
-        String chromosome
         String region
         String prefix
-        String gcs_out_root_dir
-        Int shapeit4_num_threads
-        Int merge_num_threads = 4
         Int hiphase_memory
-        Int shapeit4_memory
-        String shapeit4_extra_args = "--use-PS 0.0001" # expected error rate in phase sets derived from physical phasing
         String hiphase_extra_args
     }
-
-    Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
 
     call H.SubsetVCF as SubsetVcfShort { input:
         vcf_gz = joint_short_vcf,
