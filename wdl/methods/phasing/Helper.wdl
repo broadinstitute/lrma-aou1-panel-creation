@@ -283,6 +283,7 @@ task InferSampleName {
 task SplitVCFbySample {
     input{       
         File joint_vcf
+        File joint_vcf_tbi
         String region
         String samplename
     }
@@ -290,9 +291,7 @@ task SplitVCFbySample {
     command <<<
         set -x pipefail
 
-        bcftools index ~{joint_vcf}
-
-        bcftools view -s ~{samplename} ~{joint_vcf} -r ~{region} -o ~{samplename}.subset.g.vcf.gz
+        bcftools view -s ~{samplename} ~{joint_vcf} -r ~{region} -Oz -o ~{samplename}.subset.g.vcf.gz
 
         tabix -p vcf ~{samplename}.subset.g.vcf.gz
 
@@ -307,8 +306,8 @@ task SplitVCFbySample {
     Int disk_size = 1 + ceil(2 * (size(joint_vcf, "GiB")))
 
     runtime {
-        cpu: 1
-        memory: "64 GiB"
+        cpu: 4
+        memory: "16 GiB"
         disks: "local-disk " + disk_size + " HDD" #"local-disk 100 HDD"
         bootDiskSizeGb: 10
         preemptible: 0

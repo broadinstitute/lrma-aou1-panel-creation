@@ -20,30 +20,30 @@ workflow PhysicalAndStatisticalPhasing {
         String hiphase_extra_args
     }
 
-    call H.SubsetVCF as SubsetVcfShort { input:
-        vcf_gz = joint_short_vcf,
-        vcf_tbi = joint_short_vcf_tbi,
-        locus = region
-    }
+    # call H.SubsetVCF as SubsetVcfShort { input:
+    #     vcf_gz = joint_short_vcf,
+    #     vcf_tbi = joint_short_vcf_tbi,
+    #     locus = region
+    # }
 
-    call H.SubsetVCF as SubsetVcfSV { input:
-        vcf_gz = joint_sv_vcf,
-        vcf_tbi = joint_sv_vcf_tbi,
-        locus = region
-    }
+    # call H.SubsetVCF as SubsetVcfSV { input:
+    #     vcf_gz = joint_sv_vcf,
+    #     vcf_tbi = joint_sv_vcf_tbi,
+    #     locus = region
+    # }
 
     call UnphaseGenotypes as UnphaseSVGenotypes { input:
-        vcf = SubsetVcfSV.subset_vcf,
-        vcf_tbi = SubsetVcfSV.subset_tbi,
+        vcf = joint_sv_vcf,
+        vcf_tbi = joint_sv_vcf_tbi,
         prefix = prefix + ".unphased"
     }
 
 
-    call H.SubsetBam { input:
-        bam = all_chr_bam,
-        bai = all_chr_bai,
-        locus = region
-    }
+    # call H.SubsetBam { input:
+    #     bam = all_chr_bam,
+    #     bai = all_chr_bai,
+    #     locus = region
+    # }
 
     call H.InferSampleName { input: 
         bam = all_chr_bam, 
@@ -53,13 +53,15 @@ workflow PhysicalAndStatisticalPhasing {
     String sample_id = InferSampleName.sample_name
 
     call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-        joint_vcf = SubsetVcfShort.subset_vcf,
+        joint_vcf = joint_short_vcf,
+        joint_vcf_tbi = joint_short_vcf_tbi,
         region = region,
         samplename = sample_id
     }
 
     call H.SplitVCFbySample as SplitVcfbySampleSV { input:
         joint_vcf = UnphaseSVGenotypes.unphased_vcf,
+        joint_vcf_tbi = UnphaseSVGenotypes.unphased_vcf_tbi,
         region = region,
         samplename = sample_id
     }
@@ -72,8 +74,8 @@ workflow PhysicalAndStatisticalPhasing {
     }
 
     call H.HiPhase { input:
-        bam = SubsetBam.subset_bam,
-        bai = SubsetBam.subset_bai,
+        bam = all_chr_bam,
+        bai = all_chr_bai,
         unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
         unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
         unphased_sv_vcf = ConvertLowerCase.subset_vcf,
