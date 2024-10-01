@@ -60,6 +60,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
     call CalculateOverlapMetrics { input:
         vcf = eval_vcf,
+        region = region,
         phase_tag = overlap_phase_tag,
         docker = overlap_metrics_docker
     }
@@ -171,6 +172,7 @@ task Vcfdist {
 task CalculateOverlapMetrics {
     input {
         File vcf
+        String region
         String? phase_tag    # e.g., "PG" for kanpig integrated, "PS" for HiPhase, "NONE" for Shapeit4
 
         # docker needs bcftools, scikit-allel, and pandas
@@ -185,12 +187,16 @@ task CalculateOverlapMetrics {
         set -euxo pipefail
 
         # split to biallelic
-        bcftools norm -m- --do-not-normalize ~{vcf} \
+        bcftools norm \
+            -r ~{region} \
+            -m- --do-not-normalize ~{vcf} \
             -Oz -o split.vcf.gz
         bcftools index -t split.vcf.gz
 
         # join and subset to multiallelic
-        bcftools norm -m+ --do-not-normalize ~{vcf} | \
+        bcftools norm \
+            -r ~{region} \
+            -m+ --do-not-normalize ~{vcf} | \
             bcftools view --min-alleles 3 \
                 -Oz -o multi.vcf.gz
         bcftools index -t multi.vcf.gz
