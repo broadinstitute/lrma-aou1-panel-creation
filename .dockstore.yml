@@ -27,6 +27,9 @@ workflows:
 - name: PhasedPanelEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluation.wdl
+- name: PhasedPanelEvaluationFromHiPhase
+  subclass: wdl
+  primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluationFromHiPhase.wdl
 - name: InputPhasedPanelEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/InputPhasedPanelEvaluation.wdl
