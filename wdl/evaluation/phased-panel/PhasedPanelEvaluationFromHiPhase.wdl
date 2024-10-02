@@ -51,6 +51,7 @@ workflow PhasedPanelEvaluation {
         # inputs for VcfdistAndOverlapMetricsEvaluation
         Array[String] vcfdist_samples
         File vcfdist_truth_vcf
+        File vcfdist_truth_vcf_idx
         File vcfdist_bed_file
         String? vcfdist_extra_args
         String overlap_metrics_docker
@@ -202,7 +203,9 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = hiphase_short_vcf_gz,
+        eval_vcf_idx = hiphase_short_vcf_gz_tbi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -216,7 +219,9 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseSV { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = hiphase_sv_vcf_gz,
+        eval_vcf_idx = hiphase_sv_vcf_gz_tbi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -230,7 +235,9 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFiltered { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
+        eval_vcf_idx = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -244,7 +251,9 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = LigateVcfs.ligated_vcf,
+        eval_vcf_idx = LigateVcfs.ligated_vcf_tbi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -258,7 +267,9 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFixVariantCollisions { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = FixVariantCollisions.phased_collisionless_bcf,
+        eval_vcf_idx = FixVariantCollisions.phased_collisionless_bcf_csi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -272,7 +283,9 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = PanGeniePanelCreation.panel_vcf_gz,
+        eval_vcf_idx = PanGeniePanelCreation.panel_vcf_gz_tbi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -286,7 +299,9 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotyping { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf,
+        eval_vcf_idx = GLIMPSEMergeAcrossSamples.merged_tbi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -300,7 +315,9 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotypingFixVariantCollisions { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = GenotypingFixVariantCollisions.phased_collisionless_bcf,
+        eval_vcf_idx = GenotypingFixVariantCollisions.phased_collisionless_bcf_csi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -327,7 +344,9 @@ workflow PhasedPanelEvaluation {
         call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanGenie { input:
             samples = vcfdist_samples,
             truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
             eval_vcf = PanGenieMergeAcrossSamples.merged_vcf,
+            eval_vcf_idx = PanGenieMergeAcrossSamples.merged_tbi,
             region = region,
             reference_fasta = reference_fasta,
             reference_fasta_fai = reference_fasta_fai,
@@ -548,11 +567,12 @@ task FixVariantCollisions {
             bcftools view -Oz -o ~{output_prefix}.phased.collisionless.vcf.gz
         # index and convert via vcf.gz to avoid errors from missing header lines
         bcftools index -t ~{output_prefix}.phased.collisionless.vcf.gz
-        bcftools view ~{output_prefix}.phased.collisionless.vcf.gz -Ob -o ~{output_prefix}.phased.collisionless.bcf
+        bcftools view ~{output_prefix}.phased.collisionless.vcf.gz --write-index -Ob -o ~{output_prefix}.phased.collisionless.bcf
     >>>
 
     output {
         File phased_collisionless_bcf = "~{output_prefix}.phased.collisionless.bcf"
+        File phased_collisionless_bcf_csi = "~{output_prefix}.phased.collisionless.bcf.csi"
         File windows = "windows.txt"
         File histogram = "histogram.txt"
     }

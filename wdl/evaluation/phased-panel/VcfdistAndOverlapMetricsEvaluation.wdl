@@ -21,7 +21,9 @@ workflow VcfdistAndOverlapMetricsEvaluation {
     input {
         Array[String] samples
         File truth_vcf
+        File truth_vcf_idx
         File eval_vcf
+        File eval_vcf_idx
         String region
         File reference_fasta
         File reference_fasta_fai
@@ -36,6 +38,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
     scatter (sample in samples) {
         call SubsetSampleFromVcf as SubsetSampleFromVcfEval { input:
             vcf = eval_vcf,
+            vcf_idx = eval_vcf_idx,
             sample = sample,
             region = region,
             reference_fasta_fai = reference_fasta_fai
@@ -43,6 +46,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
         call SubsetSampleFromVcf as SubsetSampleFromVcfTruth { input:
             vcf = truth_vcf,
+            vcf_idx = truth_vcf_idx,
             sample = sample,
             region = region,
             reference_fasta_fai = reference_fasta_fai
@@ -60,6 +64,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
     call CalculateOverlapMetrics { input:
         vcf = eval_vcf,
+        vcf_idx = eval_vcf_idx,
         region = region,
         phase_tag = overlap_phase_tag,
         docker = overlap_metrics_docker
@@ -77,6 +82,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 task SubsetSampleFromVcf {
     input {
         File vcf
+        File vcf_idx
         String sample
         String region
         File reference_fasta_fai
@@ -87,7 +93,6 @@ task SubsetSampleFromVcf {
     command <<<
         set -euxo pipefail
 
-        bcftools index ~{vcf}
         bcftools view ~{vcf} \
             -s ~{sample} \
             -r ~{region} \
@@ -172,6 +177,7 @@ task Vcfdist {
 task CalculateOverlapMetrics {
     input {
         File vcf
+        File vcf_idx
         String region
         String? phase_tag    # e.g., "PG" for kanpig integrated, "PS" for HiPhase, "NONE" for Shapeit4
 
