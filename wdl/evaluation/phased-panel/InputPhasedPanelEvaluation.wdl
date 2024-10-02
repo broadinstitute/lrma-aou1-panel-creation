@@ -29,6 +29,7 @@ workflow PhasedPanelEvaluation {
         # inputs for VcfdistAndOverlapMetricsEvaluation
         Array[String] vcfdist_samples
         File vcfdist_truth_vcf
+        File vcfdist_truth_vcf_idx
         File vcfdist_bed_file
         String? vcfdist_extra_args
         String overlap_metrics_docker
