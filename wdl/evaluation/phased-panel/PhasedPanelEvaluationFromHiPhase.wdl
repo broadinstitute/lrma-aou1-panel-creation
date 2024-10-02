@@ -568,7 +568,8 @@ task FixVariantCollisions {
             bcftools view -Oz -o ~{output_prefix}.phased.collisionless.vcf.gz
         # index and convert via vcf.gz to avoid errors from missing header lines
         bcftools index -t ~{output_prefix}.phased.collisionless.vcf.gz
-        bcftools view ~{output_prefix}.phased.collisionless.vcf.gz --write-index -Ob -o ~{output_prefix}.phased.collisionless.bcf
+        bcftools view ~{output_prefix}.phased.collisionless.vcf.gz -Ob -o ~{output_prefix}.phased.collisionless.bcf
+        bcftools index ~{output_prefix}.phased.collisionless.bcf
     >>>
 
     output {
