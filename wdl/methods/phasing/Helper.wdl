@@ -291,7 +291,7 @@ task SplitVCFbySample {
         set -x pipefail
 
         bcftools view -s ~{samplename} ~{joint_vcf} -Oz -o ~{samplename}.subset.g.vcf.gz
-        bcftools index -t --thread 2 ~{prefix}.vcf.gz
+        bcftools index -t --thread 2 ~{samplename}.subset.g.vcf.gz
         
     >>>
     
