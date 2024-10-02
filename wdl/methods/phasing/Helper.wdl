@@ -292,8 +292,7 @@ task SplitVCFbySample {
 
         bcftools view -s ~{samplename} ~{joint_vcf} -Oz -o ~{samplename}.subset.g.vcf.gz
 
-        tabix -p vcf ~{samplename}.subset.g.vcf.gz
-
+        tabix -@ 2 -p vcf ~{samplename}.subset.g.vcf.gz
     >>>
     
     output {
@@ -305,9 +304,9 @@ task SplitVCFbySample {
     Int disk_size = 1 + ceil(2 * (size(joint_vcf, "GiB")))
 
     runtime {
-        cpu: 4
-        memory: "16 GiB"
-        disks: "local-disk " + disk_size + " HDD" #"local-disk 100 HDD"
+        cpu: 2
+        memory: "8 GiB"
+        disks: "local-disk " + disk_size + " SSD" #"local-disk 100 HDD"
         bootDiskSizeGb: 10
         preemptible: 0
         maxRetries: 1

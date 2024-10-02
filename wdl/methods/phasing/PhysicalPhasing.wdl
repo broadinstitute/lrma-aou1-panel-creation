@@ -17,6 +17,7 @@ workflow PhysicalAndStatisticalPhasing {
         String prefix
         Int hiphase_memory
         String hiphase_extra_args
+        String sample_id
     }
 
     # call H.SubsetVCF as SubsetVcfShort { input:
@@ -43,13 +44,6 @@ workflow PhysicalAndStatisticalPhasing {
     #     bai = all_chr_bai,
     #     locus = region
     # }
-
-    call H.InferSampleName { input: 
-        bam = all_chr_bam, 
-        bai = all_chr_bai
-    }
-
-    String sample_id = InferSampleName.sample_name
 
     call H.SplitVCFbySample as SplitVcfbySampleShort { input:
         joint_vcf = joint_short_vcf,
@@ -169,7 +163,7 @@ task FilterAndConcatVcfs {
     runtime {
         cpu: 1
         memory:  "4 GiB"
-        disks: "local-disk 50 HDD"
+        disks: "local-disk 50 SSD"
         bootDiskSizeGb: 10
         preemptible_tries:     3
         max_retries:           2
