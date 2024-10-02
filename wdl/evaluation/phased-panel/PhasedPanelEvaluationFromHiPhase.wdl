@@ -100,8 +100,8 @@ workflow PhasedPanelEvaluation {
     }
 
     call FilterAndConcatVcfs { input:
-        short_vcf = select_first([hiphase_short_vcf_gz, SubsetVcfShortInSVWindows.subset_short_vcf_gz]),
-        short_vcf_tbi = select_first([hiphase_short_vcf_gz_tbi, SubsetVcfShortInSVWindows.subset_short_vcf_gz_tbi]),
+        short_vcf = select_first([SubsetVcfShortInSVWindows.subset_short_vcf_gz, hiphase_short_vcf_gz]),
+        short_vcf_tbi = select_first([SubsetVcfShortInSVWindows.subset_short_vcf_gz_tbi, hiphase_short_vcf_gz_tbi]),
         sv_vcf = hiphase_sv_vcf_gz,
         sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
         extra_filter_args = extra_filter_args,
