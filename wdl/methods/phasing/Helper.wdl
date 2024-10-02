@@ -159,7 +159,7 @@ task SubsetVCF {
     runtime {
         cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
         memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
         bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
         preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
         maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
@@ -226,7 +226,7 @@ task SubsetBam {
     runtime {
         cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
         memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
         bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
         preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
         maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
@@ -309,7 +309,7 @@ task SplitVCFbySample {
     runtime {
         cpu: 1
         memory: "64 GiB"
-        disks: "local-disk " + disk_size + " HDD" #"local-disk 100 HDD"
+        disks: "local-disk " + disk_size + " SSD" #"local-disk 100 HDD"
         bootDiskSizeGb: 10
         preemptible: 0
         maxRetries: 1
@@ -365,7 +365,7 @@ task MergePerChrVcfWithBcftools {
     runtime {
         cpu: 16
         memory: "32 GiB"
-        disks: "local-disk 375 LOCAL"
+        disks: "local-disk 375 SSD"
         preemptible: 1
         maxRetries: 0
         docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"

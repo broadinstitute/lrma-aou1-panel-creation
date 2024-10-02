@@ -24,7 +24,7 @@ workflow PhasedPanelEvaluation {
         File hiphase_short_vcf_gz_tbi
         File hiphase_sv_vcf_gz
         File hiphase_sv_vcf_gz_tbi
-        String chromosome       # not actually used, but this dev WDL is only valid for a single chromosome because of the genetic map
+        String chromosome
         Boolean subset_short_to_sv_windows
         Int window_padding
         String? subset_filter_args
@@ -109,11 +109,12 @@ workflow PhasedPanelEvaluation {
     }
 
     Array[String] region_list = read_lines(chunk_file_for_shapeit4)
+    Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
     scatter (i in range(length(region_list))) {
         call Helper.Shapeit4 as Shapeit4 { input:
             vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
             vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-            mappingfile = genetic_mapping_tsv_for_shapeit4,
+            mappingfile = genetic_mapping_dict[chromosome],
             region = region_list[i],
             prefix = output_prefix + ".filter_and_concat.phased.shard_" + i,
             num_threads = shapeit4_num_threads,
