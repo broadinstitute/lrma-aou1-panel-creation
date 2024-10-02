@@ -117,6 +117,7 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         eval_vcf = input_vcf_gz,
+        eval_vcf_idx = input_vcf_gz_tbi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -131,6 +132,7 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf,
+        eval_vcf_idx = GLIMPSEMergeAcrossSamples.merged_tbi,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -145,6 +147,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         eval_vcf = GenotypingFixVariantCollisions.phased_collisionless_bcf,
+        eval_vcf_idx = GenotypingFixVariantCollisions.phased_collisionless_bcf_csi,
+
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -172,6 +176,7 @@ workflow PhasedPanelEvaluation {
             samples = vcfdist_samples,
             truth_vcf = vcfdist_truth_vcf,
             eval_vcf = PanGenieMergeAcrossSamples.merged_vcf,
+            eval_vcf_idx = PanGenieMergeAcrossSamples.merged_tbi,
             region = region,
             reference_fasta = reference_fasta,
             reference_fasta_fai = reference_fasta_fai,
@@ -238,10 +243,12 @@ task FixVariantCollisions {
         # index and convert via vcf.gz to avoid errors from missing header lines
         bcftools index -t ~{output_prefix}.phased.collisionless.vcf.gz
         bcftools view ~{output_prefix}.phased.collisionless.vcf.gz -Ob -o ~{output_prefix}.phased.collisionless.bcf
+        bcftools index ~{output_prefix}.phased.collisionless.bcf
     >>>
 
     output {
         File phased_collisionless_bcf = "~{output_prefix}.phased.collisionless.bcf"
+        File phased_collisionless_bcf_csi = "~{output_prefix}.phased.collisionless.bcf.csi"
         File windows = "windows.txt"
         File histogram = "histogram.txt"
     }
