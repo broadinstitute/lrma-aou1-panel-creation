@@ -116,6 +116,7 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = input_vcf_gz,
         eval_vcf_idx = input_vcf_gz_tbi,
         region = region,
@@ -131,6 +132,7 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotyping { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf,
         eval_vcf_idx = GLIMPSEMergeAcrossSamples.merged_tbi,
         region = region,
@@ -146,6 +148,7 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotypingFixVariantCollisions { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = GenotypingFixVariantCollisions.phased_collisionless_bcf,
         eval_vcf_idx = GenotypingFixVariantCollisions.phased_collisionless_bcf_csi,
 
@@ -175,6 +178,7 @@ workflow PhasedPanelEvaluation {
         call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanGenie { input:
             samples = vcfdist_samples,
             truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
             eval_vcf = PanGenieMergeAcrossSamples.merged_vcf,
             eval_vcf_idx = PanGenieMergeAcrossSamples.merged_tbi,
             region = region,
