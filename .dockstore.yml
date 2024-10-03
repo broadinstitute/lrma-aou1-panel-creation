@@ -24,3 +24,6 @@ workflows:
 - name: PhysicalPhasing
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasing.wdl
+- name: SplitCohortVcf
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/SplitCohortVcf.wdl
