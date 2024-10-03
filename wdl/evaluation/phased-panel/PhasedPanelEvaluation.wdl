@@ -79,9 +79,10 @@ workflow PhasedPanelEvaluation {
         RuntimeAttributes? leave_out_medium_runtime_attributes
         RuntimeAttributes? leave_out_large_runtime_attributes
         RuntimeAttributes? pangenie_runtime_attributes
-        RuntimeAttributes? kage_runtime_attributes
-        RuntimeAttributes? glimpse_chromosome_runtime_attributes
-        RuntimeAttributes? glimpse_gather_runtime_attributes
+        RuntimeAttributes? kage_count_kmers_runtime_attributes
+        RuntimeAttributes? kage_genotype_runtime_attributes
+        RuntimeAttributes? glimpse_case_chromosome_runtime_attributes
+        RuntimeAttributes? glimpse_case_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
     }
 
@@ -160,9 +161,10 @@ workflow PhasedPanelEvaluation {
         medium_runtime_attributes = leave_out_medium_runtime_attributes,
         large_runtime_attributes = leave_out_large_runtime_attributes,
         pangenie_runtime_attributes = pangenie_runtime_attributes,
-        kage_runtime_attributes = kage_runtime_attributes,
-        glimpse_chromosome_runtime_attributes = glimpse_chromosome_runtime_attributes,
-        glimpse_gather_runtime_attributes = glimpse_gather_runtime_attributes,
+        kage_count_kmers_runtime_attributes = kage_count_kmers_runtime_attributes,
+        kage_genotype_runtime_attributes = kage_genotype_runtime_attributes,
+        glimpse_case_chromosome_runtime_attributes = glimpse_case_chromosome_runtime_attributes,
+        glimpse_case_runtime_attributes = glimpse_case_runtime_attributes,
         calculate_metrics_runtime_attributes = calculate_metrics_runtime_attributes
     }
 

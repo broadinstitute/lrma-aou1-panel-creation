@@ -32,6 +32,11 @@ workflow KAGEPlusGLIMPSECase {
         String docker
         String kage_docker
         File? monitoring_script
+
+        RuntimeAttributes? kage_count_kmers_runtime_attributes
+        RuntimeAttributes? kage_genotype_runtime_attributes
+        RuntimeAttributes? glimpse_case_chromosome_runtime_attributes
+        RuntimeAttributes? glimpse_case_runtime_attributes
     }
 
     call IndexCaseReads {
@@ -54,7 +59,8 @@ workflow KAGEPlusGLIMPSECase {
             subset_reads = subset_reads,
             output_prefix = sample_name,
             docker = kage_docker,
-            monitoring_script = monitoring_script
+            monitoring_script = monitoring_script,
+            runtime_attributes = kage_count_kmers_runtime_attributes
     }
 
     call KAGEGenotype {
@@ -67,7 +73,9 @@ workflow KAGEPlusGLIMPSECase {
             sample_name = sample_name,
             average_coverage = average_coverage,
             docker = kage_docker,
-            monitoring_script = monitoring_script
+            monitoring_script = monitoring_script,
+            runtime_attributes = kage_genotype_runtime_attributes
+
     }
 
     scatter (j in range(length(chromosomes))) {
@@ -82,7 +90,8 @@ workflow KAGEPlusGLIMPSECase {
                 genetic_map = genetic_maps[j],
                 output_prefix = sample_name,
                 docker = kage_docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = glimpse_case_chromosome_runtime_attributes
         }
     }
 
@@ -92,7 +101,8 @@ workflow KAGEPlusGLIMPSECase {
             chromosome_glimpse_vcf_gz_tbis = GLIMPSECaseChromosome.chromosome_glimpse_vcf_gz_tbi,
             output_prefix = sample_name,
             docker = kage_docker,
-            monitoring_script = monitoring_script
+            monitoring_script = monitoring_script,
+            runtime_attributes = glimpse_case_runtime_attributes
     }
 
     output {

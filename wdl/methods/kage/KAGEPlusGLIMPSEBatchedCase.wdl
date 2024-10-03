@@ -33,6 +33,11 @@ workflow KAGEPlusGLIMPSEBatchedCase {
         String docker
         String kage_docker
         File? monitoring_script
+
+        RuntimeAttributes? kage_count_kmers_runtime_attributes
+        RuntimeAttributes? kage_genotype_runtime_attributes
+        RuntimeAttributes? glimpse_case_chromosome_runtime_attributes
+        RuntimeAttributes? glimpse_case_runtime_attributes
     }
 
     scatter (i in range(length(input_crams))) {
@@ -56,7 +61,8 @@ workflow KAGEPlusGLIMPSEBatchedCase {
                 subset_reads = subset_reads,
                 output_prefix = sample_names[i],
                 docker = kage_docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = kage_count_kmers_runtime_attributes
         }
 
         call KAGEGenotype {
@@ -69,7 +75,8 @@ workflow KAGEPlusGLIMPSEBatchedCase {
                 sample_name = sample_names[i],
                 average_coverage = average_coverage,
                 docker = kage_docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = kage_genotype_runtime_attributes
         }
     }
 
@@ -93,7 +100,8 @@ workflow KAGEPlusGLIMPSEBatchedCase {
                 genetic_map = genetic_maps[j],
                 output_prefix = output_prefix,
                 docker = kage_docker,
-                monitoring_script = monitoring_script
+                monitoring_script = monitoring_script,
+                runtime_attributes = glimpse_case_chromosome_runtime_attributes
         }
     }
 
@@ -103,7 +111,8 @@ workflow KAGEPlusGLIMPSEBatchedCase {
             chromosome_glimpse_bcf_csis = GLIMPSEBatchedCaseChromosome.chromosome_glimpse_bcf_csi,
             output_prefix = output_prefix,
             docker = kage_docker,
-            monitoring_script = monitoring_script
+            monitoring_script = monitoring_script,
+            runtime_attributes = glimpse_case_runtime_attributes
     }
 
     output {
