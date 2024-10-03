@@ -114,7 +114,7 @@ task ConvertLowerCase {
     ###################
     runtime {
         cpu: 2
-        memory:  "32 GiB"
+        memory:  "8 GiB"
         disks: "local-disk 50 HDD"
         bootDiskSizeGb: 10
         preemptible_tries:     3

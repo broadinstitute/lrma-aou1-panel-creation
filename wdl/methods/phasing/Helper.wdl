@@ -291,7 +291,7 @@ task SplitVCFbySample {
         set -x pipefail
 
         bcftools view -s ~{samplename} ~{joint_vcf} -Oz -o ~{samplename}.subset.g.vcf.gz
-        bcftools index -t --thread 2 ~{samplename}.subset.g.vcf.gz
+        bcftools index -t ~{samplename}.subset.g.vcf.gz
         
     >>>
     
@@ -304,8 +304,8 @@ task SplitVCFbySample {
     Int disk_size = 1 + ceil(2 * (size(joint_vcf, "GiB")))
 
     runtime {
-        cpu: 2
-        memory: "8 GiB"
+        cpu: 1
+        memory: "4 GiB"
         disks: "local-disk " + disk_size + " SSD" #"local-disk 100 HDD"
         bootDiskSizeGb: 10
         preemptible: 0
