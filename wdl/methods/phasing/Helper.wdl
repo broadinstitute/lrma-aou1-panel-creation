@@ -27,9 +27,7 @@ task HiPhase {
         File bai
 
         File unphased_snp_vcf
-        File unphased_snp_tbi
         File unphased_sv_vcf
-        File unphased_sv_tbi
 
         File ref_fasta
         File ref_fasta_fai
@@ -51,6 +49,9 @@ task HiPhase {
         set -euxo pipefail
 
         touch ~{bai}
+
+        bcftools index -t ~{unphased_snp_vcf}
+        bcftools index -t ~{unphased_sv_vcf}
 
         hiphase \
         --threads ~{thread_num} \

@@ -8,12 +8,10 @@ workflow PhysicalAndStatisticalPhasing {
     input {
         File all_chr_bam
         File all_chr_bai
-        File joint_short_vcf
-        File joint_short_vcf_tbi
-        File joint_sv_vcf
-        File joint_sv_vcf_tbi
         File reference_fasta
         File reference_fasta_fai
+        String small_vcfs_directory
+        String sv_vcfs_directory
         String prefix
         Int hiphase_memory
         String hiphase_extra_args
@@ -32,9 +30,15 @@ workflow PhysicalAndStatisticalPhasing {
     #     locus = region
     # }
 
+    call ConvertLowerCase {input:
+        vcf = sv_vcfs_directory + "/" + sample_id + '.vcf.gz',
+        prefix = sample_id + ".uppercased_sv_cleaned"
+            
+    }
+
     call UnphaseGenotypes as UnphaseSVGenotypes { input:
-        vcf = joint_sv_vcf,
-        vcf_tbi = joint_sv_vcf_tbi,
+        vcf = ConvertLowerCase.subset_vcf,
+        vcf_tbi = ConvertLowerCase.subset_tbi,
         prefix = prefix + ".unphased"
     }
 
@@ -45,32 +49,25 @@ workflow PhysicalAndStatisticalPhasing {
     #     locus = region
     # }
 
-    call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-        joint_vcf = joint_short_vcf,
-        joint_vcf_tbi = joint_short_vcf_tbi,
-        samplename = sample_id
-    }
+    # call H.SplitVCFbySample as SplitVcfbySampleShort { input:
+    #     joint_vcf = joint_short_vcf,
+    #     joint_vcf_tbi = joint_short_vcf_tbi,
+    #     samplename = sample_id
+    # }
 
-    call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-        joint_vcf = UnphaseSVGenotypes.unphased_vcf,
-        joint_vcf_tbi = UnphaseSVGenotypes.unphased_vcf_tbi,
-        samplename = sample_id
-    }
+    # call H.SplitVCFbySample as SplitVcfbySampleSV { input:
+    #     joint_vcf = UnphaseSVGenotypes.unphased_vcf,
+    #     joint_vcf_tbi = UnphaseSVGenotypes.unphased_vcf_tbi,
+    #     samplename = sample_id
+    # }
 
-    call ConvertLowerCase {
-        input:
-            vcf = SplitVcfbySampleSV.single_sample_vcf,
-            prefix = sample_id + ".uppercased_sv_cleaned"
-            
-    }
+
 
     call H.HiPhase { input:
         bam = all_chr_bam,
         bai = all_chr_bai,
-        unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
-        unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
-        unphased_sv_vcf = ConvertLowerCase.subset_vcf,
-        unphased_sv_tbi = ConvertLowerCase.subset_tbi,
+        unphased_snp_vcf = small_vcfs_directory + "/" + sample_id + '.vcf.gz',
+        unphased_sv_vcf = UnphaseSVGenotypes.unphased_vcf,
         ref_fasta = reference_fasta,
         ref_fasta_fai = reference_fasta_fai,
         samplename = sample_id,
@@ -91,8 +88,6 @@ task ConvertLowerCase {
         File vcf
         String prefix
     }
-
-    Int disk_size = 2*ceil(size([vcf], "GB")) + 1
     String docker_dir = "/truvari_intrasample"
     String work_dir = "/cromwell_root/truvari_intrasample"
 
