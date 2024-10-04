@@ -31,6 +31,7 @@ task SplitVcf {
     input {
         File joint_vcf
         File joint_vcf_tbi
+        Int memory
     }
 
     command <<<
@@ -52,8 +53,8 @@ task SplitVcf {
     }
     ###################
     runtime {
-        cpu: 1
-        memory:  "4 GiB"
+        cpu: 4
+        memory: memory + " GiB"
         disks: "local-disk 375 LOCAL"
         bootDiskSizeGb: 10
         preemptible_tries:     3

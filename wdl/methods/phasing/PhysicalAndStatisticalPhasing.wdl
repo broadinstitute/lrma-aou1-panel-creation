@@ -68,13 +68,11 @@ workflow PhysicalAndStatisticalPhasing {
 
         call H.SplitVCFbySample as SplitVcfbySampleShort { input:
             joint_vcf = SubsetVcfShort.subset_vcf,
-            region = region,
             samplename = sample_id
         }
 
         call H.SplitVCFbySample as SplitVcfbySampleSV { input:
             joint_vcf = UnphaseSVGenotypes.unphased_vcf,
-            region = region,
             samplename = sample_id
         }
 
