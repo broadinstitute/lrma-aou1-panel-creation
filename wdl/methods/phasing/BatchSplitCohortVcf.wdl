@@ -11,7 +11,6 @@ workflow SplitCohortVcf {
         Array[String] region_list
         Array[String] sample_list
         String outputdirectory
-        String prefix
     }
 
     scatter (region in region_list)  {
@@ -36,7 +35,7 @@ workflow SplitCohortVcf {
     # output Array[Array[File]]
     Array[Int] indexes = range(length(sample_list))
     scatter (ind in indexes) {
-
+        String sample_id = sample_list[ind]
         # flatten the array file
         scatter (array in reorder_samples.sample_map){
             File array_name = array[ind]
@@ -46,7 +45,7 @@ workflow SplitCohortVcf {
         call MergePerChrCalls {input: 
             vcfs = array_name,
             ref_dict = ref_dict,
-            prefix = prefix
+            prefix = sample_id
         }
 
     }
