@@ -31,6 +31,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
         File vcfdist_bed_file
         String? vcfdist_extra_args
 
+        Boolean do_overlap_metrics = true
         String overlap_phase_tag
         String overlap_metrics_docker
     }
@@ -62,12 +63,14 @@ workflow VcfdistAndOverlapMetricsEvaluation {
         }
     }
 
-    call CalculateOverlapMetrics { input:
-        vcf = eval_vcf,
-        vcf_idx = eval_vcf_idx,
-        region = region,
-        phase_tag = overlap_phase_tag,
-        docker = overlap_metrics_docker
+    if (do_overlap_metrics) {
+        call CalculateOverlapMetrics { input:
+            vcf = eval_vcf,
+            vcf_idx = eval_vcf_idx,
+            region = region,
+            phase_tag = overlap_phase_tag,
+            docker = overlap_metrics_docker
+        }
     }
 
     output {
@@ -75,7 +78,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
         Array[VcfdistOutputs] vcfdist_outputs_per_sample = Vcfdist.outputs
 
         # per-cohort
-        OverlapMetricsOutputs overlap_metrics_outputs = CalculateOverlapMetrics.outputs
+        OverlapMetricsOutputs? overlap_metrics_outputs = CalculateOverlapMetrics.outputs
     }
 }
 
