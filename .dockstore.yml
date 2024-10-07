@@ -27,3 +27,6 @@ workflows:
 - name: SplitCohortVcf
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/SplitCohortVcf.wdl
+- name: BatchSplitCohortVcf
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/BatchSplitCohortVcf.wdl
