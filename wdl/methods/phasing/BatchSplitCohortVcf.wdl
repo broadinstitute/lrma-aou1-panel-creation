@@ -142,7 +142,7 @@ task reorder_samples {
     reordered_filepath = []
     for sample in sample_names:
         for file in file_paths:
-            if file.startswith(sample):
+            if sample in file:
                 reordered_filepath.append(file)
                 break
     with open("reordered_file.txt", "w") as fi:
