@@ -7,7 +7,7 @@ workflow SplitCohortVcf {
     input {
         File joint_short_vcf
         File joint_short_vcf_tbi
-        File ref_dict
+        File ref_fasta_fai
         Array[String] region_list
         Array[String] sample_list
         String outputdirectory
@@ -43,21 +43,21 @@ workflow SplitCohortVcf {
         }
 
         ### merge per_chromosome vcfs
-        call MergePerChrCalls {input: 
+        call MergeAndSortVCFs {input: 
             vcfs = array_name,
-            ref_dict = ref_dict,
+            ref_fasta_fai = ref_fasta_fai,
             prefix = sample_id
         }
 
     }
 
     call H.FinalizeToDir { input:
-        files = MergePerChrCalls.vcf,
+        files = MergeAndSortVCFs.vcf,
         outdir = outputdirectory
     }
 
     output {
-        Array[File] splitted_vcf = MergePerChrCalls.vcf
+        Array[File] splitted_vcf = MergeAndSortVCFs.vcf
     }
 }
 
@@ -169,43 +169,111 @@ task reorder_samples {
     }
 }
 
-task MergePerChrCalls {
+task MergeAndSortVCFs {
 
     meta {
-        description: "Merge per-chromosome calls into a single VCF"
+        description: "Fast merging & sorting VCFs when the default sorting is expected to be slow"
     }
 
     parameter_meta {
-        vcfs: "List of per-chromosome VCFs to merge"
-        ref_dict: "Reference dictionary"
-        prefix: "Prefix for output VCF"
+        header_definitions_file: "a union of definition header lines for input VCFs (related to https://github.com/samtools/bcftools/issues/1629)"
     }
 
     input {
         Array[File] vcfs
-        File ref_dict
+
+        File ref_fasta_fai
+        File? header_definitions_file
+
         String prefix
 
         RuntimeAttr? runtime_attr_override
     }
 
-    Int disk_size = 2*ceil(size(vcfs, "GB")) + 1
+    Int sz = ceil(size(vcfs, 'GB'))
+    Int disk_sz = if sz > 100 then 5 * sz else 375  # it's rare to see such large gVCFs, for now
+
+    Boolean suspected_incomplete_definitions = defined(header_definitions_file)
+
+    Int cores = 8
+
+    # pending a bug fix (bcftools github issue 1576) in official bcftools release,
+    # bcftools sort can be more efficient in using memory
+    Int machine_memory = 48 # 96
+    Int work_memory = ceil(machine_memory * 0.8)
 
     command <<<
         set -euxo pipefail
 
-        VCF_WITH_HEADER=~{vcfs[0]}
-        GREPCMD="grep"
-        if [[ ~{vcfs[0]} =~ \.gz$ ]]; then
-            GREPCMD="zgrep"
+        echo ~{sep=' ' vcfs} | sed 's/ /\n/g' > all_raw_vcfs.txt
+
+        echo "==========================================================="
+        echo "starting concatenation" && date
+        echo "==========================================================="
+        bcftools \
+            concat \
+            --naive \
+            --threads ~{cores-1} \
+            -f all_raw_vcfs.txt \
+            --output-type v \
+            -o concatedated_raw.vcf.gz  # fast, at the expense of disk space
+        for vcf in ~{sep=' ' vcfs}; do rm $vcf ; done
+
+        # this is another bug in bcftools that's hot fixed but not in official release yet
+        # (see bcftools github issue 1591)
+        echo "==========================================================="
+        echo "done concatenation, fixing header of naively concatenated VCF" && date
+        echo "==========================================================="
+        if ~{suspected_incomplete_definitions}; then
+            # a bug from bcftools concat --naive https://github.com/samtools/bcftools/issues/1629
+            set +e
+            zgrep "^##" concatedated_raw.vcf.gz > header.txt
+            grep -vF 'fileformat' header.txt \
+                | grep -vF 'fileDate=' \
+                | grep -vF 'source=' \
+                | grep -vF 'contig' \
+                | grep -vF 'ALT' \
+                | grep -vF 'FILTER' \
+                | grep -vF 'INFO' \
+                | grep -vF 'FORMAT' \
+                > tmp.others.txt
+            touch tmp.other.txt
+            set -e
+            zgrep "^#CHROM" concatedated_raw.vcf.gz > tmp.sampleline.txt
+            cat \
+                ~{header_definitions_file} \
+                tmp.others.txt \
+                tmp.sampleline.txt \
+                > fixed.header.txt
+            rm -f tmp.*.txt && cat fixed.header.txt
+
+            bcftools reheader \
+                -h fixed.header.txt \
+                -o tmp.wgs.vcf.gz \
+                concatedated_raw.vcf.gz
+            rm concatedated_raw.vcf.gz
+        else
+            mv concatedated_raw.vcf.gz tmp.wgs.vcf.gz
         fi
+        bcftools reheader \
+            --fai ~{ref_fasta_fai} \
+            -o wgs_raw.vcf.gz \
+            tmp.wgs.vcf.gz
+        rm tmp.wgs.vcf.gz
 
-        $GREPCMD '^#' $VCF_WITH_HEADER | grep -v -e '^##contig' -e CHROM > header
-        grep '^@SQ' ~{ref_dict} | awk '{ print "##contig=<ID=" $2 ",length=" $3 ">" }' | sed 's/[SL]N://g' >> header
-        $GREPCMD -m1 CHROM $VCF_WITH_HEADER >> header
-
-        ((cat header) && ($GREPCMD -h -v '^#' ~{sep=' ' vcfs})) | bcftools sort | bgzip > ~{prefix}.vcf.gz
-        tabix -p vcf ~{prefix}.vcf.gz
+        echo "==========================================================="
+        echo "starting sort operation" && date
+        echo "==========================================================="
+        bcftools \
+            sort \
+            --temp-dir tm_sort \
+            --output-type z \
+            -o ~{prefix}.vcf.gz \
+            wgs_raw.vcf.gz
+        bcftools index --tbi --force ~{prefix}.vcf.gz
+        echo "==========================================================="
+        echo "done sorting" && date
+        echo "==========================================================="
     >>>
 
     output {
@@ -215,19 +283,19 @@ task MergePerChrCalls {
 
     #########################
     RuntimeAttr default_attr = object {
-        cpu_cores:          4,
-        mem_gb:             24,
-        disk_gb:            disk_size,
+        cpu_cores:          cores,
+        mem_gb:             "~{machine_memory}",
+        disk_gb:            disk_sz,
         boot_disk_gb:       10,
         preemptible_tries:  1,
         max_retries:        0,
-        docker:             "us.gcr.io/broad-dsp-lrma/lr-basic:latest"
+        docker:             "us.gcr.io/broad-dsp-lrma/lr-basic:0.1.1"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
     runtime {
         cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
         memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " LOCAL"
         bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
         preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
         maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
