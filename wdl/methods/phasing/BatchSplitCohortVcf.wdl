@@ -23,7 +23,8 @@ workflow SplitCohortVcf {
 
         call SplitVcf { input:
             joint_vcf = SubVCF.subset_vcf,
-            joint_vcf_tbi = SubVCF.subset_tbi
+            joint_vcf_tbi = SubVCF.subset_tbi,
+            chromo = region
         }
 
         call reorder_samples{ input:
