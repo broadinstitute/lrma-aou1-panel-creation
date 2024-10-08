@@ -82,6 +82,7 @@ task SplitVcf {
     input {
         File joint_vcf
         File joint_vcf_tbi
+        String chromo
         Int memory
     }
 
@@ -89,11 +90,12 @@ task SplitVcf {
         set -euxo pipefail
         mkdir output
         bcftools +split -Oz -o output ~{joint_vcf}
-        # cd output
-        # for vcf in $(find . -name "*.vcf.gz"); do
-        #     tabix -p vcf "$vcf"
-        # done
-        # cd -
+        cd output
+        for vcf in $(find . -name "*.vcf.gz"); do
+            filename=$(basename "$vcf")
+            mv "$vcf" "~{chromo}.$filename"
+        done
+        cd -
 
     >>>
 
