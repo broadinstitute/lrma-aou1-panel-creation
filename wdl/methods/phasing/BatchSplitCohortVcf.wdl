@@ -169,7 +169,7 @@ task reorder_samples {
     }
 }
 
-task MergeAndSortVCFs {
+task ConcateAndSortVCFs {
 
     meta {
         description: "Fast merging & sorting VCFs when the default sorting is expected to be slow"
@@ -181,10 +181,6 @@ task MergeAndSortVCFs {
 
     input {
         Array[File] vcfs
-
-        File ref_fasta_fai
-        File? header_definitions_file
-
         String prefix
 
         RuntimeAttr? runtime_attr_override
@@ -192,8 +188,6 @@ task MergeAndSortVCFs {
 
     Int sz = ceil(size(vcfs, 'GB'))
     Int disk_sz = if sz > 100 then 5 * sz else 375  # it's rare to see such large gVCFs, for now
-
-    Boolean suspected_incomplete_definitions = defined(header_definitions_file)
 
     Int cores = 8
 
@@ -215,7 +209,7 @@ task MergeAndSortVCFs {
             --naive \
             --threads ~{cores-1} \
             -f all_raw_vcfs.txt \
-            --output-type v \
+            --output-type z \
             -o concatedated_raw.vcf.gz  # fast, at the expense of disk space
         for vcf in ~{sep=' ' vcfs}; do rm $vcf ; done
 
@@ -224,42 +218,6 @@ task MergeAndSortVCFs {
         echo "==========================================================="
         echo "done concatenation, fixing header of naively concatenated VCF" && date
         echo "==========================================================="
-        if ~{suspected_incomplete_definitions}; then
-            # a bug from bcftools concat --naive https://github.com/samtools/bcftools/issues/1629
-            set +e
-            zgrep "^##" concatedated_raw.vcf.gz > header.txt
-            grep -vF 'fileformat' header.txt \
-                | grep -vF 'fileDate=' \
-                | grep -vF 'source=' \
-                | grep -vF 'contig' \
-                | grep -vF 'ALT' \
-                | grep -vF 'FILTER' \
-                | grep -vF 'INFO' \
-                | grep -vF 'FORMAT' \
-                > tmp.others.txt
-            touch tmp.other.txt
-            set -e
-            zgrep "^#CHROM" concatedated_raw.vcf.gz > tmp.sampleline.txt
-            cat \
-                ~{header_definitions_file} \
-                tmp.others.txt \
-                tmp.sampleline.txt \
-                > fixed.header.txt
-            rm -f tmp.*.txt && cat fixed.header.txt
-
-            bcftools reheader \
-                -h fixed.header.txt \
-                -o tmp.wgs.vcf.gz \
-                concatedated_raw.vcf.gz
-            rm concatedated_raw.vcf.gz
-        else
-            mv concatedated_raw.vcf.gz tmp.wgs.vcf.gz
-        fi
-        bcftools reheader \
-            --fai ~{ref_fasta_fai} \
-            -o wgs_raw.vcf.gz \
-            tmp.wgs.vcf.gz
-        rm tmp.wgs.vcf.gz
 
         echo "==========================================================="
         echo "starting sort operation" && date
@@ -269,7 +227,7 @@ task MergeAndSortVCFs {
             --temp-dir tm_sort \
             --output-type z \
             -o ~{prefix}.vcf.gz \
-            wgs_raw.vcf.gz
+            concatedated_raw.vcf.gz
         bcftools index --tbi --force ~{prefix}.vcf.gz
         echo "==========================================================="
         echo "done sorting" && date
