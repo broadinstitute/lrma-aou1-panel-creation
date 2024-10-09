@@ -43,21 +43,20 @@ workflow SplitCohortVcf {
         }
 
         ### merge per_chromosome vcfs
-        call MergeAndSortVCFs {input: 
+        call ConcateAndSortVCFs {input: 
             vcfs = array_name,
-            ref_fasta_fai = ref_fasta_fai,
             prefix = sample_id
         }
 
     }
 
     call H.FinalizeToDir { input:
-        files = MergeAndSortVCFs.vcf,
+        files = ConcateAndSortVCFs.vcf,
         outdir = outputdirectory
     }
 
     output {
-        Array[File] splitted_vcf = MergeAndSortVCFs.vcf
+        Array[File] splitted_vcf = ConcateAndSortVCFs.vcf
     }
 }
 
@@ -173,10 +172,6 @@ task ConcateAndSortVCFs {
 
     meta {
         description: "Fast merging & sorting VCFs when the default sorting is expected to be slow"
-    }
-
-    parameter_meta {
-        header_definitions_file: "a union of definition header lines for input VCFs (related to https://github.com/samtools/bcftools/issues/1629)"
     }
 
     input {
