@@ -7,7 +7,6 @@ workflow SplitCohortVcf {
     input {
         File joint_short_vcf
         File joint_short_vcf_tbi
-        File ref_fasta_fai
         Array[String] region_list
         Array[String] sample_list
         String outputdirectory
