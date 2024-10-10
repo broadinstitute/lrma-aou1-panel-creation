@@ -55,7 +55,7 @@ task SplitVcf {
     runtime {
         cpu: 4
         memory: memory + " GiB"
-        disks: "local-disk 1125 LOCAL"
+        disks: "local-disk 375 LOCAL"
         bootDiskSizeGb: 10
         preemptible_tries:     1
         max_retries:           0
