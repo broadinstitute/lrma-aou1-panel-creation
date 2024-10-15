@@ -8,87 +8,34 @@ workflow PhysicalAndStatisticalPhasing {
     input {
         File all_chr_bam
         File all_chr_bai
-        File joint_short_vcf
-        File joint_short_vcf_tbi
-        File joint_sv_vcf
-        File joint_sv_vcf_tbi
         File reference_fasta
         File reference_fasta_fai
-        File genetic_mapping_tsv_for_shapeit4
-        String chromosome
-        String region
+        String small_vcfs_directory
+        String sv_vcfs_directory
         String prefix
-        String gcs_out_root_dir
-        Int shapeit4_num_threads
-        Int merge_num_threads = 4
         Int hiphase_memory
-        Int shapeit4_memory
-        String shapeit4_extra_args = "--use-PS 0.0001" # expected error rate in phase sets derived from physical phasing
         String hiphase_extra_args
+        String sample_id
     }
 
-    Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
-    Int data_length = length(sample_bams)
-    Array[Int] indexes= range(data_length)
-
-    call H.SubsetVCF as SubsetVcfShort { input:
-        vcf_gz = joint_short_vcf,
-        vcf_tbi = joint_short_vcf_tbi,
-        locus = region
-    }
-
-    call H.SubsetVCF as SubsetVcfSV { input:
-        vcf_gz = joint_sv_vcf,
-        vcf_tbi = joint_sv_vcf_tbi,
-        locus = region
+    call ConvertLowerCase {input:
+        vcf = sv_vcfs_directory + "/" + sample_id + '.vcf.gz',
+        prefix = sample_id + ".uppercased_sv_cleaned"
+            
     }
 
     call UnphaseGenotypes as UnphaseSVGenotypes { input:
-        vcf = SubsetVcfSV.subset_vcf,
-        vcf_tbi = SubsetVcfSV.subset_tbi,
+        vcf = ConvertLowerCase.subset_vcf,
+        vcf_tbi = ConvertLowerCase.subset_tbi,
         prefix = prefix + ".unphased"
     }
 
 
-    call H.SubsetBam { input:
+    call H.HiPhase { input:
         bam = all_chr_bam,
         bai = all_chr_bai,
-        locus = region
-    }
-
-    call H.InferSampleName { input: 
-        bam = all_chr_bam, 
-        bai = all_chr_bai
-    }
-
-    String sample_id = InferSampleName.sample_name
-
-    call H.SplitVCFbySample as SplitVcfbySampleShort { input:
-        joint_vcf = SubsetVcfShort.subset_vcf,
-        region = region,
-        samplename = sample_id
-    }
-
-    call H.SplitVCFbySample as SplitVcfbySampleSV { input:
-        joint_vcf = UnphaseSVGenotypes.unphased_vcf,
-        region = region,
-        samplename = sample_id
-    }
-
-    call ConvertLowerCase {
-        input:
-            vcf = SplitVcfbySampleSV.single_sample_vcf,
-            prefix = sample_id + ".uppercased_sv_cleaned"
-            
-    }
-
-    call H.HiPhase { input:
-        bam = SubsetBam.subset_bam,
-        bai = SubsetBam.subset_bai,
-        unphased_snp_vcf = SplitVcfbySampleShort.single_sample_vcf,
-        unphased_snp_tbi = SplitVcfbySampleShort.single_sample_vcf_tbi,
-        unphased_sv_vcf = ConvertLowerCase.subset_vcf,
-        unphased_sv_tbi = ConvertLowerCase.subset_tbi,
+        unphased_snp_vcf = small_vcfs_directory + "/" + sample_id + '.vcf.gz',
+        unphased_sv_vcf = UnphaseSVGenotypes.unphased_vcf,
         ref_fasta = reference_fasta,
         ref_fasta_fai = reference_fasta_fai,
         samplename = sample_id,
@@ -109,8 +56,6 @@ task ConvertLowerCase {
         File vcf
         String prefix
     }
-
-    Int disk_size = 2*ceil(size([vcf], "GB")) + 1
     String docker_dir = "/truvari_intrasample"
     String work_dir = "/cromwell_root/truvari_intrasample"
 
@@ -132,60 +77,12 @@ task ConvertLowerCase {
     ###################
     runtime {
         cpu: 2
-        memory:  "32 GiB"
+        memory:  "8 GiB"
         disks: "local-disk 50 HDD"
         bootDiskSizeGb: 10
         preemptible_tries:     3
         max_retries:           2
         docker:"hangsuunc/cleanvcf:v1"
-    }
-}
-
-# filter out singletons (i.e., keep MAC >= 2) and concatenate with deduplication
-task FilterAndConcatVcfs {
-
-    input {
-        File short_vcf         # multiallelic
-        File short_vcf_tbi
-        File sv_vcf            # biallelic
-        File sv_vcf_tbi
-        String prefix
-    }
-
-    command <<<
-        set -euxo pipefail
-
-        # filter SV singletons
-        bcftools view -i 'MAC>=2' ~{sv_vcf} \
-            --write-index -Oz -o ~{prefix}.SV.vcf.gz
-
-        # filter short singletons and split to biallelic
-        bcftools view -i 'MAC>=2' ~{short_vcf} | \
-            bcftools norm -m-any --do-not-normalize \
-            --write-index -Oz -o ~{prefix}.short.vcf.gz
-
-        # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
-        bcftools concat \
-            ~{prefix}.SV.vcf.gz \
-            ~{prefix}.short.vcf.gz \
-            --allow-overlaps --remove-duplicates \
-            -Oz -o ~{prefix}.vcf.gz
-        bcftools index -t ~{prefix}.vcf.gz
-    >>>
-
-    output {
-        File filter_and_concat_vcf = "~{prefix}.vcf.gz"
-        File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
-    }
-    ###################
-    runtime {
-        cpu: 1
-        memory:  "4 GiB"
-        disks: "local-disk 50 HDD"
-        bootDiskSizeGb: 10
-        preemptible_tries:     3
-        max_retries:           2
-        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
     }
 }
 
