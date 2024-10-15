@@ -27,9 +27,7 @@ task HiPhase {
         File bai
 
         File unphased_snp_vcf
-        File unphased_snp_tbi
         File unphased_sv_vcf
-        File unphased_sv_tbi
 
         File ref_fasta
         File ref_fasta_fai
@@ -44,13 +42,16 @@ task HiPhase {
     }
 
     # Int bam_sz = ceil(size(bam, "GB"))
-	Int disk_size = 30 # if bam_sz > 200 then 2*bam_sz else bam_sz + 200
+	Int disk_size = 100 # if bam_sz > 200 then 2*bam_sz else bam_sz + 200
     Int thread_num = memory/2
 
     command <<<
         set -euxo pipefail
 
         touch ~{bai}
+
+        bcftools index -t ~{unphased_snp_vcf}
+        bcftools index -t ~{unphased_sv_vcf}
 
         hiphase \
         --threads ~{thread_num} \
@@ -65,7 +66,6 @@ task HiPhase {
         --stats-file ~{samplename}.stats.csv \
         --blocks-file ~{samplename}.blocks.tsv \
         --summary-file ~{samplename}.summary.tsv \
-        --verbose \
         ~{extra_args}
 
         bcftools sort ~{samplename}_phased_snp.vcf.gz -O z -o ~{samplename}_phased_snp.sorted.vcf.gz
@@ -90,8 +90,8 @@ task HiPhase {
         mem_gb:             memory,
         disk_gb:            disk_size,
         boot_disk_gb:       100,
-        preemptible_tries:  1,
-        max_retries:        0,
+        preemptible_tries:  3,
+        max_retries:        2,
         docker:             "hangsuunc/hiphase:1.3.0"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
@@ -135,8 +135,8 @@ task SubsetVCF {
 
     command <<<
         set -euxo pipefail
-
-        bcftools view ~{vcf_gz} --regions ~{locus} -O z -o ~{prefix}.vcf.gz
+        tabix -h ~{vcf_gz} ~{locus} | bgzip > ~{prefix}.vcf.gz
+        # bcftools view ~{vcf_gz} --regions ~{locus} -O z -o ~{prefix}.vcf.gz
         tabix -p vcf ~{prefix}.vcf.gz
     >>>
 
@@ -283,19 +283,16 @@ task InferSampleName {
 task SplitVCFbySample {
     input{       
         File joint_vcf
-        String region
+        File joint_vcf_tbi
         String samplename
     }
     
     command <<<
         set -x pipefail
 
-        bcftools index ~{joint_vcf}
-
-        bcftools view -s ~{samplename} ~{joint_vcf} -r ~{region} -o ~{samplename}.subset.g.vcf.gz
-
-        tabix -p vcf ~{samplename}.subset.g.vcf.gz
-
+        bcftools view -s ~{samplename} ~{joint_vcf} -Oz -o ~{samplename}.subset.g.vcf.gz
+        bcftools index -t ~{samplename}.subset.g.vcf.gz
+        
     >>>
     
     output {
@@ -308,8 +305,8 @@ task SplitVCFbySample {
 
     runtime {
         cpu: 1
-        memory: "64 GiB"
-        disks: "local-disk " + disk_size + " HDD" #"local-disk 100 HDD"
+        memory: "4 GiB"
+        disks: "local-disk " + disk_size + " SSD" #"local-disk 100 HDD"
         bootDiskSizeGb: 10
         preemptible: 0
         maxRetries: 1
@@ -428,6 +425,89 @@ task Shapeit4 {
         disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
         zones: zones
         bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+task FinalizeToDir {
+
+    meta {
+        description: "Copies the given file to the specified bucket."
+    }
+
+    parameter_meta {
+        files: {
+            description: "files to finalize",
+            localization_optional: true
+        }
+        file_names: "custom names for files; must be the same length as files if provided"
+        outdir: "directory to which files should be uploaded"
+
+        keyfile : "[optional] File used to key this finaliation.  Finalization will not take place until the KeyFile exists.  This can be used to force the finaliation to wait until a certain point in a workflow.  NOTE: The latest WDL development spec includes the `after` keyword which will obviate this."
+    }
+
+    input {
+        Array[File] files
+        Array[String]? file_names
+        String outdir
+
+        File? keyfile
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    String gcs_output_dir = sub(outdir, "/+$", "")
+
+    Boolean fail = if(defined(file_names)) then length(select_first([file_names])) != length(files) else false
+    # this variable is defined because of meta-programing:
+    # Cromwell generates the script to be executed at runtime (duing the run of the workflow),
+    # but also at "compile time" when looked from the individual task perspective--the task is "compiled" right before it is run.
+    # so optional variables, if not specified, cannot be used in the command section because at that "compile time", they are undefined
+    # here we employ a hack:
+    # if the optional input file_names isn't provided, it's not used anyway, so we don't worry about the literal correctness of
+    # the variable's values--the variable used in generating the script--but only care that it is defined.
+    Array[String] names_for_cromwell = select_first([file_names, ["correctness_doesnot_matter_here"]])
+    command <<<
+        set -euxo pipefail
+
+        if ~{fail}; then echo "input files and file_names don't have the same length!" && exit 1; fi
+
+        if ~{defined(file_names)}; then
+            paste \
+                ~{write_lines(files)} \
+                ~{write_lines(names_for_cromwell)} \
+            > file_and_customname.tsv
+            while IFS=$'\t' read -r ff nn; do
+                gcloud storage cp \
+                    "${ff}" \
+                    "~{gcs_output_dir}"/"${nn}"
+            done < file_and_customname.tsv
+        else
+            cat ~{write_lines(files)} | \
+            gcloud storage cp -I "~{gcs_output_dir}"
+        fi
+    >>>
+
+    output {
+        String gcs_dir = gcs_output_dir
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          1,
+        mem_gb:             4,
+        disk_gb:            10,
+        preemptible_tries:  2,
+        max_retries:        2,
+        docker:             "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.3"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
         preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
         maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
