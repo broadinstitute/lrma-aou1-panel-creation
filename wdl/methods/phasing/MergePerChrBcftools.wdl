@@ -14,6 +14,7 @@ workflow MergePerchrBcftools {
         String prefix
         String gcs_out_root_dir
         Int merge_num_threads = 4
+        Int batchsize
 
     }
 
@@ -22,14 +23,16 @@ workflow MergePerchrBcftools {
         vcf_input = hiphased_snp_vcf,
         tbi_input = hiphased_snp_vcf_tbi,
         pref = prefix + ".short",
-        threads_num = merge_num_threads
+        threads_num = merge_num_threads,
+        batch_size = batchsize
     }
 
     call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
         vcf_input = hiphased_sv_vcf,
         tbi_input = hiphased_sv_vcf_tbi,
         pref = prefix + ".SV",
-        threads_num = merge_num_threads
+        threads_num = merge_num_threads,
+        batch_size = batchsize
     }
 
     call FilterAndConcatVcfs { input:
@@ -84,9 +87,9 @@ task FilterAndConcatVcfs {
     }
     ###################
     runtime {
-        cpu: 1
-        memory:  "4 GiB"
-        disks: "local-disk 50 HDD"
+        cpu: 4
+        memory:  "16 GiB"
+        disks: "local-disk 375 HDD"
         bootDiskSizeGb: 10
         preemptible_tries:     3
         max_retries:           2

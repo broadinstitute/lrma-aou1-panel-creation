@@ -324,6 +324,7 @@ task MergePerChrVcfWithBcftools {
         Array[File] tbi_input
         String pref
         Int threads_num
+        Int batch_size
     }
 
     command <<<
@@ -332,24 +333,39 @@ task MergePerChrVcfWithBcftools {
         # we do single-sample phased VCFs localization ourselves
         mkdir -p ssp_vcfs
         time \
-        gcloud storage cp ~{sep=" " vcf_input} /cromwell_root/ssp_vcfs/
+        gcloud storage cp ~{sep=" " vcf_input} /cromwell_root/ssp_vcfs/ &
 
         time \
-        gcloud storage cp ~{sep=" " tbi_input} /cromwell_root/ssp_vcfs/
+        gcloud storage cp ~{sep=" " tbi_input} /cromwell_root/ssp_vcfs/ &
+        wait
 
         # then merge, and safely assume all ssp-VCFs are sorted in the same order, on one chr
         cd ssp_vcfs
-        ls *.vcf.gz > my_vcfs.txt
+        ls *.vcf.gz | split -l ~{batch_size} - subset_vcfs
 
+        for i in subset_vcfs*;
+        do
+            time \
+            bcftools merge \
+                --threads ~{threads_num} \
+                --merge none \
+                --force-single \
+                -l $i \
+                -O z \
+                -o ~{pref}.merge.$i.vcf.gz
+            bcftools index --threads ~{threads_num} -t ~{pref}.merge.$i.vcf.gz
+        done
+        ls ~{pref}.merge.*.vcf.gz > merge.txt
+
+        time \
         bcftools merge \
             --threads ~{threads_num} \
+            --force-single \
             --merge none \
-            -l my_vcfs.txt \
+            -l merge.txt \
             -O z \
             -o ~{pref}.AllSamples.vcf.gz
-
-        tabix -@ ~{threads_num} -p vcf ~{pref}.AllSamples.vcf.gz
-
+        bcftools index --threads ~{threads_num} -t ~{pref}.AllSamples.vcf.gz
         # move result files to the correct location for cromwell to de-localize
         mv ~{pref}.AllSamples.vcf.gz ~{pref}.AllSamples.vcf.gz.tbi /cromwell_root/
     >>>
@@ -360,7 +376,7 @@ task MergePerChrVcfWithBcftools {
     }
 
     runtime {
-        cpu: 32
+        cpu: 16
         memory: "64 GiB"
         disks: "local-disk 1500 LOCAL"
         preemptible: 1
@@ -368,6 +384,7 @@ task MergePerChrVcfWithBcftools {
         docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
     }
 }
+
 
 task Shapeit4 {
     input{
