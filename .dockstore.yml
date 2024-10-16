@@ -24,6 +24,6 @@ workflows:
 - name: BatchSplitCohort
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/BatchSplitCohort.wdl
-- name: MergePerChrBcftools
+- name: HierarchicalMergeVCFs
   subclass: wdl
-  primaryDescriptorPath: /wdl/methods/phasing/MergePerChrBcftools.wdl
+  primaryDescriptorPath: /wdl/methods/phasing/HierarchicalMergeVCFs.wdl

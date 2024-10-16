@@ -343,18 +343,27 @@ task MergePerChrVcfWithBcftools {
         cd ssp_vcfs
         ls *.vcf.gz | split -l ~{batch_size} - subset_vcfs
 
+        cnt=0
         for i in subset_vcfs*;
         do
-            time \
             bcftools merge \
-                --threads ~{threads_num} \
+                --threads 6 \
                 --merge none \
                 --force-single \
                 -l $i \
                 -O z \
-                -o ~{pref}.merge.$i.vcf.gz
-            bcftools index --threads ~{threads_num} -t ~{pref}.merge.$i.vcf.gz
+                -o ~{pref}.merge.$i.vcf.gz &
+            cnt=$((cnt+1))
+            if [[ $cnt -eq 18 ]]; then cnt=0; wait; fi
         done
+        wait
+        for i in ~{pref}.merge.*.vcf.gz;
+        do 
+            bcftools index --threads 6 -t $i &
+            cnt=$((cnt+1))
+            if [[ $cnt -eq 18 ]]; then cnt=0; wait; fi
+        done
+        wait
         ls ~{pref}.merge.*.vcf.gz > merge.txt
 
         time \
@@ -376,9 +385,9 @@ task MergePerChrVcfWithBcftools {
     }
 
     runtime {
-        cpu: 16
-        memory: "64 GiB"
-        disks: "local-disk 1500 LOCAL"
+        cpu: 96
+        memory: "384 GiB"
+        disks: "local-disk 3000 LOCAL"
         preemptible: 1
         maxRetries: 0
         docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
