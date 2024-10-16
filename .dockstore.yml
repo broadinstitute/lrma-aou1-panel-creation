@@ -21,6 +21,9 @@ workflows:
 - name: LeaveOutEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/kage/LeaveOutEvaluation.wdl
-- name: LeaveOneOutEvaluation
+- name: BatchSplitCohort
   subclass: wdl
-  primaryDescriptorPath: /wdl/evaluation/kage/LeaveOneOutEvaluation.wdl
+  primaryDescriptorPath: /wdl/methods/phasing/BatchSplitCohort.wdl
+- name: MergePerChrBcftools
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/MergePerChrBcftools.wdl

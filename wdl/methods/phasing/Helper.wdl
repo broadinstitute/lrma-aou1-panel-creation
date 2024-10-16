@@ -513,3 +513,62 @@ task FinalizeToDir {
         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
     }
 }
+
+task FinalizeToFile {
+
+    meta{
+        description: "Copies the given file to the specified bucket."
+    }
+
+    parameter_meta {
+        file: {
+            description: "file to finalize",
+            localization_optional: true
+        }
+        keyfile : "[optional] File used to key this finaliation.  Finalization will not take place until the KeyFile exists.  This can be used to force the finaliation to wait until a certain point in a workflow.  NOTE: The latest WDL development spec includes the `after` keyword which will obviate this."
+        outdir: "directory to which files should be uploaded"
+        name:   "name to set for uploaded file"
+    }
+
+    input {
+        File file
+        String outdir
+        String? name
+
+        File? keyfile
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    String gcs_output_dir = sub(outdir, "/+$", "")
+    String gcs_output_file = gcs_output_dir + "/" + select_first([name, basename(file)])
+
+    command <<<
+        set -euxo pipefail
+
+        gcloud storage cp "~{file}" "~{gcs_output_file}"
+    >>>
+
+    output {
+        String gcs_path = gcs_output_file
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          1,
+        mem_gb:             1,
+        disk_gb:            10,
+        preemptible_tries:  2,
+        max_retries:        2,
+        docker:             "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.3"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
