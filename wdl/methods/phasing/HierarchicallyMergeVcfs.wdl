@@ -27,6 +27,7 @@ workflow HierarchicallyMergeVcfs {
         input:
             vcf_gzs = vcf_gzs,
             vcf_gz_tbis = vcf_gz_tbis,
+            batch_size = batch_size,
             docker = docker
     }
 
