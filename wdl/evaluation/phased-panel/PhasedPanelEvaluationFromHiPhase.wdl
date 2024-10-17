@@ -110,12 +110,12 @@ workflow PhasedPanelEvaluation {
         prefix = output_prefix + ".filter_and_concat"
     }
 
-#    call CreateShapeit4Chunks { input:
-#        vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
-#        tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-#        extra_chunk_args = extra_chunk_args,
-#        prefix = output_prefix
-#    }
+    call CreateShapeit4Chunks { input:
+        vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
+        tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+        prefix = output_prefix,
+        extra_chunk_args = extra_chunk_args
+    }
 
     Array[String] region_list = read_lines(CreateShapeit4Chunks.chunks)
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
@@ -482,6 +482,69 @@ task FilterAndConcatVcfs {
         String prefix
         String region
         String? extra_filter_args
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Int disk_size = 2*ceil(size([short_vcf, short_vcf_tbi], "GB")) + 2*ceil(size([sv_vcf, sv_vcf_tbi], "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+
+        # filter SV singletons
+        bcftools view -i 'MAC>=2' ~{extra_filter_args} ~{sv_vcf} \
+            -r ~{region} \
+            --write-index -Oz -o ~{prefix}.SV.vcf.gz
+
+        # filter short singletons and split to biallelic
+        bcftools view -i 'MAC>=2' ~{extra_filter_args} ~{short_vcf} \
+            -r ~{region} | \
+            bcftools norm -m-any --do-not-normalize \
+            --write-index -Oz -o ~{prefix}.short.vcf.gz
+
+        # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
+        bcftools concat \
+            ~{prefix}.SV.vcf.gz \
+            ~{prefix}.short.vcf.gz \
+            --allow-overlaps --remove-duplicates \
+            -Oz -o ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File filter_and_concat_vcf = "~{prefix}.vcf.gz"
+        File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          1,
+        mem_gb:             8,
+        disk_gb:            disk_size,
+        boot_disk_gb:       10,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SDD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+task CreateShapeit4Chunks {
+
+    input {
+        File vcf
+        File tbi
+        String prefix
+        String? extra_chunk_args
 
         RuntimeAttr? runtime_attr_override
     }
