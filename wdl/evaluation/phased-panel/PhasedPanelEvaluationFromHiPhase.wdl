@@ -423,7 +423,7 @@ task SubsetVcfShortInSVWindows {
     command <<<
         set -euxo pipefail
 
-        bctools view ~{sv_vcf_gz} \
+        bcftools view ~{sv_vcf_gz} \
             -r ~{region} \
             -Oz -o sv.region.vcf.gz
         bcftools index -t sv.region.vcf.gz
