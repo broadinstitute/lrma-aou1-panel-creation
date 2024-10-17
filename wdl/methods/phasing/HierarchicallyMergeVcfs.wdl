@@ -11,7 +11,7 @@ struct RuntimeAttributes {
     Int? max_retries
 }
 
-workflow HierarchicalMergeVcfs {
+workflow HierarchicallyMergeVcfs {
     input {
         Array[Array[File]] batched_vcf_gzs
         Array[Array[File]] batched_vcf_gz_tbis
