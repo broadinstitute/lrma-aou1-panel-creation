@@ -544,44 +544,32 @@ task CreateShapeit4Chunks {
         File vcf
         File tbi
         String prefix
-        String? extra_chunk_args
+        String? extra_chunk_args = "--thread $(nproc) --window-size 5000000 --buffer-size 500000"
 
         RuntimeAttr? runtime_attr_override
     }
 
-    Int disk_size = 2*ceil(size([short_vcf, short_vcf_tbi], "GB")) + 2*ceil(size([sv_vcf, sv_vcf_tbi], "GB")) + 1
+    Int disk_size = 2*ceil(size([vcf, tbi], "GB")) + 1
 
     command <<<
         set -euxo pipefail
 
-        # filter SV singletons
-        bcftools view -i 'MAC>=2' ~{extra_filter_args} ~{sv_vcf} \
-            -r ~{region} \
-            --write-index -Oz -o ~{prefix}.SV.vcf.gz
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_chunk_static
+        chmod +x GLIMPSE_chunk_static
 
-        # filter short singletons and split to biallelic
-        bcftools view -i 'MAC>=2' ~{extra_filter_args} ~{short_vcf} \
-            -r ~{region} | \
-            bcftools norm -m-any --do-not-normalize \
-            --write-index -Oz -o ~{prefix}.short.vcf.gz
-
-        # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
-        bcftools concat \
-            ~{prefix}.SV.vcf.gz \
-            ~{prefix}.short.vcf.gz \
-            --allow-overlaps --remove-duplicates \
-            -Oz -o ~{prefix}.vcf.gz
-        bcftools index -t ~{prefix}.vcf.gz
+        ./GLIMPSE_chunk_static \
+            -I ~{vcf} \
+            ~{extra_chunk_args} \
+            -O chunks.txt
     >>>
 
     output {
-        File filter_and_concat_vcf = "~{prefix}.vcf.gz"
-        File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+        File chunks = "chunks.txt"
     }
 
     #########################
     RuntimeAttr default_attr = object {
-        cpu_cores:          1,
+        cpu_cores:          4,
         mem_gb:             8,
         disk_gb:            disk_size,
         boot_disk_gb:       10,
