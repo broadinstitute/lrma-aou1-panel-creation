@@ -69,14 +69,14 @@ task CreateBatches {
         RuntimeAttributes runtime_attributes = {}
     }
 
-    command <<<
+    command {
         set -euox pipefail
 
         cat ~{write_lines(vcf_gzs)} | split -l ~{batch_size} - vcf_gz_batch_
         cat ~{write_lines(vcf_gz_tbis)} | split -l ~{batch_size} - vcf_gz_tbi_batch_
-    >>>
+    }
 
-    output{
+    output {
         Array[File] vcf_gz_batch_fofns = glob("vcf_gz_batch_*")
         Array[File] vcf_gz_tbi_batch_fofns = glob("vcf_gz_tbi_batch_*")
     }
