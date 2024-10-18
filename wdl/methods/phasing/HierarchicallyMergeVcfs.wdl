@@ -185,7 +185,7 @@ task ConcatVcfs {
             -f ~{write_lines(vcf_gzs)} \
             ~{extra_args} \
             -Oz -o ~{output_prefix}.vcf.gz
-        bcftools index -t ~{output_prefix}.vcf.gz
+        bcftools index -t --threads $(nproc) ~{output_prefix}.vcf.gz
     }
 
     output {
