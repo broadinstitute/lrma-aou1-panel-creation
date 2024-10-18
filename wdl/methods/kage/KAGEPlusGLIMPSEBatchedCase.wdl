@@ -462,14 +462,10 @@ task GLIMPSECase {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        # TODO update to GLIMPSE2
-        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_ligate_static
-        chmod +x GLIMPSE_ligate_static
-
-        ./GLIMPSE_ligate_static \
-            --input ~{write_lines(chromosome_glimpse_bcfs)} \
-            --output ~{output_prefix}.kage.glimpse.unphased.bcf \
-            --log ~{output_prefix}.ligate.log
+        bcftools concat \
+            -f ~{write_lines(chromosome_glimpse_vcf_gzs)} \
+            --naive \
+            -Ob -o ~{output_prefix}.kage.glimpse.unphased.bcf
 
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
         chmod +x GLIMPSE_sample_static
