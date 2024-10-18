@@ -85,9 +85,17 @@ workflow PhasedPanelEvaluation {
         RuntimeAttributes? calculate_metrics_runtime_attributes
     }
 
-    String chromosomes_regions_arg = "~{sep(',', chromosomes)}"
-    String evaluation_chromosomes_regions_arg = "~{sep(',', evaluation_chromosomes)}"
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
+
+    call Sep as SepChromosomes { input:
+        strs = chromosomes
+    }
+    String chromosomes_regions_arg = SepChromosomes.str
+
+    call Sep as SepEvaluationChromosomes { input:
+        strs = evaluation_chromosomes
+    }
+    String evaluation_chromosomes_regions_arg = SepEvaluationChromosomes.str
 
     if (subset_short_to_sv_windows) {
         call SubsetVcfShortInSVWindows { input:
@@ -411,6 +419,29 @@ workflow PhasedPanelEvaluation {
     }
 
     output {
+    }
+}
+
+task Sep {
+    input {
+        Array[String] strs
+    }
+
+    command <<<
+    >>>
+
+    output {
+        String str = "~{sep=',' strs}"
+    }
+
+    runtime {
+        cpu: 1
+        memory: "3 GiB"
+        disks: "local-disk 10 HDD"
+        bootDiskSizeGb: 10
+        preemptible: 2
+        maxRetries: 1
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
     }
 }
 
