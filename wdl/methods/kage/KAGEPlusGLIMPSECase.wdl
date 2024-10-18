@@ -397,24 +397,20 @@ task GLIMPSECase {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        # TODO update to GLIMPSE2
-        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_ligate_static
-        chmod +x GLIMPSE_ligate_static
-
-        ./GLIMPSE_ligate_static \
-            --input ~{write_lines(chromosome_glimpse_vcf_gzs)} \
-            --output ~{output_prefix}.ligate.bcf \
-            --log ~{output_prefix}.ligate.log
+        bcftools concat \
+            -f ~{write_lines(chromosome_glimpse_vcf_gzs)} \
+            --naive \
+            -Ob -o ~{output_prefix}.concat.bcf
 
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
         chmod +x GLIMPSE_sample_static
 
-        ./GLIMPSE_sample_static --input ~{output_prefix}.ligate.bcf \
+        ./GLIMPSE_sample_static --input ~{output_prefix}.concat.bcf \
             --solve \
             --output ~{output_prefix}.sample.bcf \
             --log ~{output_prefix}.sample.log
 
-        bcftools view --no-version ~{output_prefix}.ligate.bcf -Oz -o ~{output_prefix}.kage.glimpse.unphased.vcf.gz
+        bcftools view --no-version ~{output_prefix}.concat.bcf -Oz -o ~{output_prefix}.kage.glimpse.unphased.vcf.gz
         bcftools index -t ~{output_prefix}.kage.glimpse.unphased.vcf.gz
 
         bcftools view --no-version ~{output_prefix}.sample.bcf -Oz -o ~{output_prefix}.kage.glimpse.vcf.gz
@@ -433,7 +429,6 @@ task GLIMPSECase {
 
     output {
         File monitoring_log = "monitoring.log"
-        File ligate_log = "~{output_prefix}.ligate.log"
         File glimpse_unphased_vcf_gz = "~{output_prefix}.kage.glimpse.unphased.vcf.gz"
         File glimpse_unphased_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.unphased.vcf.gz.tbi"
         File glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.vcf.gz"
