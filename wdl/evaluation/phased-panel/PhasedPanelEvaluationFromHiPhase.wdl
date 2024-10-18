@@ -608,10 +608,13 @@ task CreateShapeit4Chunks {
             --region ~{region} \
             ~{extra_chunk_args} \
             -O chunks.txt
+
+        # cut chunks + buffers
+        cut -f 3 chunks.txt > chunks.regions.txt
     >>>
 
     output {
-        File chunks = "chunks.txt"
+        File chunks = "chunks.regions.txt"
     }
 
     #########################
