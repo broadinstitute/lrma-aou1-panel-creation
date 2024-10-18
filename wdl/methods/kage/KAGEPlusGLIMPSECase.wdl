@@ -400,7 +400,8 @@ task GLIMPSECase {
         bcftools concat \
             -f ~{write_lines(chromosome_glimpse_vcf_gzs)} \
             --naive \
-            --write-index -Ob -o ~{output_prefix}.concat.bcf
+            -Ob -o ~{output_prefix}.concat.bcf
+        bcftools index ~{output_prefix}.concat.bcf
 
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
         chmod +x GLIMPSE_sample_static
