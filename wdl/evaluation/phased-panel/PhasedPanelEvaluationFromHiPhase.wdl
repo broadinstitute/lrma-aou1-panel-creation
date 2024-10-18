@@ -85,8 +85,8 @@ workflow PhasedPanelEvaluation {
         RuntimeAttributes? calculate_metrics_runtime_attributes
     }
 
-    String chromosomes_regions_arg = "~sep(',', chromosomes)"
-    String evaluation_chromosomes_regions_arg = "~sep(',', evaluation_chromosomes)"
+    String chromosomes_regions_arg = "~{sep(',', chromosomes)}"
+    String evaluation_chromosomes_regions_arg = "~{sep(',', evaluation_chromosomes)}"
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
 
     if (subset_short_to_sv_windows) {
