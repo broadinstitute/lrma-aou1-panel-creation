@@ -427,11 +427,12 @@ task Sep {
         Array[String] strs
     }
 
-    command <<<
-    >>>
+    command {
+        echo "~{sep=',' strs}" > str.txt
+    }
 
     output {
-        String str = "~{sep=',' strs}"
+        String str = read_string("str.txt")
     }
 
     runtime {
@@ -464,7 +465,7 @@ task SubsetVcfShortInSVWindows {
 
     Int disk_size = 2*ceil(size([short_vcf_gz, short_vcf_tbi], "GB")) + 2*ceil(size([sv_vcf_gz, sv_vcf_tbi], "GB")) + 1
 
-    command <<<
+    command {
         set -euxo pipefail
 
         bcftools view ~{sv_vcf_gz} \
@@ -486,7 +487,7 @@ task SubsetVcfShortInSVWindows {
             ~{filter_args} \
             -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
-    >>>
+    }
 
     output {
         File subset_short_vcf_gz = "~{prefix}.vcf.gz"
@@ -532,7 +533,7 @@ task FilterAndConcatVcfs {
 
     Int disk_size = 2*ceil(size([short_vcf, short_vcf_tbi], "GB")) + 2*ceil(size([sv_vcf, sv_vcf_tbi], "GB")) + 1
 
-    command <<<
+    command {
         set -euxo pipefail
 
         # filter SV singletons
@@ -553,7 +554,7 @@ task FilterAndConcatVcfs {
             --allow-overlaps --remove-duplicates \
             -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
-    >>>
+    }
 
     output {
         File filter_and_concat_vcf = "~{prefix}.vcf.gz"
@@ -750,7 +751,7 @@ task SummarizeEvaluations {
         Int preemptible = 1
     }
 
-    command <<<
+    command {
         set -euxo pipefail
 
         python - --labels_per_vcf_txt ~{write_lines(labels_per_vcf)} \
@@ -817,7 +818,7 @@ task SummarizeEvaluations {
         if __name__ == '__main__':
             main()
         EOF
-    >>>
+    }
 
     output {
         File evaluation_summary_tsv = "evaluation_summary.tsv"
