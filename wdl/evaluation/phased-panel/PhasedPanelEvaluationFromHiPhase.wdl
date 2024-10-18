@@ -751,7 +751,7 @@ task SummarizeEvaluations {
         Int preemptible = 1
     }
 
-    command {
+    command <<<
         set -euxo pipefail
 
         python - --labels_per_vcf_txt ~{write_lines(labels_per_vcf)} \
@@ -818,7 +818,7 @@ task SummarizeEvaluations {
         if __name__ == '__main__':
             main()
         EOF
-    }
+    >>>
 
     output {
         File evaluation_summary_tsv = "evaluation_summary.tsv"
