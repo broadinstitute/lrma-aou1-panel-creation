@@ -13,7 +13,7 @@ workflow PhasedPanelEvaluation {
         File reference_fasta
         File reference_fasta_fai
         File reference_fasta_dict
-        String region
+        Array[String] chromosomes
         String gcs_out_root_dir
         String output_prefix
         Int merge_num_threads
@@ -51,6 +51,7 @@ workflow PhasedPanelEvaluation {
         Array[String] vcfdist_samples
         File vcfdist_truth_vcf
         File vcfdist_truth_vcf_idx
+        Array[String] evaluation_chromosomes
         File vcfdist_bed_file
         String? vcfdist_extra_args
         String overlap_metrics_docker
@@ -84,6 +85,10 @@ workflow PhasedPanelEvaluation {
         RuntimeAttributes? calculate_metrics_runtime_attributes
     }
 
+    String chromosomes_regions_arg = "~sep(',', chromosomes)"
+    String evaluation_chromosomes_regions_arg = "~sep(',', evaluation_chromosomes)"
+    Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
+
     if (subset_short_to_sv_windows) {
         call SubsetVcfShortInSVWindows { input:
             short_vcf_gz = hiphase_short_vcf_gz,
@@ -94,7 +99,7 @@ workflow PhasedPanelEvaluation {
             reference_fasta_fai = reference_fasta_fai,
             reference_fasta_dict = reference_fasta_dict,
             prefix = output_prefix + ".short.subset.windowed",
-            region = region,
+            region = chromosomes_regions_arg,
             window_padding = window_padding,
             filter_args = subset_filter_args
         }
@@ -105,37 +110,45 @@ workflow PhasedPanelEvaluation {
         short_vcf_tbi = select_first([SubsetVcfShortInSVWindows.subset_short_vcf_gz_tbi, hiphase_short_vcf_gz_tbi]),
         sv_vcf = hiphase_sv_vcf_gz,
         sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
-        region = region,
+        region = chromosomes_regions_arg,
         extra_filter_args = extra_filter_args,
         prefix = output_prefix + ".filter_and_concat"
     }
 
-    call CreateShapeit4Chunks { input:
-        vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
-        tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-        prefix = output_prefix,
-        extra_chunk_args = extra_chunk_args
-    }
+    scatter (i in range(length(chromosomes))) {
+        String chromosome = chromosomes[i]
 
-    Array[String] region_list = read_lines(CreateShapeit4Chunks.chunks)
-    Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
-    scatter (i in range(length(region_list))) {
-        String chromosome = sub(region_list[i], "(:.*)", "") # e.g. chr1:1-100 -> chr1
+        call CreateShapeit4Chunks { input:
+            vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
+            tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+            region = chromosomes[i],
+            prefix = output_prefix + "." + chromosome,
+            extra_chunk_args = extra_chunk_args
+        }
 
-        call Helper.Shapeit4 as Shapeit4 { input:
-            vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
-            vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-            mappingfile = genetic_mapping_dict[chromosome],
-            region = region_list[i],
-            prefix = output_prefix + ".filter_and_concat.phased.shard_" + i,
-            num_threads = shapeit4_num_threads,
-            memory = shapeit4_memory,
-            extra_args = shapeit4_extra_args
+        Array[String] region_list = read_lines(CreateShapeit4Chunks.chunks)
+
+        scatter (j in range(length(region_list))) {
+            call Helper.Shapeit4 as Shapeit4 { input:
+                vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
+                vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+                mappingfile = genetic_mapping_dict[chromosome],
+                region = region_list[j],
+                prefix = output_prefix + "." + chromosome + ".shard-" + j + ".filter_and_concat.phased",
+                num_threads = shapeit4_num_threads,
+                memory = shapeit4_memory,
+                extra_args = shapeit4_extra_args
+            }
+        }
+
+        call LigateVcfs as LigateVcfsChromosome { input:
+            vcfs = Shapeit4.phased_bcf,
+            prefix = output_prefix + "." + chromosome + ".phased.ligated"
         }
     }
 
     call LigateVcfs { input:
-        vcfs = Shapeit4.phased_bcf,
+        vcfs = LigateVcfsChromosome.ligated_vcf,
         prefix = output_prefix + ".phased.ligated"
     }
 
@@ -219,7 +232,7 @@ workflow PhasedPanelEvaluation {
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = hiphase_short_vcf_gz,
         eval_vcf_idx = hiphase_short_vcf_gz_tbi,
-        region = region,
+        region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
@@ -235,7 +248,7 @@ workflow PhasedPanelEvaluation {
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = hiphase_sv_vcf_gz,
         eval_vcf_idx = hiphase_sv_vcf_gz_tbi,
-        region = region,
+        region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
@@ -251,7 +264,7 @@ workflow PhasedPanelEvaluation {
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
         eval_vcf_idx = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-        region = region,
+        region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
@@ -267,7 +280,7 @@ workflow PhasedPanelEvaluation {
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = LigateVcfs.ligated_vcf,
         eval_vcf_idx = LigateVcfs.ligated_vcf_tbi,
-        region = region,
+        region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
@@ -283,7 +296,7 @@ workflow PhasedPanelEvaluation {
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = FixVariantCollisions.phased_collisionless_bcf,
         eval_vcf_idx = FixVariantCollisions.phased_collisionless_bcf_csi,
-        region = region,
+        region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
@@ -299,7 +312,7 @@ workflow PhasedPanelEvaluation {
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = PanGeniePanelCreation.panel_vcf_gz,
         eval_vcf_idx = PanGeniePanelCreation.panel_vcf_gz_tbi,
-        region = region,
+        region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
@@ -315,7 +328,7 @@ workflow PhasedPanelEvaluation {
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf,
         eval_vcf_idx = GLIMPSEMergeAcrossSamples.merged_tbi,
-        region = region,
+        region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
@@ -331,7 +344,7 @@ workflow PhasedPanelEvaluation {
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = GenotypingFixVariantCollisions.phased_collisionless_bcf,
         eval_vcf_idx = GenotypingFixVariantCollisions.phased_collisionless_bcf_csi,
-        region = region,
+        region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
@@ -360,7 +373,7 @@ workflow PhasedPanelEvaluation {
             truth_vcf_idx = vcfdist_truth_vcf_idx,
             eval_vcf = PanGenieMergeAcrossSamples.merged_vcf,
             eval_vcf_idx = PanGenieMergeAcrossSamples.merged_tbi,
-            region = region,
+            region = evaluation_chromosomes_regions_arg,
             reference_fasta = reference_fasta,
             reference_fasta_fai = reference_fasta_fai,
             vcfdist_bed_file = vcfdist_bed_file,
@@ -543,6 +556,7 @@ task CreateShapeit4Chunks {
     input {
         File vcf
         File tbi
+        String region
         String prefix
         String? extra_chunk_args = "--thread $(nproc) --window-size 5000000 --buffer-size 500000"
 
@@ -559,6 +573,7 @@ task CreateShapeit4Chunks {
 
         ./GLIMPSE_chunk_static \
             -I ~{vcf} \
+            --region ~{region} \
             ~{extra_chunk_args} \
             -O chunks.txt
     >>>
