@@ -123,12 +123,21 @@ workflow PhasedPanelEvaluation {
         prefix = output_prefix + ".filter_and_concat"
     }
 
+    call FixVariantCollisions as BeforeShapeit4FixVariantCollisions { input:
+        phased_bcf = FilterAndConcatVcfs.filter_and_concat_vcf,
+        fix_variant_collisions_java = fix_variant_collisions_java,
+        operation = operation,
+        weight_tag = weight_tag,
+        is_weight_format_field = is_weight_format_field,
+        output_prefix = output_prefix
+    }
+
     scatter (i in range(length(chromosomes))) {
         String chromosome = chromosomes[i]
 
         call CreateShapeit4Chunks { input:
-            vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
-            tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+            vcf = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf,
+            tbi = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf_csi,
             region = chromosomes[i],
             prefix = output_prefix + "." + chromosome,
             extra_chunk_args = extra_chunk_args
@@ -138,8 +147,8 @@ workflow PhasedPanelEvaluation {
 
         scatter (j in range(length(region_list))) {
             call Helper.Shapeit4 as Shapeit4 { input:
-                vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
-                vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+                vcf_input = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf,
+                vcf_index = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf_csi,
                 mappingfile = genetic_mapping_dict[chromosome],
                 region = region_list[j],
                 prefix = output_prefix + "." + chromosome + ".shard-" + j + ".filter_and_concat.phased",
@@ -281,6 +290,22 @@ workflow PhasedPanelEvaluation {
         overlap_metrics_docker = overlap_metrics_docker
     }
 
+    # evaluate before Shapeit4 collisionless short + SV
+    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateBeforeShapeit4FixVariantCollisions { input:
+        samples = vcfdist_samples,
+        truth_vcf = vcfdist_truth_vcf,
+        truth_vcf_idx = vcfdist_truth_vcf_idx,
+        eval_vcf = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf,
+        eval_vcf_idx = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf_csi,
+        region = evaluation_chromosomes_regions_arg,
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
+        vcfdist_bed_file = vcfdist_bed_file,
+        vcfdist_extra_args = vcfdist_extra_args,
+        overlap_phase_tag = "PS",
+        overlap_metrics_docker = overlap_metrics_docker
+    }
+
     # evaluate Shapeit4 short + SV
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
         samples = vcfdist_samples,
@@ -391,13 +416,14 @@ workflow PhasedPanelEvaluation {
         }
     }
 
-    Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"]
+    Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"]
     call SummarizeEvaluations { input:
         labels_per_vcf = labels_per_vcf,
         vcfdist_outputs_per_vcf_and_sample = select_all([
             EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
             EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
             EvaluateFiltered.vcfdist_outputs_per_sample,
+            EvaluateBeforeShapeit4FixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluateShapeit4.vcfdist_outputs_per_sample,
             EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluatePanel.vcfdist_outputs_per_sample,
@@ -409,6 +435,7 @@ workflow PhasedPanelEvaluation {
             EvaluateHiPhaseShort.overlap_metrics_outputs,
             EvaluateHiPhaseSV.overlap_metrics_outputs,
             EvaluateFiltered.overlap_metrics_outputs,
+            EvaluateBeforeShapeit4FixVariantCollisions.overlap_metrics_outputs,
             EvaluateShapeit4.overlap_metrics_outputs,
             EvaluateFixVariantCollisions.overlap_metrics_outputs,
             EvaluatePanel.overlap_metrics_outputs,
