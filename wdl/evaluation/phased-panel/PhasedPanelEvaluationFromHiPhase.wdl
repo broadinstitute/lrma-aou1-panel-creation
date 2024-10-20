@@ -553,7 +553,7 @@ task FilterAndConcatVcfs {
         File sv_vcf_tbi
         String prefix
         String region
-        String? extra_filter_args
+        String? extra_filter_args = "-i 'MAC>=2'"
 
         RuntimeAttr? runtime_attr_override
     }
@@ -564,12 +564,12 @@ task FilterAndConcatVcfs {
         set -euxo pipefail
 
         # filter SV singletons
-        bcftools view -i 'MAC>=2' ~{extra_filter_args} ~{sv_vcf} \
+        bcftools view ~{extra_filter_args} ~{sv_vcf} \
             -r ~{region} \
             --write-index -Oz -o ~{prefix}.SV.vcf.gz
 
         # filter short singletons and split to biallelic
-        bcftools view -i 'MAC>=2' ~{extra_filter_args} ~{short_vcf} \
+        bcftools view ~{extra_filter_args} ~{short_vcf} \
             -r ~{region} | \
             bcftools norm -m-any --do-not-normalize \
             --write-index -Oz -o ~{prefix}.short.vcf.gz
