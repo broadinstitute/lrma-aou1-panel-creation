@@ -695,7 +695,7 @@ task LigateVcfs {
 
     input {
         Array[File] vcfs
-        Array[File] vcf_idxs
+        Array[File]? vcf_idxs
         String prefix
 
         RuntimeAttr? runtime_attr_override
@@ -705,6 +705,9 @@ task LigateVcfs {
 
     command <<<
         set -euxo pipefail
+        if [ ! ~{defined(vcf_idxs)} ]; then
+            for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
+        fi
         bcftools concat --ligate  ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     >>>
