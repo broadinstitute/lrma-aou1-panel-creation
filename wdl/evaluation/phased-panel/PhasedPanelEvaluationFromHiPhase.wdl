@@ -97,47 +97,47 @@ workflow PhasedPanelEvaluation {
     }
     String evaluation_chromosomes_regions_arg = SepEvaluationChromosomes.str
 
-    if (subset_short_to_sv_windows) {
-        call SubsetVcfShortInSVWindows { input:
-            short_vcf_gz = hiphase_short_vcf_gz,
-            short_vcf_tbi = hiphase_short_vcf_gz_tbi,
-            sv_vcf_gz = hiphase_sv_vcf_gz,
-            sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
-            reference_fasta = reference_fasta,
-            reference_fasta_fai = reference_fasta_fai,
-            reference_fasta_dict = reference_fasta_dict,
-            prefix = output_prefix + ".short.subset.windowed",
-            region = chromosomes_regions_arg,
-            window_padding = window_padding,
-            filter_args = subset_filter_args
-        }
-    }
-
-    call FilterAndConcatVcfs { input:
-        short_vcf = select_first([SubsetVcfShortInSVWindows.subset_short_vcf_gz, hiphase_short_vcf_gz]),
-        short_vcf_tbi = select_first([SubsetVcfShortInSVWindows.subset_short_vcf_gz_tbi, hiphase_short_vcf_gz_tbi]),
-        sv_vcf = hiphase_sv_vcf_gz,
-        sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
-        region = chromosomes_regions_arg,
-        extra_filter_args = extra_filter_args,
-        prefix = output_prefix + ".filter_and_concat"
-    }
-
-    call FixVariantCollisions as BeforeShapeit4FixVariantCollisions { input:
-        phased_bcf = FilterAndConcatVcfs.filter_and_concat_vcf,
-        fix_variant_collisions_java = fix_variant_collisions_java,
-        operation = operation,
-        weight_tag = weight_tag,
-        is_weight_format_field = is_weight_format_field,
-        output_prefix = output_prefix
-    }
-
     scatter (i in range(length(chromosomes))) {
         String chromosome = chromosomes[i]
 
+        if (subset_short_to_sv_windows) {
+            call SubsetVcfShortInSVWindows as SubsetVcfShortInSVWindowsChromosome { input:
+                short_vcf_gz = hiphase_short_vcf_gz,
+                short_vcf_tbi = hiphase_short_vcf_gz_tbi,
+                sv_vcf_gz = hiphase_sv_vcf_gz,
+                sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
+                reference_fasta = reference_fasta,
+                reference_fasta_fai = reference_fasta_fai,
+                reference_fasta_dict = reference_fasta_dict,
+                prefix = output_prefix + "." + chromosome + ".short.subset.windowed",
+                region = chromosome,
+                window_padding = window_padding,
+                filter_args = subset_filter_args
+            }
+        }
+
+        call FilterAndConcatVcfs as FilterAndConcatVcfsChromosome { input:
+            short_vcf = select_first([SubsetVcfShortInSVWindowsChromosome.subset_short_vcf_gz, hiphase_short_vcf_gz]),
+            short_vcf_tbi = select_first([SubsetVcfShortInSVWindowsChromosome.subset_short_vcf_gz_tbi, hiphase_short_vcf_gz_tbi]),
+            sv_vcf = hiphase_sv_vcf_gz,
+            sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
+            region = chromosome,
+            extra_filter_args = extra_filter_args,
+            prefix = output_prefix + "." + chromosome + ".filter_and_concat"
+        }
+
+        call FixVariantCollisions as BeforeShapeit4FixVariantCollisionsChromosome { input:
+            phased_bcf = FilterAndConcatVcfsChromosome.filter_and_concat_vcf,
+            fix_variant_collisions_java = fix_variant_collisions_java,
+            operation = operation,
+            weight_tag = weight_tag,
+            is_weight_format_field = is_weight_format_field,
+            output_prefix = output_prefix + "." + chromosome + ".before_shapeit4_collisionless"
+        }
+
         call CreateShapeit4Chunks { input:
-            vcf = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf,
-            tbi = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf_csi,
+            vcf = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf,
+            tbi = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf_csi,
             region = chromosomes[i],
             prefix = output_prefix + "." + chromosome,
             extra_chunk_args = extra_chunk_args
@@ -147,8 +147,8 @@ workflow PhasedPanelEvaluation {
 
         scatter (j in range(length(region_list))) {
             call Helper.Shapeit4 as Shapeit4 { input:
-                vcf_input = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf,
-                vcf_index = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf_csi,
+                vcf_input = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf,
+                vcf_index = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf_csi,
                 mappingfile = genetic_mapping_dict[chromosome],
                 region = region_list[j],
                 prefix = output_prefix + "." + chromosome + ".shard-" + j + ".filter_and_concat.phased",
@@ -158,28 +158,44 @@ workflow PhasedPanelEvaluation {
             }
         }
 
-        call LigateVcfs as LigateVcfsChromosome { input:
+        call LigateVcfs as LigateVcfsShapeit4Chromosome { input:
             vcfs = Shapeit4.phased_bcf,
             prefix = output_prefix + "." + chromosome + ".phased.ligated"
         }
+
+        call FixVariantCollisions as FixVariantCollisionsChromosome { input:
+            phased_bcf = LigateVcfsShapeit4Chromosome.ligated_vcf,
+            fix_variant_collisions_java = fix_variant_collisions_java,
+            operation = operation,
+            weight_tag = weight_tag,
+            is_weight_format_field = is_weight_format_field,
+            output_prefix = output_prefix + "." + chromosome + ".phased.collisionless"
+        }
     }
 
-    call LigateVcfs { input:
-        vcfs = LigateVcfsChromosome.ligated_vcf,
-        prefix = output_prefix + ".phased.ligated"
+    call LigateVcfs as LigateVcfsFilterAndConcatVcfs { input:
+        vcfs = FilterAndConcatVcfsChromosome.filter_and_concat_vcf,
+        prefix = output_prefix + ".filter_and_concat"
     }
 
-    call FixVariantCollisions { input:
-        phased_bcf = LigateVcfs.ligated_vcf,
-        fix_variant_collisions_java = fix_variant_collisions_java,
-        operation = operation,
-        weight_tag = weight_tag,
-        is_weight_format_field = is_weight_format_field,
-        output_prefix = output_prefix
+    call LigateVcfs as LigateVcfsBeforeShapeit4FixVariantCollisions { input:
+        vcfs = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf,
+        prefix = output_prefix + ".before_shapeit4_collisionless"
     }
+
+    call LigateVcfs as LigateVcfsShapeit4 { input:
+        vcfs = LigateVcfsShapeit4Chromosome.ligated_vcf,
+        prefix = output_prefix + ".phased"
+    }
+
+    call LigateVcfs as LigateVcfsFixVariantCollisions { input:
+        vcfs = FixVariantCollisionsChromosome.collisionless_bcf,
+        prefix = output_prefix + ".phased.collisionless"
+    }
+
 
     call PanGeniePanelCreation.PanGeniePanelCreation { input:
-        phased_bcf = FixVariantCollisions.phased_collisionless_bcf,
+        phased_bcf = LigateVcfsFixVariantCollisions.ligated_vcf,
         reference_fasta = reference_fasta,
         prepare_vcf_script = prepare_vcf_script,
         add_ids_script = add_ids_script,
@@ -239,7 +255,7 @@ workflow PhasedPanelEvaluation {
         operation = operation,
         weight_tag = weight_tag,
         is_weight_format_field = is_weight_format_field,
-        output_prefix = output_prefix
+        output_prefix = output_prefix + ".glimpse.merged.phased.collisionless"
     }
 
     # evaluate HiPhase short
@@ -279,8 +295,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
-        eval_vcf_idx = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+        eval_vcf = LigateVcfsFilterAndConcatVcfs.ligated_vcf,
+        eval_vcf_idx = LigateVcfsFilterAndConcatVcfs.ligated_vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -295,8 +311,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf,
-        eval_vcf_idx = BeforeShapeit4FixVariantCollisions.phased_collisionless_bcf_csi,
+        eval_vcf = LigateVcfsBeforeShapeit4FixVariantCollisions.ligated_vcf,
+        eval_vcf_idx = LigateVcfsBeforeShapeit4FixVariantCollisions.ligated_vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -311,8 +327,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = LigateVcfs.ligated_vcf,
-        eval_vcf_idx = LigateVcfs.ligated_vcf_tbi,
+        eval_vcf = LigateVcfsShapeit4.ligated_vcf,
+        eval_vcf_idx = LigateVcfsShapeit4.ligated_vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -327,8 +343,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = FixVariantCollisions.phased_collisionless_bcf,
-        eval_vcf_idx = FixVariantCollisions.phased_collisionless_bcf_csi,
+        eval_vcf = LigateVcfsFixVariantCollisions.ligated_vcf,
+        eval_vcf_idx = LigateVcfsFixVariantCollisions.ligated_vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -375,8 +391,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = GenotypingFixVariantCollisions.phased_collisionless_bcf,
-        eval_vcf_idx = GenotypingFixVariantCollisions.phased_collisionless_bcf_csi,
+        eval_vcf = GenotypingFixVariantCollisions.collisionless_bcf,
+        eval_vcf_idx = GenotypingFixVariantCollisions.collisionless_bcf_csi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -742,16 +758,16 @@ task FixVariantCollisions {
         # replace all missing alleles (correctly) emitted with reference alleles, since this is expected by PanGenie panel-creation script
         bcftools view collisionless.vcf | \
             sed -e 's/\.|0/0|0/g' | sed -e 's/0|\./0|0/g' | sed -e 's/\.|1/0|1/g' | sed -e 's/1|\./1|0/g' | sed -e 's/\.|\./0|0/g' | \
-            bcftools view -Oz -o ~{output_prefix}.phased.collisionless.vcf.gz
+            bcftools view -Oz -o ~{output_prefix}.vcf.gz
         # index and convert via vcf.gz to avoid errors from missing header lines
-        bcftools index -t ~{output_prefix}.phased.collisionless.vcf.gz
-        bcftools view ~{output_prefix}.phased.collisionless.vcf.gz -Ob -o ~{output_prefix}.phased.collisionless.bcf
-        bcftools index ~{output_prefix}.phased.collisionless.bcf
+        bcftools index -t ~{output_prefix}.vcf.gz
+        bcftools view ~{output_prefix}.vcf.gz -Ob -o ~{output_prefix}.bcf
+        bcftools index ~{output_prefix}.bcf
     >>>
 
     output {
-        File phased_collisionless_bcf = "~{output_prefix}.phased.collisionless.bcf"
-        File phased_collisionless_bcf_csi = "~{output_prefix}.phased.collisionless.bcf.csi"
+        File collisionless_bcf = "~{output_prefix}.bcf"
+        File collisionless_bcf_csi = "~{output_prefix}.bcf.csi"
         File windows = "windows.txt"
         File histogram = "histogram.txt"
     }
