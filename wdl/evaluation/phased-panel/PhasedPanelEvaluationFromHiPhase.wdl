@@ -171,44 +171,53 @@ workflow PhasedPanelEvaluation {
             is_weight_format_field = is_weight_format_field,
             output_prefix = output_prefix + "." + chromosome + ".phased.collisionless"
         }
+
+        call PanGeniePanelCreation.PanGeniePanelCreation as PanGeniePanelCreationChromosome { input:
+            phased_bcf = FixVariantCollisionsChromosome.collisionless_bcf,
+            reference_fasta = reference_fasta,
+            prepare_vcf_script = prepare_vcf_script,
+            add_ids_script = add_ids_script,
+            merge_vcfs_script = merge_vcfs_script,
+            frac_missing = frac_missing,
+            output_prefix = output_prefix + "." + chromosome,
+            docker = panel_creation_docker,
+            monitoring_script = monitoring_script
+        }
     }
 
     call LigateVcfs as LigateVcfsFilterAndConcatVcfs { input:
         vcfs = FilterAndConcatVcfsChromosome.filter_and_concat_vcf,
+        vcf_idxs = FilterAndConcatVcfsChromosome.filter_and_concat_vcf_tbi,
         prefix = output_prefix + ".filter_and_concat"
     }
 
     call LigateVcfs as LigateVcfsBeforeShapeit4FixVariantCollisions { input:
         vcfs = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf,
+        vcf_idxs = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf_csi,
         prefix = output_prefix + ".before_shapeit4_collisionless"
     }
 
     call LigateVcfs as LigateVcfsShapeit4 { input:
         vcfs = LigateVcfsShapeit4Chromosome.ligated_vcf,
+        vcf_idxs = LigateVcfsShapeit4Chromosome.ligated_vcf_tbi,
         prefix = output_prefix + ".phased"
     }
 
     call LigateVcfs as LigateVcfsFixVariantCollisions { input:
         vcfs = FixVariantCollisionsChromosome.collisionless_bcf,
+        vcf_idxs = FixVariantCollisionsChromosome.collisionless_bcf_csi,
         prefix = output_prefix + ".phased.collisionless"
     }
 
-
-    call PanGeniePanelCreation.PanGeniePanelCreation { input:
-        phased_bcf = LigateVcfsFixVariantCollisions.ligated_vcf,
-        reference_fasta = reference_fasta,
-        prepare_vcf_script = prepare_vcf_script,
-        add_ids_script = add_ids_script,
-        merge_vcfs_script = merge_vcfs_script,
-        frac_missing = frac_missing,
-        output_prefix = output_prefix,
-        docker = panel_creation_docker,
-        monitoring_script = monitoring_script
+    call LigateVcfs as LigateVcfsPanGeniePanelCreation { input:
+        vcfs = PanGeniePanelCreationChromosome.panel_vcf_gz,
+        vcf_idxs = PanGeniePanelCreationChromosome.panel_vcf_gz_tbi,
+        prefix = output_prefix + ".panel"
     }
 
     call LeaveOutEvaluation.LeaveOutEvaluation { input:
-        input_vcf_gz = PanGeniePanelCreation.panel_vcf_gz,
-        input_vcf_gz_tbi = PanGeniePanelCreation.panel_vcf_gz_tbi,
+        input_vcf_gz = LigateVcfsPanGeniePanelCreation.ligated_vcf,
+        input_vcf_gz_tbi = LigateVcfsPanGeniePanelCreation.ligated_vcf_tbi,
         case_reference_fasta = case_reference_fasta,
         case_reference_fasta_fai = case_reference_fasta_fai,
         case_reference_dict = case_reference_dict,
@@ -359,8 +368,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = PanGeniePanelCreation.panel_vcf_gz,
-        eval_vcf_idx = PanGeniePanelCreation.panel_vcf_gz_tbi,
+        eval_vcf = LigateVcfsPanGeniePanelCreation.ligated_vcf,
+        eval_vcf_idx = LigateVcfsPanGeniePanelCreation.ligated_vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -686,6 +695,7 @@ task LigateVcfs {
 
     input {
         Array[File] vcfs
+        Array[File] vcf_idxs
         String prefix
 
         RuntimeAttr? runtime_attr_override
@@ -695,7 +705,6 @@ task LigateVcfs {
 
     command <<<
         set -euxo pipefail
-        for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         bcftools concat --ligate  ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     >>>
@@ -707,7 +716,7 @@ task LigateVcfs {
 
     #########################
     RuntimeAttr default_attr = object {
-        cpu_cores:          1,
+        cpu_cores:          2,
         mem_gb:             8,
         disk_gb:            disk_size,
         boot_disk_gb:       10,
