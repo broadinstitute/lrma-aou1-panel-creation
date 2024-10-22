@@ -33,6 +33,9 @@ workflows:
 - name: PhasedPanelEvaluationFromHiPhase
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluationFromHiPhase.wdl
+- name: ChromosomePhasedPanelCreationFromHiPhase
+  subclass: wdl
+  primaryDescriptorPath: /wdl/evaluation/phased-panel/ChromosomePhasedPanelCreationFromHiPhase.wdl
 - name: InputPhasedPanelEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/InputPhasedPanelEvaluation.wdl
