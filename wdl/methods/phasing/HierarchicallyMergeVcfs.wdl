@@ -18,8 +18,8 @@ workflow HierarchicallyMergeVcfs {
         Array[String] regions   # bcftools regions, e.g. ["chr1,chr2,chr3", "chr4,chr5,chr6", ...]
         Int batch_size
         String output_prefix
-        String? extra_merge_args       # non-region args
-        String? extra_concat_args
+        String extra_merge_args = "--threads $(nproc) --force-single --merge none"       # non-region args
+        String extra_concat_args = "--threads $(nproc) --naive"
 
         String docker
         File? monitoring_script
