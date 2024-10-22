@@ -106,14 +106,13 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         }
     }
 
-    call ConcatVcfs as ConcatVcfsShapeit4Chromosome { input:
+    call LigateVcfs { input:
         vcfs = Shapeit4.phased_bcf,
-        do_ligate = true,
         prefix = output_prefix + "." + chromosome + ".phased.ligated"
     }
 
     call FixVariantCollisions as FixVariantCollisionsChromosome { input:
-        phased_bcf = ConcatVcfsShapeit4Chromosome.vcf,
+        phased_bcf = LigateVcfs.ligated_vcf_gz,
         fix_variant_collisions_java = fix_variant_collisions_java,
         operation = operation,
         weight_tag = weight_tag,
@@ -140,8 +139,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         File before_shapeit4_collisionless_bcf = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf
         File before_shapeit4_collisionless_bcf_csi = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf_csi
 
-        File phased_vcf_gz = ConcatVcfsShapeit4Chromosome.vcf
-        File phased_vcf_gz_tbi = ConcatVcfsShapeit4Chromosome.vcf_tbi
+        File phased_vcf_gz = LigateVcfs.ligated_vcf_gz
+        File phased_vcf_gz_tbi = LigateVcfs.ligated_vcf_gz_tbi
 
         File collisionless_bcf = FixVariantCollisionsChromosome.collisionless_bcf
         File collisionless_bcf_csi = FixVariantCollisionsChromosome.collisionless_bcf_csi
@@ -343,13 +342,12 @@ task CreateShapeit4Chunks {
     }
 }
 
-task ConcatVcfs {
+task LigateVcfs {
 
     input {
         Array[File] vcfs
         Array[File]? vcf_idxs
         String prefix
-        Boolean do_ligate = false
 
         RuntimeAttr? runtime_attr_override
     }
@@ -361,13 +359,17 @@ task ConcatVcfs {
         if ! ~{defined(vcf_idxs)}; then
             for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         fi
-        bcftools concat ~{true="--ligate-force" false="" do_ligate} ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
+
+        wget https://github.com/odelaneau/shapeit5/releases/download/v5.1.1/ligate_static
+        chmod +x ligate_static
+
+        ./ligate_static --input ~{write_lines(vcfs)} --output ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     >>>
 
     output {
-        File vcf = "~{prefix}.vcf.gz"
-        File vcf_tbi = "~{prefix}.vcf.gz.tbi"
+        File ligated_vcf_gz = "~{prefix}.vcf.gz"
+        File ligated_vcf_gz_tbi = "~{prefix}.vcf.gz.tbi"
     }
 
     #########################
