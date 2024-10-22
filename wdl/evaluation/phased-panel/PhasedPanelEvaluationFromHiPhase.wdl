@@ -592,8 +592,6 @@ task FilterAndConcatVcfs {
         RuntimeAttr? runtime_attr_override
     }
 
-    Int disk_size = 2*ceil(size([short_vcf, short_vcf_tbi], "GB")) + 2*ceil(size([sv_vcf, sv_vcf_tbi], "GB")) + 1
-
     command {
         set -euxo pipefail
 
@@ -625,8 +623,8 @@ task FilterAndConcatVcfs {
     #########################
     RuntimeAttr default_attr = object {
         cpu_cores:          2,
-        mem_gb:             16,
-        disk_gb:            disk_size,
+        mem_gb:             8,
+        disk_gb:            50,
         boot_disk_gb:       10,
         preemptible_tries:  2,
         max_retries:        1,
