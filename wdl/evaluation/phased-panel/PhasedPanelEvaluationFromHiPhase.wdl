@@ -28,7 +28,8 @@ workflow PhasedPanelEvaluation {
         Boolean subset_short_to_sv_windows
         Int window_padding
         String? subset_filter_args
-        String? extra_filter_args
+        String? filter_and_concat_short_filter_args
+        String? filter_and_concat_sv_filter_args
         String? extra_chunk_args
         File genetic_mapping_tsv_for_shapeit4
         Int shapeit4_num_threads
@@ -127,7 +128,8 @@ workflow PhasedPanelEvaluation {
             sv_vcf = hiphase_sv_vcf_gz,
             sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
             region = chromosome,
-            extra_filter_args = extra_filter_args,
+            filter_and_concat_short_filter_args = filter_and_concat_short_filter_args,
+            filter_and_concat_sv_filter_args = filter_and_concat_sv_filter_args,
             prefix = output_prefix + "." + chromosome + ".filter_and_concat"
         }
 
@@ -587,7 +589,8 @@ task FilterAndConcatVcfs {
         File sv_vcf_tbi
         String prefix
         String region
-        String? extra_filter_args = "-i 'MAC>=2'"
+        String? filter_and_concat_short_filter_args = "-i 'MAC>=2'"
+        String? filter_and_concat_sv_filter_args = "-i 'MAC>=2'"
 
         RuntimeAttr? runtime_attr_override
     }
@@ -596,12 +599,12 @@ task FilterAndConcatVcfs {
         set -euxo pipefail
 
         # filter SV singletons
-        bcftools view ~{extra_filter_args} ~{sv_vcf} \
+        bcftools view ~{filter_and_concat_sv_filter_args} ~{sv_vcf} \
             -r ~{region} \
             --write-index -Oz -o ~{prefix}.SV.vcf.gz
 
         # filter short singletons and split to biallelic
-        bcftools view ~{extra_filter_args} ~{short_vcf} \
+        bcftools view ~{filter_and_concat_short_filter_args} ~{short_vcf} \
             -r ~{region} | \
             bcftools norm -m-any --do-not-normalize \
             --write-index -Oz -o ~{prefix}.short.vcf.gz
