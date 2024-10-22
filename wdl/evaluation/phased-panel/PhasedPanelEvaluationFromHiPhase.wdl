@@ -1,10 +1,9 @@
 version 1.0
 
-import "../../methods/phasing/PhysicalAndStatisticalPhasing.wdl"
+import "./ChromosomePhasedPanelCreationFromHiPhase.wdl"
 import "../../methods/pangenie/PanGeniePanelCreation.wdl"
 import "./VcfdistAndOverlapMetricsEvaluation.wdl"
 import "../kage/LeaveOutEvaluation.wdl"
-import "../../methods/phasing/Helper.wdl"
 import "../../methods/phasing/HierarchicallyMergeVcfs.wdl"
 
 workflow PhasedPanelEvaluation {
@@ -106,120 +105,66 @@ workflow PhasedPanelEvaluation {
     scatter (i in range(length(chromosomes))) {
         String chromosome = chromosomes[i]
 
-        if (subset_short_to_sv_windows) {
-            call SubsetVcfShortInSVWindows as SubsetVcfShortInSVWindowsChromosome { input:
-                short_vcf_gz = hiphase_short_vcf_gz,
-                short_vcf_tbi = hiphase_short_vcf_gz_tbi,
-                sv_vcf_gz = hiphase_sv_vcf_gz,
-                sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
-                reference_fasta = reference_fasta,
-                reference_fasta_fai = reference_fasta_fai,
-                reference_fasta_dict = reference_fasta_dict,
-                prefix = output_prefix + "." + chromosome + ".short.subset.windowed",
-                region = chromosome,
-                window_padding = window_padding,
-                filter_args = subset_filter_args
-            }
-        }
-
-        call FilterAndConcatVcfs as FilterAndConcatVcfsChromosome { input:
-            short_vcf = select_first([SubsetVcfShortInSVWindowsChromosome.subset_short_vcf_gz, hiphase_short_vcf_gz]),
-            short_vcf_tbi = select_first([SubsetVcfShortInSVWindowsChromosome.subset_short_vcf_gz_tbi, hiphase_short_vcf_gz_tbi]),
-            sv_vcf = hiphase_sv_vcf_gz,
-            sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
-            region = chromosome,
+        call ChromosomePhasedPanelCreationFromHiPhase.PhasedPanelEvaluation as ChromosomePhasedPanelCreationFromHiPhase { input:
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            reference_fasta_dict = reference_fasta_dict,
+            chromosome = chromosome,
+            output_prefix = output_prefix,
+            monitoring_script = monitoring_script,
+            hiphase_short_vcf_gz = hiphase_short_vcf_gz,
+            hiphase_short_vcf_gz_tbi = hiphase_short_vcf_gz_tbi,
+            hiphase_sv_vcf_gz = hiphase_sv_vcf_gz,
+            hiphase_sv_vcf_gz_tbi = hiphase_sv_vcf_gz_tbi,
+            subset_short_to_sv_windows = subset_short_to_sv_windows,
+            window_padding = window_padding,
+            subset_filter_args = subset_filter_args,
             filter_and_concat_short_filter_args = filter_and_concat_short_filter_args,
             filter_and_concat_sv_filter_args = filter_and_concat_sv_filter_args,
-            prefix = output_prefix + "." + chromosome + ".filter_and_concat"
-        }
-
-        call FixVariantCollisions as BeforeShapeit4FixVariantCollisionsChromosome { input:
-            phased_bcf = FilterAndConcatVcfsChromosome.filter_and_concat_vcf,
+            extra_chunk_args = extra_chunk_args,
+            genetic_mapping_tsv_for_shapeit4 = genetic_mapping_tsv_for_shapeit4,
+            shapeit4_num_threads = shapeit4_num_threads,
+            shapeit4_memory = shapeit4_memory,
+            shapeit4_extra_args = shapeit4_extra_args,
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,
             weight_tag = weight_tag,
             is_weight_format_field = is_weight_format_field,
-            output_prefix = output_prefix + "." + chromosome + ".before_shapeit4_collisionless"
-        }
-
-        call CreateShapeit4Chunks { input:
-            vcf = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf,
-            tbi = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf_csi,
-            region = chromosomes[i],
-            prefix = output_prefix + "." + chromosome,
-            extra_chunk_args = extra_chunk_args
-        }
-
-        Array[String] region_list = read_lines(CreateShapeit4Chunks.chunks)
-
-        scatter (j in range(length(region_list))) {
-            call Helper.Shapeit4 as Shapeit4 { input:
-                vcf_input = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf,
-                vcf_index = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf_csi,
-                mappingfile = genetic_mapping_dict[chromosome],
-                region = region_list[j],
-                prefix = output_prefix + "." + chromosome + ".shard-" + j + ".filter_and_concat.phased",
-                num_threads = shapeit4_num_threads,
-                memory = shapeit4_memory,
-                extra_args = shapeit4_extra_args
-            }
-        }
-
-        call ConcatVcfs as ConcatVcfsShapeit4Chromosome { input:
-            vcfs = Shapeit4.phased_bcf,
-            do_ligate = true,
-            prefix = output_prefix + "." + chromosome + ".phased.ligated"
-        }
-
-        call FixVariantCollisions as FixVariantCollisionsChromosome { input:
-            phased_bcf = ConcatVcfsShapeit4Chromosome.vcf,
-            fix_variant_collisions_java = fix_variant_collisions_java,
-            operation = operation,
-            weight_tag = weight_tag,
-            is_weight_format_field = is_weight_format_field,
-            output_prefix = output_prefix + "." + chromosome + ".phased.collisionless"
-        }
-
-        call PanGeniePanelCreation.PanGeniePanelCreation as PanGeniePanelCreationChromosome { input:
-            phased_bcf = FixVariantCollisionsChromosome.collisionless_bcf,
-            reference_fasta = reference_fasta,
             prepare_vcf_script = prepare_vcf_script,
             add_ids_script = add_ids_script,
             merge_vcfs_script = merge_vcfs_script,
             frac_missing = frac_missing,
-            output_prefix = output_prefix + "." + chromosome,
-            docker = panel_creation_docker,
-            monitoring_script = monitoring_script
+            panel_creation_docker = panel_creation_docker
         }
     }
 
     call ConcatVcfs as ConcatVcfsFilterAndConcatVcfs { input:
-        vcfs = FilterAndConcatVcfsChromosome.filter_and_concat_vcf,
-        vcf_idxs = FilterAndConcatVcfsChromosome.filter_and_concat_vcf_tbi,
+        vcfs = ChromosomePhasedPanelCreationFromHiPhase.filter_and_concat_vcf_gz,
+        vcf_idxs = ChromosomePhasedPanelCreationFromHiPhase.filter_and_concat_vcf_gz_tbi,
         prefix = output_prefix + ".filter_and_concat"
     }
 
     call ConcatVcfs as ConcatVcfsBeforeShapeit4FixVariantCollisions { input:
-        vcfs = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf,
-        vcf_idxs = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf_csi,
+        vcfs = ChromosomePhasedPanelCreationFromHiPhase.before_shapeit4_collisionless_bcf,
+        vcf_idxs = ChromosomePhasedPanelCreationFromHiPhase.before_shapeit4_collisionless_bcf_csi,
         prefix = output_prefix + ".before_shapeit4_collisionless"
     }
 
     call ConcatVcfs as ConcatVcfsShapeit4 { input:
-        vcfs = ConcatVcfsShapeit4Chromosome.vcf,
-        vcf_idxs = ConcatVcfsShapeit4Chromosome.vcf_tbi,
+        vcfs = ChromosomePhasedPanelCreationFromHiPhase.phased_vcf_gz,
+        vcf_idxs = ChromosomePhasedPanelCreationFromHiPhase.phased_vcf_gz_tbi,
         prefix = output_prefix + ".phased"
     }
 
     call ConcatVcfs as ConcatVcfsFixVariantCollisions { input:
-        vcfs = FixVariantCollisionsChromosome.collisionless_bcf,
-        vcf_idxs = FixVariantCollisionsChromosome.collisionless_bcf_csi,
+        vcfs = ChromosomePhasedPanelCreationFromHiPhase.collisionless_bcf,
+        vcf_idxs = ChromosomePhasedPanelCreationFromHiPhase.collisionless_bcf_csi,
         prefix = output_prefix + ".phased.collisionless"
     }
 
     call ConcatVcfs as ConcatVcfsPanGeniePanelCreation { input:
-        vcfs = PanGeniePanelCreationChromosome.panel_vcf_gz,
-        vcf_idxs = PanGeniePanelCreationChromosome.panel_vcf_gz_tbi,
+        vcfs = ChromosomePhasedPanelCreationFromHiPhase.panel_vcf_gz,
+        vcf_idxs = ChromosomePhasedPanelCreationFromHiPhase.panel_vcf_gz_tbi,
         prefix = output_prefix + ".panel"
     }
 
@@ -708,7 +653,6 @@ task ConcatVcfs {
         Array[File] vcfs
         Array[File]? vcf_idxs
         String prefix
-        Boolean do_ligate = false
 
         RuntimeAttr? runtime_attr_override
     }
@@ -720,7 +664,7 @@ task ConcatVcfs {
         if ! ~{defined(vcf_idxs)}; then
             for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         fi
-        bcftools concat ~{true="--ligate" false="" do_ligate} ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
+        bcftools concat ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     >>>
 

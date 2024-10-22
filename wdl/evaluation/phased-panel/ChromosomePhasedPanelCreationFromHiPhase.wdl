@@ -4,7 +4,7 @@ import "../../methods/phasing/PhysicalAndStatisticalPhasing.wdl"
 import "../../methods/pangenie/PanGeniePanelCreation.wdl"
 import "../../methods/phasing/Helper.wdl"
 
-workflow PhasedPanelEvaluation {
+workflow PhasedPanelEvaluation {    # TODO change name later, easier to share configs for now
 
     input {
         # common inputs
