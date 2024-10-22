@@ -5,6 +5,7 @@ import "../../methods/pangenie/PanGeniePanelCreation.wdl"
 import "./VcfdistAndOverlapMetricsEvaluation.wdl"
 import "../kage/LeaveOutEvaluation.wdl"
 import "../../methods/phasing/Helper.wdl"
+import "../../methods/phasing/HierarchicallyMergeVcfs.wdl"
 
 workflow PhasedPanelEvaluation {
 
@@ -83,6 +84,10 @@ workflow PhasedPanelEvaluation {
         RuntimeAttributes? glimpse_case_chromosome_runtime_attributes
         RuntimeAttributes? glimpse_case_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
+
+        # inputs for HierarchicallyMergeVcfs
+        Array[String] hierarchically_merge_regions   # bcftools regions, e.g. ["chr1,chr2,chr3", "chr4,chr5,chr6", ...]
+        Int hierarchically_merge_batch_size
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit4)
@@ -251,15 +256,16 @@ workflow PhasedPanelEvaluation {
     }
 
     # merge GLIMPSE VCFs
-    call Helper.MergePerChrVcfWithBcftools as GLIMPSEMergeAcrossSamples { input:
-        vcf_input = LeaveOutEvaluation.glimpse_vcf_gzs,
-        tbi_input = LeaveOutEvaluation.glimpse_vcf_gz_tbis,
-        pref = output_prefix + ".glimpse.merged",
-        threads_num = merge_num_threads
+    call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as GLIMPSEMergeAcrossSamples { input:
+        vcf_gzs = LeaveOutEvaluation.glimpse_vcf_gzs,
+        vcf_gz_tbis = LeaveOutEvaluation.glimpse_vcf_gz_tbis,
+        regions = hierarchically_merge_regions,
+        batch_size = hierarchically_merge_batch_size,
+        output_prefix = output_prefix + ".glimpse.merged"
     }
 
     call FixVariantCollisions as GenotypingFixVariantCollisions { input:
-        phased_bcf = GLIMPSEMergeAcrossSamples.merged_vcf,
+        phased_bcf = GLIMPSEMergeAcrossSamples.merged_vcf_gz,
         fix_variant_collisions_java = fix_variant_collisions_java,
         operation = operation,
         weight_tag = weight_tag,
@@ -384,8 +390,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf,
-        eval_vcf_idx = GLIMPSEMergeAcrossSamples.merged_tbi,
+        eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf_gz,
+        eval_vcf_idx = GLIMPSEMergeAcrossSamples.merged_vcf_gz_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -415,11 +421,12 @@ workflow PhasedPanelEvaluation {
 
     if (do_pangenie) {
         # merge PanGenie VCFs
-        call Helper.MergePerChrVcfWithBcftools as PanGenieMergeAcrossSamples { input:
-            vcf_input = select_all(LeaveOutEvaluation.pangenie_vcf_gzs),
-            tbi_input = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
-            pref = output_prefix + ".pangenie.merged",
-            threads_num = merge_num_threads
+        call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as PanGenieMergeAcrossSamples { input:
+            vcf_gzs = select_all(LeaveOutEvaluation.pangenie_vcf_gzs),
+            vcf_gz_tbis = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
+            regions = hierarchically_merge_regions,
+            batch_size = hierarchically_merge_batch_size,
+            output_prefix = output_prefix + ".pangenie.merged"
         }
 
         # summarize PanGenie metrics vs. panel
@@ -429,8 +436,8 @@ workflow PhasedPanelEvaluation {
             samples = vcfdist_samples,
             truth_vcf = vcfdist_truth_vcf,
             truth_vcf_idx = vcfdist_truth_vcf_idx,
-            eval_vcf = PanGenieMergeAcrossSamples.merged_vcf,
-            eval_vcf_idx = PanGenieMergeAcrossSamples.merged_tbi,
+            eval_vcf = PanGenieMergeAcrossSamples.merged_vcf_gz,
+            eval_vcf_idx = PanGenieMergeAcrossSamples.merged_vcf_gz_tbi,
             region = evaluation_chromosomes_regions_arg,
             reference_fasta = reference_fasta,
             reference_fasta_fai = reference_fasta_fai,
