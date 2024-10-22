@@ -261,7 +261,8 @@ workflow PhasedPanelEvaluation {
         vcf_gz_tbis = LeaveOutEvaluation.glimpse_vcf_gz_tbis,
         regions = hierarchically_merge_regions,
         batch_size = hierarchically_merge_batch_size,
-        output_prefix = output_prefix + ".glimpse.merged"
+        output_prefix = output_prefix + ".glimpse.merged",
+        monitoring_script = monitoring_script
     }
 
     call FixVariantCollisions as GenotypingFixVariantCollisions { input:
@@ -426,7 +427,8 @@ workflow PhasedPanelEvaluation {
             vcf_gz_tbis = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
             regions = hierarchically_merge_regions,
             batch_size = hierarchically_merge_batch_size,
-            output_prefix = output_prefix + ".pangenie.merged"
+            output_prefix = output_prefix + ".pangenie.merged",
+            monitoring_script = monitoring_script
         }
 
         # summarize PanGenie metrics vs. panel
