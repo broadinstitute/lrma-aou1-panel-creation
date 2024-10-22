@@ -62,7 +62,7 @@ workflow PhasedPanelEvaluation {
         File case_reference_fasta
         File case_reference_fasta_fai
         File case_reference_dict
-        Array[File] genetic_maps
+        Array[File] leave_out_genetic_maps
         File repeat_mask_bed
         File segmental_duplications_bed
         File simple_repeats_bed
@@ -230,7 +230,7 @@ workflow PhasedPanelEvaluation {
         case_reference_dict = case_reference_dict,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
-        genetic_maps = genetic_maps,
+        genetic_maps = leave_out_genetic_maps,
         repeat_mask_bed = repeat_mask_bed,
         segmental_duplications_bed = segmental_duplications_bed,
         simple_repeats_bed = simple_repeats_bed,
