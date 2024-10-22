@@ -165,13 +165,14 @@ workflow PhasedPanelEvaluation {
             }
         }
 
-        call LigateVcfs as LigateVcfsShapeit4Chromosome { input:
+        call ConcatVcfs as ConcatVcfsShapeit4Chromosome { input:
             vcfs = Shapeit4.phased_bcf,
+            do_ligate = true,
             prefix = output_prefix + "." + chromosome + ".phased.ligated"
         }
 
         call FixVariantCollisions as FixVariantCollisionsChromosome { input:
-            phased_bcf = LigateVcfsShapeit4Chromosome.ligated_vcf,
+            phased_bcf = ConcatVcfsShapeit4Chromosome.vcf,
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,
             weight_tag = weight_tag,
@@ -192,39 +193,39 @@ workflow PhasedPanelEvaluation {
         }
     }
 
-    call LigateVcfs as LigateVcfsFilterAndConcatVcfs { input:
+    call ConcatVcfs as ConcatVcfsFilterAndConcatVcfs { input:
         vcfs = FilterAndConcatVcfsChromosome.filter_and_concat_vcf,
         vcf_idxs = FilterAndConcatVcfsChromosome.filter_and_concat_vcf_tbi,
         prefix = output_prefix + ".filter_and_concat"
     }
 
-    call LigateVcfs as LigateVcfsBeforeShapeit4FixVariantCollisions { input:
+    call ConcatVcfs as ConcatVcfsBeforeShapeit4FixVariantCollisions { input:
         vcfs = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf,
         vcf_idxs = BeforeShapeit4FixVariantCollisionsChromosome.collisionless_bcf_csi,
         prefix = output_prefix + ".before_shapeit4_collisionless"
     }
 
-    call LigateVcfs as LigateVcfsShapeit4 { input:
-        vcfs = LigateVcfsShapeit4Chromosome.ligated_vcf,
-        vcf_idxs = LigateVcfsShapeit4Chromosome.ligated_vcf_tbi,
+    call ConcatVcfs as ConcatVcfsShapeit4 { input:
+        vcfs = ConcatVcfsShapeit4Chromosome.vcf,
+        vcf_idxs = ConcatVcfsShapeit4Chromosome.vcf_tbi,
         prefix = output_prefix + ".phased"
     }
 
-    call LigateVcfs as LigateVcfsFixVariantCollisions { input:
+    call ConcatVcfs as ConcatVcfsFixVariantCollisions { input:
         vcfs = FixVariantCollisionsChromosome.collisionless_bcf,
         vcf_idxs = FixVariantCollisionsChromosome.collisionless_bcf_csi,
         prefix = output_prefix + ".phased.collisionless"
     }
 
-    call LigateVcfs as LigateVcfsPanGeniePanelCreation { input:
+    call ConcatVcfs as ConcatVcfsPanGeniePanelCreation { input:
         vcfs = PanGeniePanelCreationChromosome.panel_vcf_gz,
         vcf_idxs = PanGeniePanelCreationChromosome.panel_vcf_gz_tbi,
         prefix = output_prefix + ".panel"
     }
 
     call LeaveOutEvaluation.LeaveOutEvaluation { input:
-        input_vcf_gz = LigateVcfsPanGeniePanelCreation.ligated_vcf,
-        input_vcf_gz_tbi = LigateVcfsPanGeniePanelCreation.ligated_vcf_tbi,
+        input_vcf_gz = ConcatVcfsPanGeniePanelCreation.vcf,
+        input_vcf_gz_tbi = ConcatVcfsPanGeniePanelCreation.vcf_tbi,
         case_reference_fasta = case_reference_fasta,
         case_reference_fasta_fai = case_reference_fasta_fai,
         case_reference_dict = case_reference_dict,
@@ -313,8 +314,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = LigateVcfsFilterAndConcatVcfs.ligated_vcf,
-        eval_vcf_idx = LigateVcfsFilterAndConcatVcfs.ligated_vcf_tbi,
+        eval_vcf = ConcatVcfsFilterAndConcatVcfs.vcf,
+        eval_vcf_idx = ConcatVcfsFilterAndConcatVcfs.vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -329,8 +330,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = LigateVcfsBeforeShapeit4FixVariantCollisions.ligated_vcf,
-        eval_vcf_idx = LigateVcfsBeforeShapeit4FixVariantCollisions.ligated_vcf_tbi,
+        eval_vcf = ConcatVcfsBeforeShapeit4FixVariantCollisions.vcf,
+        eval_vcf_idx = ConcatVcfsBeforeShapeit4FixVariantCollisions.vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -345,8 +346,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = LigateVcfsShapeit4.ligated_vcf,
-        eval_vcf_idx = LigateVcfsShapeit4.ligated_vcf_tbi,
+        eval_vcf = ConcatVcfsShapeit4.vcf,
+        eval_vcf_idx = ConcatVcfsShapeit4.vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -361,8 +362,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = LigateVcfsFixVariantCollisions.ligated_vcf,
-        eval_vcf_idx = LigateVcfsFixVariantCollisions.ligated_vcf_tbi,
+        eval_vcf = ConcatVcfsFixVariantCollisions.vcf,
+        eval_vcf_idx = ConcatVcfsFixVariantCollisions.vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -377,8 +378,8 @@ workflow PhasedPanelEvaluation {
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = LigateVcfsPanGeniePanelCreation.ligated_vcf,
-        eval_vcf_idx = LigateVcfsPanGeniePanelCreation.ligated_vcf_tbi,
+        eval_vcf = ConcatVcfsPanGeniePanelCreation.vcf,
+        eval_vcf_idx = ConcatVcfsPanGeniePanelCreation.vcf_tbi,
         region = evaluation_chromosomes_regions_arg,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -701,12 +702,13 @@ task CreateShapeit4Chunks {
     }
 }
 
-task LigateVcfs {
+task ConcatVcfs {
 
     input {
         Array[File] vcfs
         Array[File]? vcf_idxs
         String prefix
+        Boolean do_ligate = false
 
         RuntimeAttr? runtime_attr_override
     }
@@ -718,13 +720,13 @@ task LigateVcfs {
         if ! ~{defined(vcf_idxs)}; then
             for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         fi
-        bcftools concat --ligate  ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
+        bcftools concat ~{true="--ligate" false="" do_ligate} ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     >>>
 
     output {
-        File ligated_vcf = "~{prefix}.vcf.gz"
-        File ligated_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+        File vcf = "~{prefix}.vcf.gz"
+        File vcf_tbi = "~{prefix}.vcf.gz.tbi"
     }
 
     #########################
