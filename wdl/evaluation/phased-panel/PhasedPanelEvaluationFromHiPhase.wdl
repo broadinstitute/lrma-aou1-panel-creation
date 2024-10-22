@@ -705,7 +705,7 @@ task LigateVcfs {
 
     command <<<
         set -euxo pipefail
-        if [ ! ~{defined(vcf_idxs)} ]; then
+        if ! ~{defined(vcf_idxs)}; then
             for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         fi
         bcftools concat --ligate  ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
