@@ -455,7 +455,7 @@ task ConcatVcfs {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools concat ~{sep=" " vcf_gzs} -Oz -o ~{output_prefix}.vcf.gz
+        bcftools concat ~{sep=" " vcf_gzs} --naive -Oz -o ~{output_prefix}.vcf.gz
         bcftools index -t ~{output_prefix}.vcf.gz
     }
 
