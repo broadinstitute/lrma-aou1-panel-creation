@@ -33,25 +33,67 @@ workflow KAGEPanelWithPreprocessing {
     }
 
     if (do_preprocessing) {
-        call PreprocessPanelVCF {
+        scatter (i in range(length(chromosomes))) {
+            call PreprocessPanelVCF {
+                input:
+                    input_vcf_gz = input_vcf_gz,
+                    input_vcf_gz_tbi = input_vcf_gz_tbi,
+                    chromosomes = [chromosomes[i]],
+                    output_prefix = output_prefix + "." + chromosomes[i],
+                    docker = docker,
+                    monitoring_script = monitoring_script,
+                    runtime_attributes = runtime_attributes
+            }
+        }
+
+        call ConcatVcfs as ConcatVcfsPreprocessedPanel {
             input:
-                input_vcf_gz = input_vcf_gz,
-                input_vcf_gz_tbi = input_vcf_gz_tbi,
-                chromosomes = chromosomes,
-                output_prefix = output_prefix,
+                vcf_gzs = PreprocessPanelVCF.preprocessed_panel_vcf_gz,
+                vcf_gz_tbis = PreprocessPanelVCF.preprocessed_panel_vcf_gz_tbi,
+                output_prefix = output_prefix + ".preprocessed",
+                docker = docker,
+                monitoring_script = monitoring_script,
+                runtime_attributes = runtime_attributes
+        }
+
+        call ConcatVcfs as ConcatVcfsPreprocessedPanelSplit {
+            input:
+                vcf_gzs = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
+                vcf_gz_tbis = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
+                output_prefix = output_prefix + ".preprocessed.split",
+                docker = docker,
+                monitoring_script = monitoring_script,
+                runtime_attributes = runtime_attributes
+        }
+
+        call ConcatVcfs as ConcatVcfsPreprocessedPanelBi {
+            input:
+                vcf_gzs = PreprocessPanelVCF.preprocessed_panel_bi_vcf_gz,
+                vcf_gz_tbis = PreprocessPanelVCF.preprocessed_panel_bi_vcf_gz_tbi,
+                output_prefix = output_prefix + ".preprocessed.bi",
+                docker = docker,
+                monitoring_script = monitoring_script,
+                runtime_attributes = runtime_attributes
+        }
+
+        call ConcatVcfs as ConcatVcfsPreprocessedPanelMultiSplit {
+            input:
+                vcf_gzs = PreprocessPanelVCF.preprocessed_panel_multi_split_vcf_gz,
+                vcf_gz_tbis = PreprocessPanelVCF.preprocessed_panel_multi_split_vcf_gz_tbi,
+                output_prefix = output_prefix + ".preprocessed.multi.split",
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = runtime_attributes
         }
     }
 
-    File preprocessed_panel_bi_vcf_gz = select_first([PreprocessPanelVCF.preprocessed_panel_bi_vcf_gz, input_vcf_gz])
-    File preprocessed_panel_bi_vcf_gz_tbi = select_first([PreprocessPanelVCF.preprocessed_panel_bi_vcf_gz_tbi, input_vcf_gz_tbi])
+    File preprocessed_panel_bi_vcf_gz_ = select_first([ConcatVcfsPreprocessedPanelBi.vcf_gz, input_vcf_gz])
+    File preprocessed_panel_bi_vcf_gz_tbi_ = select_first([ConcatVcfsPreprocessedPanelBi.vcf_gz_tbi, input_vcf_gz_tbi])
 
     call MakeSitesOnlyVcfAndNumpyVariants {
         input:
-            input_vcf_gz = preprocessed_panel_bi_vcf_gz,
-            input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi,
+            input_vcf_gz = preprocessed_panel_bi_vcf_gz_,
+            input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi_,
             chromosomes = chromosomes,
             output_prefix = output_prefix,
             docker = docker,
@@ -62,8 +104,8 @@ workflow KAGEPanelWithPreprocessing {
     scatter (i in range(length(chromosomes))) {
         call MakeChromosomeGenotypeMatrix {
             input:
-                input_vcf_gz = preprocessed_panel_bi_vcf_gz,
-                input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi,
+                input_vcf_gz = preprocessed_panel_bi_vcf_gz_,
+                input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi_,
                 chromosome = chromosomes[i],
                 output_prefix = output_prefix,
                 docker = docker,
@@ -73,8 +115,8 @@ workflow KAGEPanelWithPreprocessing {
 
         call MakeChromosomeGraph {
             input:
-                input_vcf_gz = preprocessed_panel_bi_vcf_gz,
-                input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi,
+                input_vcf_gz = preprocessed_panel_bi_vcf_gz_,
+                input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi_,
                 reference_fasta = reference_fasta,
                 chromosome = chromosomes[i],
                 output_prefix = output_prefix,
@@ -298,6 +340,15 @@ workflow KAGEPanelWithPreprocessing {
     output {
         File index = MakeIndexBundle.index
         File kmer_index_only_variants_with_revcomp = MakeVariantKmerIndexWithReverseComplements.kmer_index_only_variants_with_revcomp
+
+        File? preprocessed_panel_vcf_gz = ConcatVcfsPreprocessedPanel.vcf_gz
+        File? preprocessed_panel_vcf_gz_tbi = ConcatVcfsPreprocessedPanel.vcf_gz_tbi
+        File? preprocessed_panel_split_vcf_gz = ConcatVcfsPreprocessedPanelSplit.vcf_gz
+        File? preprocessed_panel_split_vcf_gz_tbi = ConcatVcfsPreprocessedPanelSplit.vcf_gz_tbi
+        File preprocessed_panel_bi_vcf_gz = preprocessed_panel_bi_vcf_gz_
+        File preprocessed_panel_bi_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi_
+        File? preprocessed_panel_multi_split_vcf_gz = ConcatVcfsPreprocessedPanelMultiSplit.vcf_gz
+        File? preprocessed_panel_multi_split_vcf_gz_tbi = ConcatVcfsPreprocessedPanelMultiSplit.vcf_gz_tbi
     }
 }
 
@@ -378,6 +429,50 @@ task PreprocessPanelVCF {
         File preprocessed_panel_bi_vcf_gz_tbi = "~{output_prefix}.preprocessed.bi.vcf.gz.tbi"
         File preprocessed_panel_multi_split_vcf_gz = "~{output_prefix}.preprocessed.multi.split.vcf.gz"
         File preprocessed_panel_multi_split_vcf_gz_tbi = "~{output_prefix}.preprocessed.multi.split.vcf.gz.tbi"
+    }
+}
+
+task ConcatVcfs {
+    input {
+        Array[File] vcf_gzs
+        Array[File] vcf_gz_tbis
+        String output_prefix
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    Int disk_size_gb = 3 * ceil(size(vcf_gzs, "GB"))
+
+    command {
+        set -euxo pipefail
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        bcftools concat ~{sep=" " vcf_gzs} -Oz -o ~{output_prefix}.vcf.gz
+        bcftools index -t ~{output_prefix}.vcf.gz
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        File vcf_gz = "~{output_prefix}.vcf.gz"
+        File vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
     }
 }
 
