@@ -123,7 +123,7 @@ task MergeVcfs {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes runtime_attributes = {}
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
     command {
