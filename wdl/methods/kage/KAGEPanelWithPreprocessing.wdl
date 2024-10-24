@@ -20,6 +20,7 @@ workflow KAGEPanelWithPreprocessing {
         File reference_fasta_fai
         String output_prefix
         Array[String] chromosomes
+        Boolean do_single_chromosome = false
 
         String docker
         File? monitoring_script
@@ -32,6 +33,8 @@ workflow KAGEPanelWithPreprocessing {
         Int? cpu_make_count_model
     }
 
+    String output_prefix_ = if do_single_chromosome then output_prefix + "." + chromosomes[0] else output_prefix
+
     if (do_preprocessing) {
         scatter (i in range(length(chromosomes))) {
             call PreprocessPanelVCF {
@@ -39,7 +42,7 @@ workflow KAGEPanelWithPreprocessing {
                     input_vcf_gz = input_vcf_gz,
                     input_vcf_gz_tbi = input_vcf_gz_tbi,
                     chromosomes = [chromosomes[i]],
-                    output_prefix = output_prefix + "." + chromosomes[i],
+                    output_prefix = output_prefix_ + "." + chromosomes[i],
                     docker = docker,
                     monitoring_script = monitoring_script,
                     runtime_attributes = runtime_attributes
@@ -50,7 +53,7 @@ workflow KAGEPanelWithPreprocessing {
             input:
                 vcf_gzs = PreprocessPanelVCF.preprocessed_panel_vcf_gz,
                 vcf_gz_tbis = PreprocessPanelVCF.preprocessed_panel_vcf_gz_tbi,
-                output_prefix = output_prefix + ".preprocessed",
+                output_prefix = output_prefix_ + ".preprocessed",
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = runtime_attributes
@@ -60,7 +63,7 @@ workflow KAGEPanelWithPreprocessing {
             input:
                 vcf_gzs = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
                 vcf_gz_tbis = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
-                output_prefix = output_prefix + ".preprocessed.split",
+                output_prefix = output_prefix_ + ".preprocessed.split",
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = runtime_attributes
@@ -70,7 +73,7 @@ workflow KAGEPanelWithPreprocessing {
             input:
                 vcf_gzs = PreprocessPanelVCF.preprocessed_panel_bi_vcf_gz,
                 vcf_gz_tbis = PreprocessPanelVCF.preprocessed_panel_bi_vcf_gz_tbi,
-                output_prefix = output_prefix + ".preprocessed.bi",
+                output_prefix = output_prefix_ + ".preprocessed.bi",
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = runtime_attributes
@@ -80,7 +83,7 @@ workflow KAGEPanelWithPreprocessing {
             input:
                 vcf_gzs = PreprocessPanelVCF.preprocessed_panel_multi_split_vcf_gz,
                 vcf_gz_tbis = PreprocessPanelVCF.preprocessed_panel_multi_split_vcf_gz_tbi,
-                output_prefix = output_prefix + ".preprocessed.multi.split",
+                output_prefix = output_prefix_ + ".preprocessed.multi.split",
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = runtime_attributes
@@ -95,7 +98,7 @@ workflow KAGEPanelWithPreprocessing {
             input_vcf_gz = preprocessed_panel_bi_vcf_gz_,
             input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi_,
             chromosomes = chromosomes,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = runtime_attributes
@@ -107,7 +110,7 @@ workflow KAGEPanelWithPreprocessing {
                 input_vcf_gz = preprocessed_panel_bi_vcf_gz_,
                 input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi_,
                 chromosome = chromosomes[i],
-                output_prefix = output_prefix,
+                output_prefix = output_prefix_,
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = medium_runtime_attributes
@@ -119,7 +122,7 @@ workflow KAGEPanelWithPreprocessing {
                 input_vcf_gz_tbi = preprocessed_panel_bi_vcf_gz_tbi_,
                 reference_fasta = reference_fasta,
                 chromosome = chromosomes[i],
-                output_prefix = output_prefix,
+                output_prefix = output_prefix_,
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = medium_runtime_attributes
@@ -131,7 +134,7 @@ workflow KAGEPanelWithPreprocessing {
                 sites_only_vcf_gz = MakeSitesOnlyVcfAndNumpyVariants.sites_only_vcf_gz,
                 sites_only_vcf_gz_tbi = MakeSitesOnlyVcfAndNumpyVariants.sites_only_vcf_gz_tbi,
                 chromosome = chromosomes[i],
-                output_prefix = output_prefix,
+                output_prefix = output_prefix_,
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = runtime_attributes
@@ -142,7 +145,7 @@ workflow KAGEPanelWithPreprocessing {
                 chromosome_variant_to_nodes = MakeChromosomeVariantToNodes.chromosome_variant_to_nodes,
                 chromosome_genotype_matrix = MakeChromosomeGenotypeMatrix.chromosome_genotype_matrix,
                 chromosome = chromosomes[i],
-                output_prefix = output_prefix,
+                output_prefix = output_prefix_,
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = medium_runtime_attributes
@@ -152,7 +155,7 @@ workflow KAGEPanelWithPreprocessing {
     call MergeChromosomeGraphs {
         input:
             chromosome_graphs = MakeChromosomeGraph.chromosome_graph,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = large_runtime_attributes
@@ -161,7 +164,7 @@ workflow KAGEPanelWithPreprocessing {
     call MergeChromosomeVariantToNodes {
         input:
             chromosome_variant_to_nodes = MakeChromosomeVariantToNodes.chromosome_variant_to_nodes,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = runtime_attributes
@@ -172,7 +175,7 @@ workflow KAGEPanelWithPreprocessing {
             chromosome_haplotype_to_nodes = MakeChromosomeHaplotypeToNodes.chromosome_haplotype_to_nodes,
             chromosome_haplotype_nodes = MakeChromosomeHaplotypeToNodes.chromosome_haplotype_nodes,
             num_nodes = MergeChromosomeVariantToNodes.num_nodes,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = medium_runtime_attributes
@@ -182,10 +185,10 @@ workflow KAGEPanelWithPreprocessing {
         input:
         chromosome_genotype_matrices = MakeChromosomeGenotypeMatrix.chromosome_genotype_matrix,
         variant_to_nodes = MergeChromosomeVariantToNodes.variant_to_nodes,
-        output_prefix = output_prefix,
+        output_prefix = output_prefix_,
         docker = docker,
         monitoring_script = monitoring_script,
-        runtime_attributes = large_runtime_attributes
+        runtime_attributes = medium_runtime_attributes
     }
 
     scatter (i in range(length(chromosomes))) {
@@ -193,7 +196,7 @@ workflow KAGEPanelWithPreprocessing {
             input:
                 reference_fasta = reference_fasta,
                 chromosome = chromosomes[i],
-                output_prefix = output_prefix,
+                output_prefix = output_prefix_,
                 spacing = spacing,
                 docker = docker,
                 monitoring_script = monitoring_script,
@@ -206,7 +209,7 @@ workflow KAGEPanelWithPreprocessing {
             flat_kmers = SampleChromosomeKmersFromLinearReference.chromosome_linear_kmers,
             num_nodes = MergeChromosomeVariantToNodes.num_nodes,
             reference_fasta_fai = reference_fasta_fai,
-            output_prefix = "~{output_prefix}.linear_kmers",
+            output_prefix = "~{output_prefix_}.linear_kmers",
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = large_runtime_attributes
@@ -215,7 +218,7 @@ workflow KAGEPanelWithPreprocessing {
     call MakeLinearReferenceKmerCounter {
         input:
             linear_kmers = MergeChromosomeKmersFromLinearReference.merged_kmers,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = large_runtime_attributes
@@ -231,7 +234,7 @@ workflow KAGEPanelWithPreprocessing {
                 sites_only_vcf_gz = MakeSitesOnlyVcfAndNumpyVariants.sites_only_vcf_gz,
                 sites_only_vcf_gz_tbi = MakeSitesOnlyVcfAndNumpyVariants.sites_only_vcf_gz_tbi,
                 chromosome = chromosomes[i],
-                output_prefix = output_prefix,
+                output_prefix = output_prefix_,
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = large_runtime_attributes
@@ -243,7 +246,7 @@ workflow KAGEPanelWithPreprocessing {
                 chromosome_variant_to_nodes = MakeChromosomeVariantToNodes.chromosome_variant_to_nodes[i],
                 linear_kmers_counter = MakeLinearReferenceKmerCounter.linear_kmers_counter,
                 chromosome = chromosomes[i],
-                output_prefix = output_prefix,
+                output_prefix = output_prefix_,
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = large_runtime_attributes
@@ -252,7 +255,7 @@ workflow KAGEPanelWithPreprocessing {
         call MergeFlatKmers as MergeChromosomeShortAndStructuralVariantKmers {
             input:
                 flat_kmers = [GetChromosomeShortVariantKmers.chromosome_short_variant_kmers, SampleChromosomeStructuralVariantKmers.chromosome_structural_variant_kmers],
-                output_prefix = "~{output_prefix}.~{chromosomes[i]}.variant_kmers",
+                output_prefix = "~{output_prefix_}.~{chromosomes[i]}.variant_kmers",
                 docker = docker,
                 monitoring_script = monitoring_script,
                 runtime_attributes = large_runtime_attributes
@@ -264,7 +267,7 @@ workflow KAGEPanelWithPreprocessing {
             flat_kmers = MergeChromosomeShortAndStructuralVariantKmers.merged_kmers,
             num_nodes = MergeChromosomeVariantToNodes.num_nodes,
             reference_fasta_fai = reference_fasta_fai,
-            output_prefix = "~{output_prefix}.variant_kmers",
+            output_prefix = "~{output_prefix_}.variant_kmers",
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = large_runtime_attributes
@@ -273,7 +276,7 @@ workflow KAGEPanelWithPreprocessing {
     call MakeReverseVariantKmerIndex {
         input:
             variant_kmers = MergeChromosomeVariantKmers.merged_kmers,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = medium_runtime_attributes
@@ -282,7 +285,7 @@ workflow KAGEPanelWithPreprocessing {
     call MakeVariantKmerIndexWithReverseComplements {
         input:
             variant_kmers = MergeChromosomeVariantKmers.merged_kmers,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = medium_runtime_attributes
@@ -294,7 +297,7 @@ workflow KAGEPanelWithPreprocessing {
             haplotype_to_nodes = MergeChromosomeHaplotypeToNodes.haplotype_to_nodes,
             haplotype_nodes = MergeChromosomeHaplotypeToNodes.haplotype_nodes,
             kmer_index_only_variants_with_revcomp = MakeVariantKmerIndexWithReverseComplements.kmer_index_only_variants_with_revcomp,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = large_runtime_attributes,
@@ -305,7 +308,7 @@ workflow KAGEPanelWithPreprocessing {
         input:
             variant_to_nodes = MergeChromosomeVariantToNodes.variant_to_nodes,
             sampling_count_model = MakeCountModel.sampling_count_model,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = medium_runtime_attributes
@@ -316,7 +319,7 @@ workflow KAGEPanelWithPreprocessing {
             variant_to_nodes = MergeChromosomeVariantToNodes.variant_to_nodes,
             sampling_count_model = MakeCountModel.sampling_count_model,
             reverse_variant_kmers = MakeReverseVariantKmerIndex.reverse_variant_kmers,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = medium_runtime_attributes
@@ -331,7 +334,7 @@ workflow KAGEPanelWithPreprocessing {
             helper_model = MakeHelperModel.helper_model,
             helper_model_combo_matrix = MakeHelperModel.helper_model_combo_matrix,
             kmer_index_only_variants_with_revcomp = MakeVariantKmerIndexWithReverseComplements.kmer_index_only_variants_with_revcomp,
-            output_prefix = output_prefix,
+            output_prefix = output_prefix_,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = medium_runtime_attributes
