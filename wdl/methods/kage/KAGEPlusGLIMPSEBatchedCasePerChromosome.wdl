@@ -34,13 +34,19 @@ workflow KAGEPlusGLIMPSEBatchedCase {
         Float average_coverage
         String output_prefix
 
+        # inputs for FixVariantCollisions
+        File fix_variant_collisions_java
+        Int operation
+        String weight_tag
+        Int is_weight_format_field
+
         String kage_docker
         File? monitoring_script
 
-        RuntimeAttributes? kage_count_kmers_runtime_attributes
-        RuntimeAttributes? kage_genotype_runtime_attributes
-        RuntimeAttributes? glimpse_case_chromosome_runtime_attributes
-        RuntimeAttributes? glimpse_case_runtime_attributes
+        RuntimeAttributes kage_count_kmers_runtime_attributes = {}
+        RuntimeAttributes kage_genotype_runtime_attributes = {}
+        RuntimeAttributes glimpse_case_chromosome_runtime_attributes = {}
+        RuntimeAttributes glimpse_case_runtime_attributes = {}
 
         Int hierarchically_merge_batch_size
     }
@@ -130,13 +136,25 @@ workflow KAGEPlusGLIMPSEBatchedCase {
             runtime_attributes = glimpse_case_runtime_attributes
     }
 
+    call FixVariantCollisions as GenotypingFixVariantCollisions { input:
+        vcf_gz = GLIMPSEBatchedCase.glimpse_vcf_gz,
+        vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi,
+        fix_variant_collisions_java = fix_variant_collisions_java,
+        operation = operation,
+        weight_tag = weight_tag,
+        is_weight_format_field = is_weight_format_field,
+        output_prefix = output_prefix + ".glimpse.collisionless"
+    }
+
     output {
-        File kage_vcf_gzs = KAGEConcatVcfs.vcf_gz
-        File kage_vcf_gz_tbis = KAGEConcatVcfs.vcf_gz_tbi
-        File glimpse_unphased_vcf_gzs = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz
-        File glimpse_unphased_vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi
-        File glimpse_vcf_gzs = GLIMPSEBatchedCase.glimpse_vcf_gz
-        File glimpse_vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi
+        File kage_vcf_gz = KAGEConcatVcfs.vcf_gz
+        File kage_vcf_gz_tbi = KAGEConcatVcfs.vcf_gz_tbi
+        File glimpse_unphased_vcf_gz = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz
+        File glimpse_unphased_vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi
+        File glimpse_vcf_gz = GLIMPSEBatchedCase.glimpse_vcf_gz
+        File glimpse_vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi
+        File phased_collisionless_vcf_gz = GenotypingFixVariantCollisions.collisionless_vcf_gz
+        File phased_collisionless_vcf_gz_tbi = GenotypingFixVariantCollisions.collisionless_vcf_gz_tbi
     }
 }
 
@@ -497,48 +515,53 @@ task GLIMPSECase {
     }
 }
 
-# change to bcftools +split for larger batches
-task SubsetSamples {
+task FixVariantCollisions {
+
     input {
-        File vcf_gz
+        File vcf_gz                         # biallelic
         File vcf_gz_tbi
-        String sample_name
+        File fix_variant_collisions_java
+        Int operation = 1                   # 0=can only remove an entire VCF record; 1=can remove single ones from a GT
+        String weight_tag = "UNIT_WEIGHT"   # ID of the weight field; if this field is not found, all weights are set to one; weights are assumed to be non-negative
+        Int is_weight_format_field = 0      # given a VCF record in a sample, assign it a weight encoded in the sample column (1) or in the INFO field (0)
         String output_prefix
-
-        String docker
-        File? monitoring_script
-
-        RuntimeAttributes runtime_attributes = {}
     }
 
-    Int disk_size_gb = 3 * ceil(size(vcf_gz, "GB"))
-
-    command {
+    command <<<
         set -euxo pipefail
 
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
+        java ~{fix_variant_collisions_java} \
+            ~{vcf_gz} \
+            ~{operation} \
+            ~{weight_tag} \
+            ~{is_weight_format_field} \
+            collisionless.vcf \
+            windows.txt \
+            histogram.txt \
+            null                            # do not output figures
 
-        bcftools view ~{vcf_gz} -s ~{sample_name} -Oz -o ~{output_prefix}.vcf.gz
+        # replace all missing alleles (correctly) emitted with reference alleles, since this is expected by PanGenie panel-creation script
+        # bcftools view collisionless.vcf | \
+        #    sed -e 's/\.|0/0|0/g' | sed -e 's/0|\./0|0/g' | sed -e 's/\.|1/0|1/g' | sed -e 's/1|\./1|0/g' | sed -e 's/\.|\./0|0/g' | \
+        #    bcftools view -Oz -o ~{output_prefix}.vcf.gz
+        # bcftools view collisionless.vcf -Oz -o ~{output_prefix}.vcf.gz
         bcftools index -t ~{output_prefix}.vcf.gz
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
+    >>>
 
     output {
-        File monitoring_log = "monitoring.log"
-        File sample_vcf_gz = "~{output_prefix}.vcf.gz"
-        File sample_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
+        File collisionless_vcf_gz = "~{output_prefix}.vcf.gz"
+        File collisionless_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
+        File windows = "windows.txt"
+        File histogram = "histogram.txt"
+    }
+    ###################
+    runtime {
+        cpu: 1
+        memory:  "16 GiB"
+        disks: "local-disk 100 HDD"
+        bootDiskSizeGb: 10
+        preemptible_tries:     3
+        max_retries:           2
+        docker:"us.gcr.io/broad-gatk/gatk:4.6.0.0"
     }
 }
