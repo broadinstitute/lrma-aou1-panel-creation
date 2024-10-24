@@ -138,7 +138,8 @@ workflow KAGEPlusGLIMPSEBatchedCase {
         operation = operation,
         weight_tag = weight_tag,
         is_weight_format_field = is_weight_format_field,
-        output_prefix = output_prefix + ".glimpse.collisionless"
+        output_prefix = output_prefix + ".glimpse.collisionless",
+        monitoring_script = monitoring_script
     }
 
     output {
@@ -169,7 +170,7 @@ task IndexCaseReads {
     String output_prefix = basename(input_cram, ".cram")
 
     command {
-        set -eou pipefail
+        set -euox pipefail
 
         # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
         touch monitoring.log
@@ -222,7 +223,7 @@ task KAGECountKmers {
     Int cpu_resolved = select_first([runtime_attributes.cpu, cpu])
 
     command <<<
-        set -eou pipefail
+        set -euox pipefail
 
         # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
         touch monitoring.log
@@ -295,7 +296,7 @@ task KAGEGenotype {
     Int cpu_resolved = select_first([runtime_attributes.cpu, cpu])
 
     command {
-        set -eou pipefail
+        set -euox pipefail
 
         # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
         touch monitoring.log
@@ -410,7 +411,7 @@ task ConcatVcfs {
     Int disk_size_gb = 3 * ceil(size(vcf_gzs, "GB"))
 
     command {
-        set -euxo pipefail
+        set -euox pipefail
 
         # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
         touch monitoring.log
@@ -457,7 +458,7 @@ task GLIMPSECaseChromosome {
     }
 
     command {
-        set -eou pipefail
+        set -euox pipefail
 
         # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
         touch monitoring.log
@@ -516,7 +517,7 @@ task GLIMPSECase {
     }
 
     command {
-        set -e
+        set -euox pipefail
 
         # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
         touch monitoring.log
@@ -570,10 +571,18 @@ task FixVariantCollisions {
         String weight_tag = "UNIT_WEIGHT"   # ID of the weight field; if this field is not found, all weights are set to one; weights are assumed to be non-negative
         Int is_weight_format_field = 0      # given a VCF record in a sample, assign it a weight encoded in the sample column (1) or in the INFO field (0)
         String output_prefix
+
+        File? monitoring_script
     }
 
     command <<<
-        set -euxo pipefail
+        set -euox pipefail
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
 
         java ~{fix_variant_collisions_java} \
             ~{vcf_gz} \
@@ -594,6 +603,7 @@ task FixVariantCollisions {
     >>>
 
     output {
+        File monitoring_log = "monitoring.log"
         File collisionless_vcf_gz = "~{output_prefix}.vcf.gz"
         File collisionless_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
         File windows = "windows.txt"
