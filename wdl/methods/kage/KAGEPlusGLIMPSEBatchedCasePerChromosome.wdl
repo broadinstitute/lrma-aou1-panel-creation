@@ -1,7 +1,5 @@
 version 1.0
 
-import "../phasing/HierarchicallyMergeVcfs.wdl"
-
 struct RuntimeAttributes {
     Int? cpu
     Int? command_mem_gb
