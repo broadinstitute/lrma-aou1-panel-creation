@@ -410,7 +410,7 @@ task ConcatVcfs {
         if ! ~{defined(vcf_idxs)}; then
             for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         fi
-        bcftools concat ~{sep=" " vcfs} --naive -Oz -o ~{prefix}.vcf.gz
+        bcftools concat ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     >>>
 
