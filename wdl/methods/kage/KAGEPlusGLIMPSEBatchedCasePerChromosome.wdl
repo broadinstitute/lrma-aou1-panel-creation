@@ -602,10 +602,9 @@ task FixVariantCollisions {
             null                            # do not output figures
 
         # replace all missing alleles (correctly) emitted with reference alleles, since this is expected by PanGenie panel-creation script
-        # bcftools view collisionless.vcf | \
-        #    sed -e 's/\.|0/0|0/g' | sed -e 's/0|\./0|0/g' | sed -e 's/\.|1/0|1/g' | sed -e 's/1|\./1|0/g' | sed -e 's/\.|\./0|0/g' | \
-        #    bcftools view -Oz -o ~{output_prefix}.vcf.gz
-        # bcftools view collisionless.vcf -Oz -o ~{output_prefix}.vcf.gz
+         bcftools view collisionless.vcf | \
+            sed -e 's/\.|0/0|0/g' | sed -e 's/0|\./0|0/g' | sed -e 's/\.|1/0|1/g' | sed -e 's/1|\./1|0/g' | sed -e 's/\.|\./0|0/g' | \
+            bcftools view -Oz -o ~{output_prefix}.vcf.gz
         bcftools index -t ~{output_prefix}.vcf.gz
     >>>
 
