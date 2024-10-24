@@ -358,6 +358,7 @@ task PreprocessPanelVCF {
         File input_vcf_gz_tbi
         Array[String] chromosomes
         String output_prefix
+        String? extra_view_args
 
         String docker
         File? monitoring_script
@@ -375,7 +376,7 @@ task PreprocessPanelVCF {
         fi
 
         # use tee to pipe the output of the first bcftools command to the three subsequent command blocks
-        bcftools view --no-version ~{input_vcf_gz} -r ~{sep="," chromosomes} -Ou | \
+        bcftools view --no-version ~{input_vcf_gz} -r ~{sep="," chromosomes} ~{extra_view_args} -Ou | \
             bcftools norm --no-version -m+ -N -Ou | \
             bcftools plugin fill-tags --no-version -Ou -- -t AF,AC,AN | tee \
         >(
