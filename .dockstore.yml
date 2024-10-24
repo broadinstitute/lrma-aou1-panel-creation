@@ -18,6 +18,9 @@ workflows:
 - name: KAGEPlusGLIMPSEBatchedCase
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/KAGEPlusGLIMPSEBatchedCase.wdl
+- name: KAGEPlusGLIMPSEBatchedCasePerChromosome
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/kage/KAGEPlusGLIMPSEBatchedCasePerChromosome.wdl
 - name: PanGenieCase
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/pangenie/PanGenieCase.wdl
