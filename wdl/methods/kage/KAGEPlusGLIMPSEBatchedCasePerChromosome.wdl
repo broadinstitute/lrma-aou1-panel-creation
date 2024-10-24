@@ -94,6 +94,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
         call Ivcfmerge as KAGEMergeAcrossSamples { input:
             vcf_gzs = KAGEGenotype.kage_vcf_gz,
             vcf_gz_tbis = KAGEGenotype.kage_vcf_gz_tbi,
+            sample_names = sample_names,
             output_prefix = output_prefix + "." + chromosomes[j] + ".kage.merged",
             monitoring_script = monitoring_script
         }
@@ -351,6 +352,7 @@ task Ivcfmerge {
     input{
         Array[File] vcf_gzs
         Array[File] vcf_gz_tbis
+        Array[String] sample_names
         String output_prefix
 
         String docker
@@ -374,7 +376,7 @@ task Ivcfmerge {
         mkdir decompressed
         cat ~{write_lines(vcf_gzs)} | xargs -I % sh -c 'bcftools annotate --no-version -x INFO % -Ov -o decompressed/$(basename % .gz)'
         time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
-        bcftools annotate --no-version -x FORMAT/FT ~{output_prefix}.vcf -Oz -o ~{output_prefix}.vcf.gz
+        bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf -Oz -o ~{output_prefix}.vcf.gz
         bcftools index -t ~{output_prefix}.vcf.gz
     }
 
