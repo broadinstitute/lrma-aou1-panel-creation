@@ -130,42 +130,13 @@ workflow KAGEPlusGLIMPSEBatchedCase {
             runtime_attributes = glimpse_case_runtime_attributes
     }
 
-    scatter (sample_name in sample_names) {
-        call SubsetSamples as KAGESubsetSamples {
-            input:
-                vcf_gz = KAGEConcatVcfs.vcf_gz,
-                vcf_gz_tbi = KAGEConcatVcfs.vcf_gz_tbi,
-                sample_name = sample_name,
-                output_prefix = sample_name + ".kage",
-                monitoring_script = monitoring_script
-        }
-
-        call SubsetSamples as GLIMPSEUnphasedSubsetSamples {
-            input:
-                vcf_gz = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz,
-                vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi,
-                sample_name = sample_name,
-                output_prefix = sample_name + ".kage.glimpse.unphased",
-                monitoring_script = monitoring_script
-        }
-
-        call SubsetSamples as GLIMPSESubsetSamples {
-            input:
-                vcf_gz = GLIMPSEBatchedCase.glimpse_vcf_gz,
-                vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi,
-                sample_name = sample_name,
-                output_prefix = sample_name + ".kage.glimpse",
-                monitoring_script = monitoring_script
-        }
-    }
-
     output {
-        Array[File] kage_vcf_gzs = KAGESubsetSamples.sample_vcf_gz
-        Array[File] kage_vcf_gz_tbis = KAGESubsetSamples.sample_vcf_gz_tbi
-        Array[File] glimpse_unphased_vcf_gz = GLIMPSEUnphasedSubsetSamples.sample_vcf_gz
-        Array[File] glimpse_unphased_vcf_gz_tbi = GLIMPSEUnphasedSubsetSamples.sample_vcf_gz_tbi
-        Array[File] glimpse_vcf_gz = GLIMPSESubsetSamples.sample_vcf_gz
-        Array[File] glimpse_vcf_gz_tbi = GLIMPSESubsetSamples.sample_vcf_gz_tbi
+        File kage_vcf_gzs = KAGEConcatVcfs.vcf_gz
+        File kage_vcf_gz_tbis = KAGEConcatVcfs.vcf_gz_tbi
+        File glimpse_unphased_vcf_gzs = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz
+        File glimpse_unphased_vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi
+        File glimpse_vcf_gzs = GLIMPSEBatchedCase.glimpse_vcf_gz
+        File glimpse_vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi
     }
 }
 
