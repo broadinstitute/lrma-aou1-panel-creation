@@ -28,6 +28,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
         Array[File] panel_split_vcf_gz_tbi
         Array[File] panel_multi_split_vcf_gz # for filling in biallelic-only VCFs produced by KAGE
         Array[File] panel_multi_split_vcf_gz_tbi
+        Map[String, Int] chromosome_to_glimpse_mem_gb
 
         Float average_coverage
         String output_prefix
@@ -109,6 +110,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
                 output_prefix = output_prefix + "." + chromosomes[j],
                 docker = kage_docker,
                 monitoring_script = monitoring_script,
+                mem_gb = chromosome_to_glimpse_mem_gb[chromosomes[j]],
                 runtime_attributes = glimpse_case_chromosome_runtime_attributes
         }
     }
@@ -454,6 +456,7 @@ task GLIMPSECaseChromosome {
         String docker
         File? monitoring_script
 
+        Int mem_gb
         RuntimeAttributes runtime_attributes = {}
     }
 
@@ -497,7 +500,7 @@ task GLIMPSECaseChromosome {
     runtime {
         docker: docker
         cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        memory: select_first([runtime_attributes.command_mem_gb, mem_gb]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
         disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
         preemptible: select_first([runtime_attributes.preemptible, 2])
