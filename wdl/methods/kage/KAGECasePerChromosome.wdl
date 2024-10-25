@@ -23,11 +23,8 @@ workflow KAGECasePerChromosome {
         Array[String]+ chromosomes
         Array[File] panel_index
         Array[File] panel_kmer_index_only_variants_with_revcomp
-        Array[File] panel_split_vcf_gz # for GLIMPSE
-        Array[File] panel_split_vcf_gz_tbi
         Array[File] panel_multi_split_vcf_gz # for filling in biallelic-only VCFs produced by KAGE
         Array[File] panel_multi_split_vcf_gz_tbi
-        Map[String, Int] chromosome_to_glimpse_command_mem_gb
 
         Float average_coverage
         String output_prefix
