@@ -487,7 +487,7 @@ task GLIMPSECaseChromosome {
 
         # take KAGE VCF header and add GLIMPSE INFO and FORMAT lines (GLIMPSE header only contains a single chromosome and breaks bcftools concat --naive)
         bcftools view --no-version -h ~{kage_vcf_gz} | grep '^##' > kage.header.txt
-        bcftools view --no-version -h ~{output_prefix}.kage.glimpse.~{chromosome}.raw.vcf.gz | grep -E '##INFO|##FORMAT' > glimpse.header.txt
+        bcftools view --no-version -h ~{output_prefix}.kage.glimpse.~{chromosome}.raw.vcf.gz | grep -E '^##INFO|^##FORMAT|^##NMAIN|^##FPLOIDY' > glimpse.header.txt
         bcftools view --no-version -h ~{kage_vcf_gz} | grep '^#CHROM' > kage.columns.txt
         cat kage.header.txt glimpse.header.txt kage.columns.txt > header.txt
         bcftools reheader -h header.txt ~{output_prefix}.kage.glimpse.~{chromosome}.raw.vcf.gz > ~{output_prefix}.kage.glimpse.~{chromosome}.vcf.gz
