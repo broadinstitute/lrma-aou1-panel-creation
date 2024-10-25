@@ -58,6 +58,8 @@ workflow KAGEPlusGLIMPSEBatchedCase {
     }
 
     scatter (j in range(length(chromosomes))) {
+        String chromosome = chromosomes[j]
+
         scatter (i in range(length(input_crams))) {
             call KAGECountKmers {
                 input:
@@ -67,9 +69,9 @@ workflow KAGEPlusGLIMPSEBatchedCase {
                     reference_fasta = reference_fasta,
                     reference_fasta_fai = reference_fasta_fai,
                     reference_dict = reference_dict,
-                    chromosomes = [chromosomes[j]],
+                    chromosomes = [chromosome],
                     subset_reads = true,
-                    output_prefix = sample_names[i] + "." + chromosomes[j],
+                    output_prefix = sample_names[i] + "." + chromosome,
                     docker = kage_docker,
                     monitoring_script = monitoring_script,
                     runtime_attributes = kage_count_kmers_runtime_attributes
@@ -81,7 +83,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
                     panel_index = panel_index[j],
                     panel_multi_split_vcf_gz = panel_multi_split_vcf_gz[j],
                     panel_multi_split_vcf_gz_tbi = panel_multi_split_vcf_gz_tbi[j],
-                    output_prefix = sample_names[i] + "." + chromosomes[j],
+                    output_prefix = sample_names[i] + "." + chromosome,
                     sample_name = sample_names[i],
                     average_coverage = average_coverage,
                     docker = kage_docker,
@@ -94,7 +96,7 @@ workflow KAGEPlusGLIMPSEBatchedCase {
             vcf_gzs = KAGEGenotype.kage_vcf_gz,
             vcf_gz_tbis = KAGEGenotype.kage_vcf_gz_tbi,
             sample_names = sample_names,
-            output_prefix = output_prefix + "." + chromosomes[j] + ".kage.merged",
+            output_prefix = output_prefix + "." + chromosome + ".kage.merged",
             monitoring_script = monitoring_script
         }
 
@@ -105,12 +107,12 @@ workflow KAGEPlusGLIMPSEBatchedCase {
                 panel_split_vcf_gz = panel_split_vcf_gz[j],
                 panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi[j],
                 reference_fasta_fai = reference_fasta_fai,
-                chromosome = chromosomes[j],
+                chromosome = chromosome,
                 genetic_map = genetic_maps[j],
-                output_prefix = output_prefix + "." + chromosomes[j],
+                output_prefix = output_prefix + "." + chromosome,
                 docker = kage_docker,
                 monitoring_script = monitoring_script,
-                command_mem_gb = chromosome_to_glimpse_command_mem_gb[chromosomes[j]],
+                command_mem_gb = chromosome_to_glimpse_command_mem_gb[chromosome],
                 runtime_attributes = glimpse_case_chromosome_runtime_attributes
         }
     }
