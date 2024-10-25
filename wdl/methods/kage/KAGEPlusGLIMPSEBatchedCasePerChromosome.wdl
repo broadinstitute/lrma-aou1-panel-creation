@@ -560,7 +560,6 @@ task GLIMPSECase {
 
     output {
         File monitoring_log = "monitoring.log"
-        File ligate_log = "~{output_prefix}.ligate.log"
         File glimpse_unphased_vcf_gz = "~{output_prefix}.kage.glimpse.unphased.vcf.gz"
         File glimpse_unphased_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.unphased.vcf.gz.tbi"
         File glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.vcf.gz"
