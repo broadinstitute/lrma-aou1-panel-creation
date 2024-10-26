@@ -13,8 +13,8 @@ struct RuntimeAttributes {
 
 workflow GLIMPSEBatchedCasePerChromosome {
     input {
-        Array[Array[File]] sample_by_chromosome_kage_vcf_gzs
-        Array[Array[File]] sample_by_chromosome_kage_vcf_gzs_kage_vcf_gz_tbis
+        File sample_by_chromosome_kage_vcf_gzs_tsv
+        File sample_by_chromosome_kage_vcf_gzs_kage_vcf_gz_tbis_tsv
         Array[String] sample_names
         File reference_fasta
         File reference_fasta_fai
@@ -42,6 +42,9 @@ workflow GLIMPSEBatchedCasePerChromosome {
         RuntimeAttributes glimpse_case_chromosome_runtime_attributes = {}
         RuntimeAttributes glimpse_case_runtime_attributes = {}
     }
+
+    Array[Array[String]] sample_by_chromosome_kage_vcf_gzs = read_tsv(sample_by_chromosome_kage_vcf_gzs_tsv)
+    Array[Array[String]] sample_by_chromosome_kage_vcf_gzs_kage_vcf_gz_tbis = read_tsv(sample_by_chromosome_kage_vcf_gzs_kage_vcf_gz_tbis_tsv)
 
     call CreateBatches {
         input:
