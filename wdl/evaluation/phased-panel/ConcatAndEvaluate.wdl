@@ -3,7 +3,6 @@ version 1.0
 import "./VcfdistAndOverlapMetricsEvaluation.wdl"
 import "./ChromosomePhasedPanelCreationFromHiPhase.wdl"
 import "../kage/LeaveOutEvaluation.wdl"
-import "../../methods/phasing/HierarchicallyMergeVcfs.wdl"
 
 struct RuntimeAttr {
     Float? mem_gb
@@ -70,10 +69,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         RuntimeAttributes? glimpse_case_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
 
-        # inputs for HierarchicallyMergeVcfs
-        Array[String] hierarchically_merge_regions   # bcftools regions, e.g. ["chr1,chr2,chr3", "chr4,chr5,chr6", ...]
-        Int hierarchically_merge_batch_size
-        String hierarchically_merge_docker
+        # inputs for Ivcfmerge
+        String ivcfmerge_docker
 
         # inputs for FixVariantCollisions
         File fix_variant_collisions_java
@@ -159,13 +156,12 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
     }
 
     # merge GLIMPSE VCFs
-    call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as GLIMPSEMergeAcrossSamples { input:
+    call Ivcfmerge as GLIMPSEMergeAcrossSamples { input:
         vcf_gzs = LeaveOutEvaluation.glimpse_vcf_gzs,
         vcf_gz_tbis = LeaveOutEvaluation.glimpse_vcf_gz_tbis,
-        regions = hierarchically_merge_regions,
-        batch_size = hierarchically_merge_batch_size,
+        sample_names = leave_out_sample_names,
         output_prefix = output_prefix + ".glimpse.merged",
-        docker = hierarchically_merge_docker,
+        docker = ivcfmerge_docker,
         monitoring_script = monitoring_script
     }
 
@@ -328,13 +324,12 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
 
     if (do_pangenie) {
         # merge PanGenie VCFs
-        call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as PanGenieMergeAcrossSamples { input:
+        call Ivcfmerge as PanGenieMergeAcrossSamples { input:
             vcf_gzs = select_all(LeaveOutEvaluation.pangenie_vcf_gzs),
             vcf_gz_tbis = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
-            regions = hierarchically_merge_regions,
-            batch_size = hierarchically_merge_batch_size,
+            sample_names = leave_out_sample_names,
             output_prefix = output_prefix + ".pangenie.merged",
-            docker = hierarchically_merge_docker,
+            docker = ivcfmerge_docker,
             monitoring_script = monitoring_script
         }
 
@@ -598,5 +593,55 @@ task SummarizeEvaluations {
         memory: mem_gb + " GiB"
         cpu: cpu
         preemptible: preemptible
+    }
+}
+
+# assumes all VCFs have identical variants
+task Ivcfmerge {
+    input{
+        Array[File] vcf_gzs
+        Array[File] vcf_gz_tbis
+        Array[String] sample_names
+        String output_prefix
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
+    }
+
+    command {
+        set -euox pipefail
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        wget https://github.com/iqbal-lab-org/ivcfmerge/archive/refs/tags/v1.0.0.tar.gz
+        tar -xvf v1.0.0.tar.gz
+
+        mkdir decompressed
+        cat ~{write_lines(vcf_gzs)} | xargs -I % sh -c 'bcftools annotate --no-version -x INFO % -Ov -o decompressed/$(basename % .gz)'
+        time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
+        bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf -Oz -o ~{output_prefix}.vcf.gz
+        bcftools index -t ~{output_prefix}.vcf.gz
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        File merged_vcf_gz = "~{output_prefix}.vcf.gz"
+        File merged_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 250]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
     }
 }
