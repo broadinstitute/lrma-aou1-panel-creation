@@ -25,8 +25,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         String output_prefix
         File? monitoring_script
 
-        File hiphase_short_vcf_gz
-        File hiphase_short_vcf_gz_tbi
+        File? hiphase_short_vcf_gz      # this can be expensive to evaluate, make it optional
+        File? hiphase_short_vcf_gz_tbi
         File hiphase_sv_vcf_gz
         File hiphase_sv_vcf_gz_tbi
 
@@ -178,20 +178,22 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         output_prefix = output_prefix + ".glimpse.merged.phased.collisionless"
     }
 
-    # evaluate HiPhase short
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
-        samples = vcfdist_samples,
-        truth_vcf = vcfdist_truth_vcf,
-        truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = hiphase_short_vcf_gz,
-        eval_vcf_idx = hiphase_short_vcf_gz_tbi,
-        region = evaluation_chromosomes_regions_arg,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        overlap_phase_tag = "PS",
-        overlap_metrics_docker = overlap_metrics_docker
+    if (defined(hiphase_short_vcf_gz)) {
+        # evaluate HiPhase short
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
+            samples = vcfdist_samples,
+            truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
+            eval_vcf = select_first([hiphase_short_vcf_gz]),
+            eval_vcf_idx = select_first([hiphase_short_vcf_gz_tbi]),
+            region = evaluation_chromosomes_regions_arg,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            overlap_phase_tag = "PS",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
     }
 
     # evaluate HiPhase SV
@@ -355,7 +357,11 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         }
     }
 
-    Array[String] labels_per_vcf = if do_pangenie then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"]
+    Array[String] labels_per_vcf =
+        if do_pangenie then
+            (if defined(hiphase_short_vcf_gz) then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"])
+        else
+            (if defined(hiphase_short_vcf_gz) then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"] else ["HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"])
     call SummarizeEvaluations { input:
         labels_per_vcf = labels_per_vcf,
         vcfdist_outputs_per_vcf_and_sample = select_all([
