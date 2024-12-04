@@ -50,7 +50,6 @@ workflow HierarchicallyMergeVcfs {
             }
         }
     }
-
     if (!use_ivcfmerge) {
         scatter (i in range(length(CreateBatches.vcf_gz_batch_fofns))) {
             scatter (j in range(length(regions))) {
@@ -70,24 +69,40 @@ workflow HierarchicallyMergeVcfs {
     Array[Array[File]] region_by_batch_vcf_gzs = transpose(select_first([IvcfmergeSingleBatchRegion.merged_vcf_gz, MergeVcfsSingleBatchRegion.merged_vcf_gz]))
     Array[Array[File]] region_by_batch_vcf_gz_tbis = transpose(select_first([IvcfmergeSingleBatchRegion.merged_vcf_gz_tbi, MergeVcfsSingleBatchRegion.merged_vcf_gz_tbi]))
 
-    # merge all samples in each region
-    scatter (j in range(length(regions))) {
-        call MergeVcfs as MergeVcfsSingleRegion {
-            input:
-                vcf_gzs = region_by_batch_vcf_gzs[j],
-                vcf_gz_tbis = region_by_batch_vcf_gz_tbis[j],
-                output_prefix = output_prefix + ".region" + j,
-                extra_args = extra_merge_args,
-                docker = docker,
-                monitoring_script = monitoring_script
+    if (use_ivcfmerge) {
+        # merge all samples in each region
+        scatter (j in range(length(regions))) {
+            call Ivcfmerge as IvcfmergeSingleRegion {
+                input:
+                    vcf_gzs = region_by_batch_vcf_gzs[j],
+                    vcf_gz_tbis = region_by_batch_vcf_gz_tbis[j],
+                    output_prefix = output_prefix + ".region" + j,
+                    sample_names = select_first([sample_names]),
+                    docker = docker,
+                    monitoring_script = monitoring_script
+            }
+        }
+    }
+    if (!use_ivcfmerge) {
+        # merge all samples in each region
+        scatter (j in range(length(regions))) {
+            call MergeVcfs as MergeVcfsSingleRegion {
+                input:
+                    vcf_gzs = region_by_batch_vcf_gzs[j],
+                    vcf_gz_tbis = region_by_batch_vcf_gz_tbis[j],
+                    output_prefix = output_prefix + ".region" + j,
+                    extra_args = extra_merge_args,
+                    docker = docker,
+                    monitoring_script = monitoring_script
+            }
         }
     }
 
     # concatenate all regions
     call ConcatVcfs {
         input:
-            vcf_gzs = MergeVcfsSingleRegion.merged_vcf_gz,
-            vcf_gz_tbis = MergeVcfsSingleRegion.merged_vcf_gz_tbi,
+            vcf_gzs = select_first([IvcfmergeSingleRegion.merged_vcf_gz, MergeVcfsSingleRegion.merged_vcf_gz]),
+            vcf_gz_tbis = select_first([IvcfmergeSingleRegion.merged_vcf_gz, MergeVcfsSingleRegion.merged_vcf_gz_tbi]),
             output_prefix = output_prefix,
             extra_args = extra_concat_args,
             docker = docker,
