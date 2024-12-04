@@ -20,6 +20,8 @@ workflow HierarchicallyMergeVcfs {
         String output_prefix
         String extra_merge_args = "--threads $(nproc) --force-single --merge none"       # non-region args
         String extra_concat_args = "--threads $(nproc) --naive"
+        Boolean use_ivcfmerge   # requires sample_names
+        Array[String]? sample_names
 
         String docker
         File? monitoring_script
@@ -33,22 +35,40 @@ workflow HierarchicallyMergeVcfs {
             docker = docker
     }
 
-    scatter (i in range(length(CreateBatches.vcf_gz_batch_fofns))) {
-        scatter (j in range(length(regions))) {
-            call MergeVcfs as MergeVcfsSingleBatchRegion {
-                input:
-                    vcf_gzs = read_lines(CreateBatches.vcf_gz_batch_fofns[i]),
-                    vcf_gz_tbis = read_lines(CreateBatches.vcf_gz_tbi_batch_fofns[i]),
-                    output_prefix = output_prefix + ".batch-" + i + ".region-" + i,
-                    extra_args = "-r " + regions[j] + " " + extra_merge_args,
-                    docker = docker,
-                    monitoring_script = monitoring_script
+    if (use_ivcfmerge) {
+        scatter (i in range(length(CreateBatches.vcf_gz_batch_fofns))) {
+            scatter (j in range(length(regions))) {
+                call Ivcfmerge as IvcfmergeSingleBatchRegion {
+                    input:
+                        vcf_gzs = read_lines(CreateBatches.vcf_gz_batch_fofns[i]),
+                        vcf_gz_tbis = read_lines(CreateBatches.vcf_gz_tbi_batch_fofns[i]),
+                        output_prefix = output_prefix + ".batch-" + i + ".region-" + i,
+                        sample_names = select_first([sample_names]),
+                        docker = docker,
+                        monitoring_script = monitoring_script
+                }
             }
         }
     }
 
-    Array[Array[File]] region_by_batch_vcf_gzs = transpose(MergeVcfsSingleBatchRegion.merged_vcf_gz)
-    Array[Array[File]] region_by_batch_vcf_gz_tbis = transpose(MergeVcfsSingleBatchRegion.merged_vcf_gz_tbi)
+    if (!use_ivcfmerge) {
+        scatter (i in range(length(CreateBatches.vcf_gz_batch_fofns))) {
+            scatter (j in range(length(regions))) {
+                call MergeVcfs as MergeVcfsSingleBatchRegion {
+                    input:
+                        vcf_gzs = read_lines(CreateBatches.vcf_gz_batch_fofns[i]),
+                        vcf_gz_tbis = read_lines(CreateBatches.vcf_gz_tbi_batch_fofns[i]),
+                        output_prefix = output_prefix + ".batch-" + i + ".region-" + i,
+                        extra_args = "-r " + regions[j] + " " + extra_merge_args,
+                        docker = docker,
+                        monitoring_script = monitoring_script
+                }
+            }
+        }
+    }
+
+    Array[Array[File]] region_by_batch_vcf_gzs = transpose(select_first([IvcfmergeSingleBatchRegion.merged_vcf_gz, MergeVcfsSingleBatchRegion.merged_vcf_gz]))
+    Array[Array[File]] region_by_batch_vcf_gz_tbis = transpose(select_first([IvcfmergeSingleBatchRegion.merged_vcf_gz_tbi, MergeVcfsSingleBatchRegion.merged_vcf_gz_tbi]))
 
     # merge all samples in each region
     scatter (j in range(length(regions))) {
@@ -153,6 +173,56 @@ task MergeVcfs {
         cpu: select_first([runtime_attributes.cpu, 1])
         memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
         disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+}
+
+# assumes all VCFs have identical variants
+task Ivcfmerge {
+    input{
+        Array[File] vcf_gzs
+        Array[File] vcf_gz_tbis
+        Array[String] sample_names
+        String output_prefix
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
+    }
+
+    command {
+        set -euox pipefail
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        wget https://github.com/iqbal-lab-org/ivcfmerge/archive/refs/tags/v1.0.0.tar.gz
+        tar -xvf v1.0.0.tar.gz
+
+        mkdir decompressed
+        cat ~{write_lines(vcf_gzs)} | xargs -I % sh -c 'bcftools annotate --no-version -x INFO % -Ov -o decompressed/$(basename % .gz)'
+        time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
+        bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf -Oz -o ~{output_prefix}.vcf.gz
+        bcftools index -t ~{output_prefix}.vcf.gz
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        File merged_vcf_gz = "~{output_prefix}.vcf.gz"
+        File merged_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 250]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
         preemptible: select_first([runtime_attributes.preemptible, 2])
         maxRetries: select_first([runtime_attributes.max_retries, 1])
