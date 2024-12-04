@@ -77,7 +77,7 @@ workflow HierarchicallyMergeVcfs {
                 input:
                     vcf_gzs = region_by_batch_vcf_gzs[j],
                     vcf_gz_tbis = region_by_batch_vcf_gz_tbis[j],
-                    output_prefix = output_prefix + ".region" + j,
+                    output_prefix = output_prefix + ".region-" + j,
                     sample_names = select_first([sample_names]),
                     docker = docker,
                     monitoring_script = monitoring_script
@@ -91,7 +91,7 @@ workflow HierarchicallyMergeVcfs {
                 input:
                     vcf_gzs = region_by_batch_vcf_gzs[j],
                     vcf_gz_tbis = region_by_batch_vcf_gz_tbis[j],
-                    output_prefix = output_prefix + ".region" + j,
+                    output_prefix = output_prefix + ".region-" + j,
                     extra_args = extra_merge_args,
                     docker = docker,
                     monitoring_script = monitoring_script
