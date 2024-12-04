@@ -44,6 +44,7 @@ workflow HierarchicallyMergeVcfs {
                         vcf_gz_tbis = read_lines(CreateBatches.vcf_gz_tbi_batch_fofns[i]),
                         output_prefix = output_prefix + ".batch-" + i + ".region-" + i,
                         sample_names = select_first([sample_names]),
+                        region_args = "-r " + regions[j],
                         docker = docker,
                         monitoring_script = monitoring_script
                 }
@@ -201,6 +202,7 @@ task Ivcfmerge {
         Array[File] vcf_gz_tbis
         Array[String] sample_names
         String output_prefix
+        String? region_args
 
         String docker
         File? monitoring_script
@@ -221,7 +223,7 @@ task Ivcfmerge {
         tar -xvf v1.0.0.tar.gz
 
         mkdir decompressed
-        cat ~{write_lines(vcf_gzs)} | xargs -I % sh -c 'bcftools annotate --no-version -x INFO % -Ov -o decompressed/$(basename % .gz)'
+        cat ~{write_lines(vcf_gzs)} | xargs -I % sh -c 'bcftools annotate --no-version ~{region_args} -x INFO % -Ov -o decompressed/$(basename % .gz)'
         time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
         bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf -Oz -o ~{output_prefix}.vcf.gz
         bcftools index -t ~{output_prefix}.vcf.gz
