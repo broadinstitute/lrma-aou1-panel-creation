@@ -102,7 +102,7 @@ workflow HierarchicallyMergeVcfs {
     call ConcatVcfs {
         input:
             vcf_gzs = select_first([IvcfmergeSingleRegion.merged_vcf_gz, MergeVcfsSingleRegion.merged_vcf_gz]),
-            vcf_gz_tbis = select_first([IvcfmergeSingleRegion.merged_vcf_gz, MergeVcfsSingleRegion.merged_vcf_gz_tbi]),
+            vcf_gz_tbis = select_first([IvcfmergeSingleRegion.merged_vcf_gz_tbi, MergeVcfsSingleRegion.merged_vcf_gz_tbi]),
             output_prefix = output_prefix,
             extra_args = extra_concat_args,
             docker = docker,
