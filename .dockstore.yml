@@ -27,3 +27,6 @@ workflows:
 - name: HierarchicalMergeVCFs
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/HierarchicalMergeVCFs.wdl
+- name: PhysicalPhasingTRGT
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasingTRGT.wdl
