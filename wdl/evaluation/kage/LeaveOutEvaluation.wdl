@@ -285,6 +285,7 @@ task PreprocessPanelVCF {
         File challenging_medically_relevant_genes_bed
         Array[String] chromosomes
         String output_prefix
+        String? extra_view_args
 
         String docker
         File? monitoring_script
@@ -301,7 +302,7 @@ task PreprocessPanelVCF {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools view --no-version ~{input_vcf_gz} -r ~{sep="," chromosomes} -Ou | \
+        bcftools view --no-version ~{input_vcf_gz} -r ~{sep="," chromosomes} ~{extra_view_args} -Ou | \
             bcftools norm --no-version -m+ -N -Ou | \
             bcftools plugin fill-tags --no-version -Ou -- -t AF,AC,AN | \
             truvari anno svinfo | \
