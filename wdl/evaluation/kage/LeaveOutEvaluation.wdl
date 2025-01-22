@@ -34,6 +34,7 @@ workflow LeaveOutEvaluation {
         Array[String] leave_out_sample_names
         Int case_average_coverage
         Boolean do_pangenie
+        String? extra_view_args
 
         # TODO we require the alignments to subset by chromosome; change to start from raw reads
         Map[String, File] leave_out_crams
@@ -66,6 +67,7 @@ workflow LeaveOutEvaluation {
             challenging_medically_relevant_genes_bed = challenging_medically_relevant_genes_bed,
             chromosomes = chromosomes,
             output_prefix = output_prefix,
+            extra_view_args = extra_view_args,
             docker = docker,
             monitoring_script = monitoring_script,
             runtime_attributes = runtime_attributes

@@ -54,6 +54,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         Array[String] leave_out_sample_names
         Int case_average_coverage
         Boolean do_pangenie
+        String? extra_view_args
         Map[String, File] leave_out_crams
         String leave_out_docker
         String kage_docker
@@ -139,6 +140,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         leave_out_sample_names = leave_out_sample_names,
         case_average_coverage = case_average_coverage,
         do_pangenie = do_pangenie,
+        extra_view_args = extra_view_args,
         leave_out_crams = leave_out_crams,
         docker = leave_out_docker,
         kage_docker = kage_docker,
