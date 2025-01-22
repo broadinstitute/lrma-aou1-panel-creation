@@ -30,6 +30,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
         File vcfdist_bed_file
         String? vcfdist_extra_args
+        Int? vcfdist_mem_gb
 
         Boolean do_overlap_metrics = true
         String overlap_phase_tag
@@ -59,7 +60,8 @@ workflow VcfdistAndOverlapMetricsEvaluation {
             truth_vcf = SubsetSampleFromVcfTruth.single_sample_vcf,
             bed_file = vcfdist_bed_file,
             reference_fasta = reference_fasta,
-            extra_args = vcfdist_extra_args
+            extra_args = vcfdist_extra_args,
+            mem_gb = vcfdist_mem_gb
         }
     }
 

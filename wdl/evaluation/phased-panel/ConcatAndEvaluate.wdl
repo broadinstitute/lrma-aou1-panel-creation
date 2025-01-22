@@ -85,6 +85,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         String evaluation_chromosomes_regions_arg
         File vcfdist_bed_file
         String? vcfdist_extra_args
+        Int? vcfdist_mem_gb
         String overlap_metrics_docker
 
         String summarize_evaluations_docker
@@ -187,6 +188,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             reference_fasta_fai = reference_fasta_fai,
             vcfdist_bed_file = vcfdist_bed_file,
             vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
             overlap_phase_tag = "PS",
             overlap_metrics_docker = overlap_metrics_docker
         }
@@ -204,6 +206,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
         vcfdist_extra_args = vcfdist_extra_args,
+        vcfdist_mem_gb = vcfdist_mem_gb,
         overlap_phase_tag = "PS",
         overlap_metrics_docker = overlap_metrics_docker
     }
@@ -220,6 +223,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
         vcfdist_extra_args = vcfdist_extra_args,
+        vcfdist_mem_gb = vcfdist_mem_gb,
         overlap_phase_tag = "PS",
         overlap_metrics_docker = overlap_metrics_docker
     }
@@ -236,6 +240,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
         vcfdist_extra_args = vcfdist_extra_args,
+        vcfdist_mem_gb = vcfdist_mem_gb,
         overlap_phase_tag = "PS",
         overlap_metrics_docker = overlap_metrics_docker
     }
@@ -252,6 +257,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
         vcfdist_extra_args = vcfdist_extra_args,
+        vcfdist_mem_gb = vcfdist_mem_gb,
         overlap_phase_tag = "NONE",
         overlap_metrics_docker = overlap_metrics_docker
     }
@@ -268,6 +274,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
         vcfdist_extra_args = vcfdist_extra_args,
+        vcfdist_mem_gb = vcfdist_mem_gb,
         overlap_phase_tag = "NONE",
         overlap_metrics_docker = overlap_metrics_docker
     }
@@ -284,6 +291,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
         vcfdist_extra_args = vcfdist_extra_args,
+        vcfdist_mem_gb = vcfdist_mem_gb,
         overlap_phase_tag = "NONE",
         overlap_metrics_docker = overlap_metrics_docker
     }
@@ -300,6 +308,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
         vcfdist_extra_args = vcfdist_extra_args,
+        vcfdist_mem_gb = vcfdist_mem_gb,
         overlap_phase_tag = "NONE",
         overlap_metrics_docker = overlap_metrics_docker
     }
@@ -316,6 +325,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         reference_fasta_fai = reference_fasta_fai,
         vcfdist_bed_file = vcfdist_bed_file,
         vcfdist_extra_args = vcfdist_extra_args,
+        vcfdist_mem_gb = vcfdist_mem_gb,
         overlap_phase_tag = "NONE",
         overlap_metrics_docker = overlap_metrics_docker
     }
@@ -347,6 +357,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             reference_fasta_fai = reference_fasta_fai,
             vcfdist_bed_file = vcfdist_bed_file,
             vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
             overlap_phase_tag = "NONE",
             overlap_metrics_docker = overlap_metrics_docker
         }
