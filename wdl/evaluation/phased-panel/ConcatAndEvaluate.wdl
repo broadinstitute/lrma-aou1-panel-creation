@@ -141,6 +141,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             overlap_phase_tag = "PS",
             overlap_metrics_docker = overlap_metrics_docker
         }
+
+        String hiphase_short_label = "HiPhaseShort"
     }
 
     # evaluate HiPhase SV
@@ -361,14 +363,27 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
                 overlap_phase_tag = "NONE",
                 overlap_metrics_docker = overlap_metrics_docker
             }
+
+            String pangenie_label = "PanGenie"
         }
+
+        String panel_label = "Panel"
+        String genotyping_label = "Genotyping"
+        String genotyping_fix_variant_collisions_label = "GenotypingFixVariantCollisions"
     }
 
-    Array[String] labels_per_vcf =
-        if do_pangenie then
-            (if defined(hiphase_short_vcf_gz) then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"] else ["HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions", "PanGenie"])
-        else
-            (if defined(hiphase_short_vcf_gz) then ["HiPhaseShort", "HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"] else ["HiPhaseSV", "ConcatAndFiltered", "BeforeShapeit4FixVariantCollisions", "Shapeit4", "FixVariantCollisions", "Panel", "Genotyping", "GenotypingFixVariantCollisions"])
+    Array[String] labels_per_vcf = select_all([
+        hiphase_short_label,
+        "HiPhaseSV",
+        "ConcatAndFiltered",
+        "BeforeShapeit4FixVariantCollisions",
+        "Shapeit4",
+        "FixVariantCollisions",
+        panel_label,
+        genotyping_label,
+        genotyping_fix_variant_collisions_label,
+        pangenie_label
+    ])
     call SummarizeEvaluations { input:
         labels_per_vcf = labels_per_vcf,
         vcfdist_outputs_per_vcf_and_sample = select_all([
