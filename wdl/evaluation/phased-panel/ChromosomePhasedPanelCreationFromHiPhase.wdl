@@ -69,6 +69,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         sv_vcf = hiphase_sv_vcf_gz,
         sv_vcf_tbi = hiphase_sv_vcf_gz_tbi,
         region = chromosome,
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
         filter_and_concat_short_filter_args = filter_and_concat_short_filter_args,
         filter_and_concat_sv_filter_args = filter_and_concat_sv_filter_args,
         prefix = output_prefix + "." + chromosome + ".filter_and_concat"
@@ -230,6 +232,8 @@ task FilterAndConcatVcfs {
         File sv_vcf_tbi
         String prefix
         String region
+        File reference_fasta
+        File reference_fasta_fai
         String? filter_and_concat_short_filter_args = "-i 'MAC>=2'"
         String? filter_and_concat_sv_filter_args = "-i 'MAC>=2'"
 
@@ -247,7 +251,7 @@ task FilterAndConcatVcfs {
         # filter short singletons and split to biallelic
         bcftools view ~{filter_and_concat_short_filter_args} ~{short_vcf} \
             -r ~{region} | \
-            bcftools norm -m-any \
+            bcftools norm -m-any -f ~{reference_fasta} \
             --write-index -Oz -o ~{prefix}.short.vcf.gz
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
