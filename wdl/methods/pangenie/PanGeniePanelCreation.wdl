@@ -105,13 +105,17 @@ task PanGeniePanelCreation {
             2> merge-haplotypes.log \
             1> prepare.id.split.mergehap.vcf
 
-        # additional normalization to address KAGE bug for unnormalized SNPs?
-        bcftools view prepare.id.split.mergehap.vcf | \
-            bcftools norm -f ~{reference_fasta} \
-                -Oz -o ~{output_prefix}.prepare.id.split.mergehap.vcf.gz
-        bcftools index -t ~{output_prefix}.prepare.id.split.mergehap.vcf.gz
+        # PanGenie script emits header with missing chr1, so we must bgzip and index
+        bcftools view prepare.id.split.mergehap.vcf \
+            -Oz -o prepare.id.split.mergehap.vcf.gz
+        bcftools index -t prepare.id.split.mergehap.vcf.gz
 
-        bcftools stats ~{output_prefix}.prepare.id.split.mergehap.vcf.gz > ~{output_prefix}.prepare.id.split.mergehap.stats.txt
+        # additional normalization to address KAGE bug for unnormalized SNPs?
+        bcftools norm prepare.id.split.mergehap.vcf.gz -f ~{reference_fasta} \
+            -Oz -o ~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz
+        bcftools index -t ~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz
+
+        bcftools stats ~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz > ~{output_prefix}.prepare.id.split.mergehap.norm.stats.txt
     }
 
     runtime {
@@ -128,8 +132,8 @@ task PanGeniePanelCreation {
         File monitoring_log = "monitoring.log"
         Array[File] logs = glob("*.log")
         File prepare_stats = "~{output_prefix}.prepare.stats.txt"
-        File panel_stats = "~{output_prefix}.prepare.id.split.mergehap.stats.txt"
-        File panel_vcf_gz = "~{output_prefix}.prepare.id.split.mergehap.vcf.gz"
-        File panel_vcf_gz_tbi = "~{output_prefix}.prepare.id.split.mergehap.vcf.gz.tbi"
+        File panel_stats = "~{output_prefix}.prepare.id.split.mergehap.norm.stats.txt"
+        File panel_vcf_gz = "~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz"
+        File panel_vcf_gz_tbi = "~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz.tbi"
     }
 }
