@@ -105,7 +105,7 @@ task PanGeniePanelCreation {
             2> merge-haplotypes.log \
             1> prepare.id.split.mergehap.vcf
 
-        # PanGenie script emits header with missing chr1, so we must bgzip and index
+        # PanGenie script emits header with missing contig lines, so we must bgzip and index
         bcftools view prepare.id.split.mergehap.vcf \
             -Oz -o prepare.id.split.mergehap.vcf.gz
         bcftools index -t prepare.id.split.mergehap.vcf.gz
