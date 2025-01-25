@@ -105,8 +105,9 @@ task PanGeniePanelCreation {
             2> merge-haplotypes.log \
             1> prepare.id.split.mergehap.vcf
 
+        # additional normalization to address KAGE bug for unnormalized SNPs?
         bcftools view prepare.id.split.mergehap.vcf | \
-            bcftools norm -f ~{reference_fasta} \       # addition to address KAGE bug for unnormalized SNPs?
+            bcftools norm -f ~{reference_fasta} \
                 -Oz -o ~{output_prefix}.prepare.id.split.mergehap.vcf.gz
         bcftools index -t ~{output_prefix}.prepare.id.split.mergehap.vcf.gz
 
