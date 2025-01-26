@@ -449,7 +449,10 @@ task CalculateMetrics {
         bcftools annotate --no-version -r ~{sep="," chromosomes} -a case.split.vcf.gz -m +CASE ~{truth_vcf_gz} -Oz -o panel.annot.vcf.gz
         bcftools index -t panel.annot.vcf.gz
 
-        conda install -y seaborn numpy=1.26.4
+        # TODO old conda install freezing upon solve, we'll mix conda and pip for now
+        # conda install -y seaborn numpy=1.26.4
+        conda install -y numpy=1.26.4
+        pip install seaborn==0.13.2
 
         python - --case_vcf_gz case.split.vcf.gz \
                  --truth_vcf_gz panel.annot.vcf.gz \
