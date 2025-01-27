@@ -30,3 +30,6 @@ workflows:
 - name: PhysicalPhasingTRGT
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasingTRGT.wdl
+- name: PhysicalPhasing_Subset
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasing_Subset.wdl
