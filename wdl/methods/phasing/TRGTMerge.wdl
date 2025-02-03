@@ -34,8 +34,8 @@ task TRGTMerge {
         set -euxo pipefail
         wget https://github.com/PacificBiosciences/trgt/releases/download/v1.5.0/trgt-v1.5.0-x86_64-unknown-linux-gnu.tar.gz
         tar -xvf trgt-v1.5.0-x86_64-unknown-linux-gnu.tar.gz
-
-        ./trgt-v1.5.0-x86_64-unknown-linux-gnu/trgt merge -o ~{prefix}.vcf.gz ~{vcfs}
+         # use sep to seperate vcfs array
+        ./trgt-v1.5.0-x86_64-unknown-linux-gnu/trgt merge -o ~{prefix}.vcf.gz ~{sep=" " vcfs}
         tabix -p vcf ~{prefix}.vcf.gz
     >>>
 
