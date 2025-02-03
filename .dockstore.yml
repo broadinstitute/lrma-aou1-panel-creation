@@ -33,3 +33,6 @@ workflows:
 - name: PhysicalPhasing_Subset
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasing_Subset.wdl
+- name: TRGTMerge
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/TRGTMerge.wdl
