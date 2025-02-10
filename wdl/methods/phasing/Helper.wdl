@@ -92,7 +92,7 @@ task HiPhase {
         boot_disk_gb:       100,
         preemptible_tries:  3,
         max_retries:        2,
-        docker:             "hangsuunc/hiphase:1.3.0"
+        docker:             "hangsuunc/hiphase:1.4.5"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
     runtime {
@@ -195,7 +195,7 @@ task HiphaseSVTrgt {
         boot_disk_gb:       100,
         preemptible_tries:  0,
         max_retries:        0,
-        docker:             "hangsuunc/hiphase:1.3.0"
+        docker:             "hangsuunc/hiphase:1.4.5"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
     runtime {

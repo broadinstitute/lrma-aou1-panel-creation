@@ -6,10 +6,8 @@ import "./Helper.wdl" as H
 workflow HierarchicalMergeVCFs {
 
     input {
-        Array[File] hiphased_snp_vcf
-        Array[File] hiphased_snp_vcf_tbi
-        Array[File] hiphased_sv_vcf
-        Array[File] hiphased_sv_vcf_tbi
+        Array[File] vcfs
+        Array[File] tbis
 
         String prefix
         String gcs_out_root_dir
@@ -19,28 +17,19 @@ workflow HierarchicalMergeVCFs {
     }
 
 
-    call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesShort { input:
-        vcf_input = hiphased_snp_vcf,
-        tbi_input = hiphased_snp_vcf_tbi,
-        pref = prefix + ".short",
-        threads_num = merge_num_threads,
-        batch_size = batchsize
-    }
 
     call H.MergePerChrVcfWithBcftools as MergeAcrossSamplesSV { input:
-        vcf_input = hiphased_sv_vcf,
-        tbi_input = hiphased_sv_vcf_tbi,
-        pref = prefix + ".SV",
+        vcf_input = vcfs,
+        tbi_input = tbis,
+        pref = prefix,
         threads_num = merge_num_threads,
         batch_size = batchsize
     }
 
     output {
-        File hiphase_short_vcf = MergeAcrossSamplesShort.merged_vcf
-        File hiphase_short_tbi = MergeAcrossSamplesShort.merged_tbi
-        File hiphase_sv_vcf = MergeAcrossSamplesSV.merged_vcf
-        File hiphase_sv_tbi = MergeAcrossSamplesSV.merged_tbi
-        
+        File merged_vcf = MergeAcrossSamplesSV.merged_vcf
+        File merged_tbi = MergeAcrossSamplesSV.merged_tbi
+     
     }
 }
 
