@@ -20,6 +20,7 @@ struct OverlapMetricsOutputs {
 workflow VcfdistAndOverlapMetricsEvaluation {
     input {
         Array[String] samples
+        Array[File] confident_regions_bed_files
         File truth_vcf
         File truth_vcf_idx
         File eval_vcf
@@ -37,12 +38,15 @@ workflow VcfdistAndOverlapMetricsEvaluation {
         String overlap_metrics_docker
     }
 
-    scatter (sample in samples) {
+    scatter (i in range(length(samples))) {
+        String sample = samples[i]
+
         call SubsetSampleFromVcf as SubsetSampleFromVcfEval { input:
             vcf = eval_vcf,
             vcf_idx = eval_vcf_idx,
             sample = sample,
             region = region,
+            bed_file = confident_regions_bed_files[i],
             reference_fasta_fai = reference_fasta_fai
         }
 
@@ -51,6 +55,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
             vcf_idx = truth_vcf_idx,
             sample = sample,
             region = region,
+            bed_file = confident_regions_bed_files[i],
             reference_fasta_fai = reference_fasta_fai
         }
 
@@ -90,6 +95,7 @@ task SubsetSampleFromVcf {
         File vcf_idx
         String sample
         String region
+        File? bed_file
         File reference_fasta_fai
     }
 
@@ -98,9 +104,11 @@ task SubsetSampleFromVcf {
     command <<<
         set -euxo pipefail
 
+        # must use -T bed_file to intersect with -r region properly
         bcftools view ~{vcf} \
             -s ~{sample} \
             -r ~{region} \
+            ~{"-T " + bed_file} \
             -Oz -o ~{sample}.subset.g.vcf.gz
         bcftools reheader ~{sample}.subset.g.vcf.gz \
             --fai ~{reference_fasta_fai} \

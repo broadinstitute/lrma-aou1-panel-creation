@@ -83,6 +83,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
 
         # inputs for VcfdistAndOverlapMetricsEvaluation
         Array[String] vcfdist_samples
+        Array[File] confident_regions_bed_files
         File vcfdist_truth_vcf
         File vcfdist_truth_vcf_idx
         String evaluation_chromosomes_regions_arg
@@ -128,6 +129,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         # evaluate HiPhase short
         call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
             samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
             truth_vcf = vcfdist_truth_vcf,
             truth_vcf_idx = vcfdist_truth_vcf_idx,
             eval_vcf = select_first([hiphase_short_vcf_gz]),
@@ -148,6 +150,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
     # evaluate HiPhase SV
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseSV { input:
         samples = vcfdist_samples,
+        confident_regions_bed_files = confident_regions_bed_files,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = hiphase_sv_vcf_gz,
@@ -165,6 +168,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
     # evaluate filtered short + SV
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFiltered { input:
         samples = vcfdist_samples,
+        confident_regions_bed_files = confident_regions_bed_files,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = ConcatVcfsFilterAndConcatVcfs.vcf_gz,
@@ -182,6 +186,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
     # evaluate before Shapeit4 collisionless short + SV
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateBeforeShapeit4FixVariantCollisions { input:
         samples = vcfdist_samples,
+        confident_regions_bed_files = confident_regions_bed_files,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = ConcatVcfsBeforeShapeit4FixVariantCollisions.vcf_gz,
@@ -199,6 +204,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
     # evaluate Shapeit4 short + SV
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
         samples = vcfdist_samples,
+        confident_regions_bed_files = confident_regions_bed_files,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = ConcatVcfsShapeit4.vcf_gz,
@@ -216,6 +222,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
     # evaluate collisionless short + SV
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFixVariantCollisions { input:
         samples = vcfdist_samples,
+        confident_regions_bed_files = confident_regions_bed_files,
         truth_vcf = vcfdist_truth_vcf,
         truth_vcf_idx = vcfdist_truth_vcf_idx,
         eval_vcf = ConcatVcfsFixVariantCollisions.vcf_gz,
@@ -288,6 +295,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         # evaluate panel short + SV
         call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
             samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
             truth_vcf = vcfdist_truth_vcf,
             truth_vcf_idx = vcfdist_truth_vcf_idx,
             eval_vcf = ConcatVcfsPanGeniePanelCreation.vcf_gz,
@@ -305,6 +313,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         # evaluate GLIMPSE
         call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotyping { input:
             samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
             truth_vcf = vcfdist_truth_vcf,
             truth_vcf_idx = vcfdist_truth_vcf_idx,
             eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf_gz,
@@ -322,6 +331,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         # evaluate collisionless GLIMPSE
         call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotypingFixVariantCollisions { input:
             samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
             truth_vcf = vcfdist_truth_vcf,
             truth_vcf_idx = vcfdist_truth_vcf_idx,
             eval_vcf = GenotypingFixVariantCollisions.collisionless_bcf,
@@ -350,6 +360,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             # evaluate PanGenie
             call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanGenie { input:
                 samples = vcfdist_samples,
+                confident_regions_bed_files = confident_regions_bed_files,
                 truth_vcf = vcfdist_truth_vcf,
                 truth_vcf_idx = vcfdist_truth_vcf_idx,
                 eval_vcf = PanGenieMergeAcrossSamples.merged_vcf_gz,
