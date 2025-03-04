@@ -6,8 +6,8 @@ import "./Helper.wdl" as H
 workflow PhysicalAndStatisticalPhasing {
 
     input {
-        File all_chr_bam
-        File all_chr_bai
+        File bam
+        File bai
         File reference_fasta
         File reference_fasta_fai
         File snp_vcf
@@ -33,12 +33,12 @@ workflow PhysicalAndStatisticalPhasing {
 
 
     call H.HiPhase { input:
-        bam = all_chr_bam,
-        bai = all_chr_bai,
+        bam = bam,
+        bai = bai,
         unphased_snp_vcf = snp_vcf,
         unphased_snp_tbi = snp_vcf_tbi,
         unphased_sv_vcf = UnphaseSVGenotypes.unphased_vcf,
-        unphased_sv_tbi = UnphaseSVGenotypes.unphased_tbi,
+        unphased_sv_tbi = UnphaseSVGenotypes.unphased_vcf_tbi,
         ref_fasta = reference_fasta,
         ref_fasta_fai = reference_fasta_fai,
         samplename = sample_id,
