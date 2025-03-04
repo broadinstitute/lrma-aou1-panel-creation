@@ -10,8 +10,10 @@ workflow PhysicalAndStatisticalPhasing {
         File all_chr_bai
         File reference_fasta
         File reference_fasta_fai
-        File unphased_snp_vcf
+        File snp_vcf
+        File snp_vcf_tbi
         File sv_vcf
+        File sv_vcf_tbi
         String prefix
         Int hiphase_memory
         String hiphase_extra_args
@@ -34,8 +36,10 @@ workflow PhysicalAndStatisticalPhasing {
     call H.HiPhase { input:
         bam = all_chr_bam,
         bai = all_chr_bai,
-        unphased_snp_vcf = unphased_snp_vcf,
+        unphased_snp_vcf = snp_vcf,
+        unphased_snp_tbi = snp_vcf_tbi,
         unphased_sv_vcf = UnphaseSVGenotypes.unphased_vcf,
+        unphased_sv_tbi = UnphaseSVGenotypes.unphased_tbi,
         ref_fasta = reference_fasta,
         ref_fasta_fai = reference_fasta_fai,
         samplename = sample_id,
