@@ -14,7 +14,6 @@ workflow PhysicalAndStatisticalPhasing {
         File snp_vcf_tbi
         File sv_vcf
         File sv_vcf_tbi
-        String prefix
         Int hiphase_memory
         String hiphase_extra_args
         String sample_id
@@ -29,7 +28,7 @@ workflow PhysicalAndStatisticalPhasing {
     call UnphaseGenotypes as UnphaseSVGenotypes { input:
         vcf = ConvertLowerCase.subset_vcf,
         vcf_tbi = ConvertLowerCase.subset_tbi,
-        prefix = prefix + ".unphased"
+        prefix = sample_id + ".unphased"
     }
 
 
