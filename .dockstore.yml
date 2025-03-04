@@ -3,24 +3,18 @@ workflows:
 - name: HierarchicallyMergeVcfs
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/HierarchicallyMergeVcfs.wdl
-- name: PhysicalAndStatisticalPhasing
+- name: PhysicalPhasing
   subclass: wdl
-  primaryDescriptorPath: /wdl/methods/phasing/PhysicalAndStatisticalPhasing.wdl
+  primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasing.wdl
+- name: ChromosomePhasedPanelCreationFromHiPhase
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/ChromosomePhasedPanelCreationFromHiPhase.wdl
 - name: FixVariantCollisions
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/FixVariantCollisions.wdl
 - name: KAGEPanelWithPreprocessing
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/KAGEPanelWithPreprocessing.wdl
-- name: KAGEPlusGLIMPSECase
-  subclass: wdl
-  primaryDescriptorPath: /wdl/methods/kage/KAGEPlusGLIMPSECase.wdl
-- name: KAGEPlusGLIMPSEBatchedCase
-  subclass: wdl
-  primaryDescriptorPath: /wdl/methods/kage/KAGEPlusGLIMPSEBatchedCase.wdl
-- name: KAGEPlusGLIMPSEBatchedCasePerChromosome
-  subclass: wdl
-  primaryDescriptorPath: /wdl/methods/kage/KAGEPlusGLIMPSEBatchedCasePerChromosome.wdl
 - name: KAGECasePerChromosome
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/KAGECasePerChromosome.wdl
@@ -36,21 +30,9 @@ workflows:
 - name: VcfdistAndOverlapMetricsEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/VcfdistAndOverlapMetricsEvaluation.wdl
-- name: PhasedPanelEvaluation
-  subclass: wdl
-  primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluation.wdl
-- name: PhasedPanelEvaluationFromHiPhase
-  subclass: wdl
-  primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluationFromHiPhase.wdl
-- name: ChromosomePhasedPanelCreationFromHiPhase
-  subclass: wdl
-  primaryDescriptorPath: /wdl/evaluation/phased-panel/ChromosomePhasedPanelCreationFromHiPhase.wdl
 - name: ConcatAndEvaluate
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/ConcatAndEvaluate.wdl
-- name: InputPhasedPanelEvaluation
-  subclass: wdl
-  primaryDescriptorPath: /wdl/evaluation/phased-panel/InputPhasedPanelEvaluation.wdl
 - name: LeaveOutEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/kage/LeaveOutEvaluation.wdl

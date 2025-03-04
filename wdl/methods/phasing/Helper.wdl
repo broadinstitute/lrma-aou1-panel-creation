@@ -44,7 +44,7 @@ task HiPhase {
     }
 
     # Int bam_sz = ceil(size(bam, "GB"))
-	Int disk_size = 30 # if bam_sz > 200 then 2*bam_sz else bam_sz + 200
+	Int disk_size = 100 # if bam_sz > 200 then 2*bam_sz else bam_sz + 200
     Int thread_num = memory/2
 
     command <<<
@@ -90,9 +90,9 @@ task HiPhase {
         mem_gb:             memory,
         disk_gb:            disk_size,
         boot_disk_gb:       100,
-        preemptible_tries:  1,
-        max_retries:        0,
-        docker:             "hangsuunc/hiphase:1.3.0"
+        preemptible_tries:  3,
+        max_retries:        2,
+        docker:             "hangsuunc/hiphase:1.4.5"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
     runtime {
@@ -283,23 +283,20 @@ task InferSampleName {
 task SplitVCFbySample {
     input{       
         File joint_vcf
-        String region
+        File joint_vcf_tbi
         String samplename
     }
     
     command <<<
         set -x pipefail
 
-        bcftools index ~{joint_vcf}
-
-        bcftools view -s ~{samplename} ~{joint_vcf} -r ~{region} -o ~{samplename}.subset.g.vcf.gz
-
-        tabix -p vcf ~{samplename}.subset.g.vcf.gz
-
+        bcftools view -s ~{samplename} ~{joint_vcf} -Oz -o ~{samplename}.subset.g.vcf.gz
+        bcftools index -t ~{samplename}.subset.g.vcf.gz
+        
     >>>
     
     output {
-		File single_sample_vcf = "~{samplename}.subset.g.vcf.gz"
+        File single_sample_vcf = "~{samplename}.subset.g.vcf.gz"
         File single_sample_vcf_tbi = "~{samplename}.subset.g.vcf.gz.tbi"
     }
 
@@ -308,67 +305,12 @@ task SplitVCFbySample {
 
     runtime {
         cpu: 1
-        memory: "64 GiB"
+        memory: "4 GiB"
         disks: "local-disk " + disk_size + " SSD" #"local-disk 100 HDD"
         bootDiskSizeGb: 10
         preemptible: 0
         maxRetries: 1
         docker: "us.gcr.io/broad-dsp-lrma/lr-basic:0.1.1"
-    }
-}
-
-task MergePerChrVcfWithBcftools {
-    parameter_meta {
-        vcf_input: {localization_optional: true}
-        tbi_input: {localization_optional: true}
-    }
-    input{
-        Array[File] vcf_input
-        Array[File] tbi_input
-        String pref
-        Int threads_num
-    }
-
-    command <<<
-        set -eux
-
-        # we do single-sample phased VCFs localization ourselves
-        mkdir -p ssp_vcfs
-        time \
-        gcloud storage cp ~{sep=" " vcf_input} /cromwell_root/ssp_vcfs/
-
-        time \
-        gcloud storage cp ~{sep=" " tbi_input} /cromwell_root/ssp_vcfs/
-
-        # then merge, and safely assume all ssp-VCFs are sorted in the same order, on one chr
-        cd ssp_vcfs
-        ls *.vcf.gz > my_vcfs.txt
-
-        bcftools merge \
-            --threads ~{threads_num} \
-            --merge none \
-            -l my_vcfs.txt \
-            -O z \
-            -o ~{pref}.AllSamples.vcf.gz
-
-        tabix -@ ~{threads_num} -p vcf ~{pref}.AllSamples.vcf.gz
-
-        # move result files to the correct location for cromwell to de-localize
-        mv ~{pref}.AllSamples.vcf.gz ~{pref}.AllSamples.vcf.gz.tbi /cromwell_root/
-    >>>
-
-    output{
-        File merged_vcf = "~{pref}.AllSamples.vcf.gz"
-        File merged_tbi = "~{pref}.AllSamples.vcf.gz.tbi"
-    }
-
-    runtime {
-        cpu: 16
-        memory: "32 GiB"
-        disks: "local-disk 375 SSD"
-        preemptible: 1
-        maxRetries: 0
-        docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
     }
 }
 
