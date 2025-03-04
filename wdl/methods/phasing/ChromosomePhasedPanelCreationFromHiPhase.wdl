@@ -1,8 +1,7 @@
 version 1.0
 
-import "../../methods/phasing/PhysicalAndStatisticalPhasing.wdl"
-import "../../methods/pangenie/PanGeniePanelCreation.wdl"
-import "../../methods/phasing/Helper.wdl"
+import "../pangenie/PanGeniePanelCreation.wdl"
+import "Helper.wdl"
 
 workflow PhasedPanelEvaluation {    # TODO change name later, easier to share configs for now
 
@@ -15,7 +14,6 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         String output_prefix
         File? monitoring_script
 
-        # inputs for PhysicalAndStatisticalPhasing
         File hiphase_short_vcf_gz
         File hiphase_short_vcf_gz_tbi
         File hiphase_sv_vcf_gz
