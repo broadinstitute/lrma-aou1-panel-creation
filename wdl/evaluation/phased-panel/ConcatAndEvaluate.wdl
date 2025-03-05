@@ -1,7 +1,7 @@
 version 1.0
 
 import "./VcfdistAndOverlapMetricsEvaluation.wdl"
-import "./ChromosomePhasedPanelCreationFromHiPhase.wdl"
+import "../../methods/phasing/ChromosomePhasedPanelCreationFromHiPhase.wdl"
 import "../kage/LeaveOutEvaluation.wdl"
 
 struct RuntimeAttr {
