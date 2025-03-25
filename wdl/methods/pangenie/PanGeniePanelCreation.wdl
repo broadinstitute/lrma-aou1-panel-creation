@@ -41,7 +41,8 @@ workflow PanGeniePanelCreation {
     output {
         File panel_vcf_gz = PanGeniePanelCreation.panel_vcf_gz
         File panel_vcf_gz_tbi = PanGeniePanelCreation.panel_vcf_gz_tbi
-        File panel_id_split_vcf = PanGeniePanelCreation.panel_id_split_vcf
+        File panel_id_split_vcf_gz = PanGeniePanelCreation.panel_id_split_vcf_gz
+        File panel_id_split_vcf_gz_tbi = PanGeniePanelCreation.panel_id_split_vcf_gz_tbi
     }
 }
 
@@ -117,6 +118,9 @@ task PanGeniePanelCreation {
         bcftools index -t ~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz
 
         bcftools stats ~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz > ~{output_prefix}.prepare.id.split.mergehap.norm.stats.txt
+
+        bcftools view prepare.id.split.vcf -Oz -o ~{output_prefix}.prepare.id.split.vcf.gz
+        bcftools index -t ~{output_prefix}.prepare.id.split.vcf.gz
     }
 
     runtime {
@@ -136,6 +140,7 @@ task PanGeniePanelCreation {
         File panel_stats = "~{output_prefix}.prepare.id.split.mergehap.norm.stats.txt"
         File panel_vcf_gz = "~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz"
         File panel_vcf_gz_tbi = "~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz.tbi"
-        File panel_id_split_vcf = "~{output_prefix}.prepare.id.split.vcf"
+        File panel_id_split_vcf_gz = "~{output_prefix}.prepare.id.split.vcf.gz"
+        File panel_id_split_vcf_gz_tbi = "~{output_prefix}.prepare.id.split.vcf.gz.tbi"
     }
 }
