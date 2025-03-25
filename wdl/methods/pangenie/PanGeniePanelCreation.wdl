@@ -41,6 +41,7 @@ workflow PanGeniePanelCreation {
     output {
         File panel_vcf_gz = PanGeniePanelCreation.panel_vcf_gz
         File panel_vcf_gz_tbi = PanGeniePanelCreation.panel_vcf_gz_tbi
+        File panel_id_split_vcf = PanGeniePanelCreation.panel_id_split_vcf
     }
 }
 
