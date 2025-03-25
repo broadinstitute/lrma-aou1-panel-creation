@@ -135,5 +135,6 @@ task PanGeniePanelCreation {
         File panel_stats = "~{output_prefix}.prepare.id.split.mergehap.norm.stats.txt"
         File panel_vcf_gz = "~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz"
         File panel_vcf_gz_tbi = "~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz.tbi"
+        File panel_id_split_vcf = "~{output_prefix}.prepare.id.split.vcf"
     }
 }
