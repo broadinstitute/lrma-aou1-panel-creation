@@ -121,7 +121,7 @@ task PanGeniePanelCreation {
 
 #        bcftools stats ~{output_prefix}.prepare.id.split.mergehap.norm.vcf.gz > ~{output_prefix}.prepare.id.split.mergehap.norm.stats.txt
 
-        bcftools view prepare.id.split.vcf -Oz -o ~{output_prefix}.prepare.id.split.vcf.gz
+        bcftools sort prepare.id.split.vcf -Oz -o ~{output_prefix}.prepare.id.split.vcf.gz
         bcftools index -t ~{output_prefix}.prepare.id.split.vcf.gz
     }
 
