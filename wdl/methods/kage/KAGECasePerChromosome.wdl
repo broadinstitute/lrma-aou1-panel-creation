@@ -27,8 +27,8 @@ workflow KAGECasePerChromosome {
         Array[File] panel_multi_split_vcf_gz_tbi
 
         Float average_coverage
-        String output_prefix
 
+        String samtools_docker
         String kage_docker
         File? monitoring_script
 
@@ -40,6 +40,7 @@ workflow KAGECasePerChromosome {
         # TODO we require the alignments to subset by chromosome; change to start from raw reads
         input:
             input_cram = input_cram,
+            docker = samtools_docker,
             monitoring_script = monitoring_script
     }
 
@@ -78,6 +79,7 @@ workflow KAGECasePerChromosome {
     }
 
     output {
+        File cram_idx = IndexCaseReads.cram_idx
         Array[File] chromosome_kmer_counts = KAGECountKmers.kmer_counts
         Array[File] chromosome_kage_vcf_gzs = KAGEGenotype.kage_vcf_gz
         Array[File] chromosome_kage_vcf_gz_tbis = KAGEGenotype.kage_vcf_gz_tbi

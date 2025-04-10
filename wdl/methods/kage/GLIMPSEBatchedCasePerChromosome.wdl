@@ -62,18 +62,19 @@ workflow GLIMPSEBatchedCasePerChromosome {
             Array[String] chromosome_kage_vcf_gzs = transpose(read_tsv(CreateBatches.chromosome_vcf_gz_batch_files[b]))[j]
             Array[String] chromosome_kage_vcf_gz_tbis = transpose(read_tsv(CreateBatches.chromosome_vcf_gz_tbi_batch_files[b]))[j]
 
-            call Ivcfmerge as KAGEMergeAcrossSamples { input:
+            call Ivcfmerge as ChromosomeKAGEMergeAcrossSamples { input:
                 vcf_gzs = chromosome_kage_vcf_gzs,
                 vcf_gz_tbis = chromosome_kage_vcf_gz_tbis,
                 sample_names = read_lines(CreateBatches.sample_name_batch_files[b]),
                 output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".kage",
+                docker = kage_docker,
                 monitoring_script = monitoring_script
             }
 
             call GLIMPSECaseChromosome as GLIMPSEBatchedCaseChromosome {
                 input:
-                    kage_vcf_gz = KAGEMergeAcrossSamples.merged_vcf_gz,
-                    kage_vcf_gz_tbi = KAGEMergeAcrossSamples.merged_vcf_gz_tbi,
+                    kage_vcf_gz = ChromosomeKAGEMergeAcrossSamples.merged_vcf_gz,
+                    kage_vcf_gz_tbi = ChromosomeKAGEMergeAcrossSamples.merged_vcf_gz_tbi,
                     panel_split_vcf_gz = panel_split_vcf_gz[j],
                     panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi[j],
                     reference_fasta_fai = reference_fasta_fai,
@@ -89,9 +90,10 @@ workflow GLIMPSEBatchedCasePerChromosome {
 
         call ConcatVcfs as KAGEConcatVcfs {
             input:
-                vcf_gzs = KAGEMergeAcrossSamples.merged_vcf_gz,
-                vcf_gz_tbis = KAGEMergeAcrossSamples.merged_vcf_gz_tbi,
+                vcf_gzs = ChromosomeKAGEMergeAcrossSamples.merged_vcf_gz,
+                vcf_gz_tbis = ChromosomeKAGEMergeAcrossSamples.merged_vcf_gz_tbi,
                 output_prefix = output_prefix + ".batch-" + b + ".kage",
+                docker = kage_docker,
                 monitoring_script = monitoring_script
         }
 
@@ -105,7 +107,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
                 runtime_attributes = glimpse_case_runtime_attributes
         }
 
-        call FixVariantCollisions as GenotypingFixVariantCollisions { input:
+        call FixVariantCollisions as GLIMPSEFixVariantCollisions { input:
             vcf_gz = GLIMPSEBatchedCase.glimpse_vcf_gz,
             vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi,
             fix_variant_collisions_java = fix_variant_collisions_java,
@@ -117,11 +119,30 @@ workflow GLIMPSEBatchedCasePerChromosome {
         }
     }
 
-    call Ivcfmerge as GenotypingMergeAcrossSamples { input:
-        vcf_gzs = GenotypingFixVariantCollisions.collisionless_vcf_gz,
-        vcf_gz_tbis = GenotypingFixVariantCollisions.collisionless_vcf_gz_tbi,
+    call Ivcfmerge as KAGEMergeAcrossSamples { input:
+        vcf_gzs = KAGEConcatVcfs.vcf_gz,
+        vcf_gz_tbis = KAGEConcatVcfs.vcf_gz_tbi,
+        sample_names = sample_names,
+        output_prefix = output_prefix + ".kage",
+        docker = kage_docker,
+        monitoring_script = monitoring_script
+    }
+
+    call Ivcfmerge as GLIMPSEMergeAcrossSamples { input:
+        vcf_gzs = GLIMPSEBatchedCase.glimpse_vcf_gz,
+        vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi,
+        sample_names = sample_names,
+        output_prefix = output_prefix + ".kage.glimpse",
+        docker = kage_docker,
+        monitoring_script = monitoring_script
+    }
+
+    call Ivcfmerge as PhasedCollisionlessMergeAcrossSamples { input:
+        vcf_gzs = GLIMPSEFixVariantCollisions.collisionless_vcf_gz,
+        vcf_gz_tbis = GLIMPSEFixVariantCollisions.collisionless_vcf_gz_tbi,
         sample_names = sample_names,
         output_prefix = output_prefix + ".kage.glimpse.collisionless",
+        docker = kage_docker,
         monitoring_script = monitoring_script
     }
 
@@ -132,8 +153,15 @@ workflow GLIMPSEBatchedCasePerChromosome {
         Array[File] batch_glimpse_unphased_vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi
         Array[File] batch_glimpse_vcf_gzs = GLIMPSEBatchedCase.glimpse_vcf_gz
         Array[File] batch_glimpse_vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi
-        Array[File] batch_phased_collisionless_vcf_gzs = GenotypingFixVariantCollisions.collisionless_vcf_gz
-        Array[File] batch_phased_collisionless_vcf_gz_tbis = GenotypingFixVariantCollisions.collisionless_vcf_gz_tbi
+        Array[File] batch_phased_collisionless_vcf_gzs = GLIMPSEFixVariantCollisions.collisionless_vcf_gz
+        Array[File] batch_phased_collisionless_vcf_gz_tbis = GLIMPSEFixVariantCollisions.collisionless_vcf_gz_tbi
+
+        File kage_vcf_gz = KAGEMergeAcrossSamples.merged_vcf_gz
+        File kage_vcf_gz_tbi = KAGEMergeAcrossSamples.merged_vcf_gz_tbi
+        File glimpse_vcf_gz = GLIMPSEMergeAcrossSamples.merged_vcf_gz
+        File glimpse_vcf_gz_tbi = GLIMPSEMergeAcrossSamples.merged_vcf_gz_tbi
+        File phased_collisionless_vcf_gz = PhasedCollisionlessMergeAcrossSamples.merged_vcf_gz
+        File phased_collisionless_vcf_gz_tbi = PhasedCollisionlessMergeAcrossSamples.merged_vcf_gz_tbi
     }
 }
 
