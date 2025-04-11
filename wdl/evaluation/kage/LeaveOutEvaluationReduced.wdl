@@ -441,7 +441,7 @@ task ReducePanelVCF {
             grep -v SVLEN | \
             shuf | \
             head -n ~{num_short_variants_to_retain} | \
-            sort -k1h -k2h | \
+            sort -k1V -k2h | \
             bgzip -c > ~{output_prefix}.retained.short.tsv.gz
         tabix -s1 -b2 -e2 ~{output_prefix}.retained.short.tsv.gz
 
@@ -451,7 +451,7 @@ task ReducePanelVCF {
         tabix -s1 -b2 -e2 ~{output_prefix}.retained.sv.tsv.gz
 
         cat <(bgzip -cd ~{output_prefix}.retained.short.tsv.gz) <(bgzip -cd ~{output_prefix}.retained.sv.tsv.gz) | \
-            sort -k1h -k2h | \
+            sort -k1V -k2h | \
             bgzip -c > ~{output_prefix}.retained.tsv.gz
         tabix -s1 -b2 -e2 ~{output_prefix}.retained.tsv.gz
 
@@ -473,12 +473,12 @@ task ReducePanelVCF {
 
     output {
         File monitoring_log = "monitoring.log"
-        File retained_short_tsv_gz = "~{output_prefix}.retained.short.vcf.gz"
-        File retained_short_tsv_gz_tbi = "~{output_prefix}.retained.short.vcf.gz.tbi"
-        File retained_sv_tsv_gz = "~{output_prefix}.retained.sv.vcf.gz"
-        File retained_sv_tsv_gz_tbi = "~{output_prefix}.retained.sv.vcf.gz.tbi"
-        File retained_tsv_gz = "~{output_prefix}.retained.vcf.gz"
-        File retained_tsv_gz_tbi = "~{output_prefix}.retained.vcf.gz.tbi"
+        File retained_short_tsv_gz = "~{output_prefix}.retained.short.tsv.gz"
+        File retained_short_tsv_gz_tbi = "~{output_prefix}.retained.short.tsv.gz.tbi"
+        File retained_sv_tsv_gz = "~{output_prefix}.retained.sv.tsv.gz"
+        File retained_sv_tsv_gz_tbi = "~{output_prefix}.retained.sv.tsv.gz.tbi"
+        File retained_tsv_gz = "~{output_prefix}.retained.tsv.gz"
+        File retained_tsv_gz_tbi = "~{output_prefix}.retained.tsv.gz.tbi"
         File reduced_vcf_gz = "~{output_prefix}.reduced.vcf.gz"
         File reduced_vcf_gz_tbi = "~{output_prefix}.reduced.vcf.gz.tbi"
     }

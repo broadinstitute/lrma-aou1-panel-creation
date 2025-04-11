@@ -244,7 +244,8 @@ task KAGEGenotype {
             ~{true='-I true' false='-I false' ignore_helper_model} \
             ~{kage_genotype_extra_args} \
             -o ~{output_prefix}.kage.bi.vcf
-        bcftools view ~{output_prefix}.kage.bi.vcf --write-index -Ob -o ~{output_prefix}.kage.bi.bcf
+        bcftools view ~{output_prefix}.kage.bi.vcf -Ob -o ~{output_prefix}.kage.bi.bcf
+        bcftools index ~{output_prefix}.kage.bi.bcf
 
         # we need to add split multiallelics to biallelic-only KAGE BCF
         # create single-sample header from LOO panel w/ split multiallelics
@@ -255,7 +256,8 @@ task KAGEGenotype {
         bcftools view --no-version -H -G ~{panel_multi_split_vcf_gz} | \
             sed 's/$/\tGT:GL\t.\/.:nan,nan,nan/g' > ~{output_prefix}.multi.split.GT.txt
         # create single-sample BCF w/ split multiallelics
-        bcftools view <(cat ~{output_prefix}.multi.split.header.txt ~{output_prefix}.multi.split.GT.txt) --write-index -Ob -o ~{output_prefix}.multi.split.bcf
+        bcftools view <(cat ~{output_prefix}.multi.split.header.txt ~{output_prefix}.multi.split.GT.txt) -Ob -o ~{output_prefix}.multi.split.bcf
+        bcftools index ~{output_prefix}.multi.split.bcf
 
         bcftools concat --no-version -a ~{output_prefix}.kage.bi.bcf ~{output_prefix}.multi.split.bcf -Oz -o ~{output_prefix}.kage.vcf.gz
         bcftools index -t ~{output_prefix}.kage.vcf.gz
