@@ -324,7 +324,8 @@ task GLIMPSECaseChromosome {
 
         bcftools view --no-version -r ~{chromosome} ~{kage_vcf_gz} | \
             sed -e 's/nan/-1000000.0/g' | sed -e 's/-inf/-1000000.0/g' | sed -e 's/inf/-1000000.0/g' | \
-            bcftools view --write-index -Ob -o ~{output_prefix}.kage.nonan.~{chromosome}.bcf
+            bcftools view -Ob -o ~{output_prefix}.kage.nonan.~{chromosome}.bcf
+        bcftools index ~{output_prefix}.kage.nonan.~{chromosome}.bcf
 
         # TODO update to GLIMPSE2; first figure out why it complains about AC/AN and GT being inconsistent?
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_phase_static
