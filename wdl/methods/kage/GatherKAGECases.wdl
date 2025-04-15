@@ -13,9 +13,9 @@ struct RuntimeAttributes {
 
 workflow GatherKAGECases {
     input {
-        Array[Array[String]] sample_by_chromosome_kage_vcf_gzs
-        Array[Array[String]] sample_by_chromosome_kage_vcf_gzs_kage_vcf_gz_tbis
-        Array[String] sample_names
+        File sample_by_chromosome_kage_vcf_gzs_tsv
+        File sample_by_chromosome_kage_vcf_gz_tbis_tsv
+        File sample_names_file
 
         # per chromosome
         Array[String]+ chromosomes
@@ -26,6 +26,10 @@ workflow GatherKAGECases {
         String kage_docker
         File? monitoring_script
     }
+
+    Array[Array[String]] sample_by_chromosome_kage_vcf_gzs = read_tsv(sample_by_chromosome_kage_vcf_gzs_tsv)
+    Array[Array[String]] sample_by_chromosome_kage_vcf_gzs_kage_vcf_gz_tbis = read_tsv(sample_by_chromosome_kage_vcf_gz_tbis_tsv)
+    Array[String] sample_names = read_lines(sample_names_file)
 
     call CreateBatches {
         input:
