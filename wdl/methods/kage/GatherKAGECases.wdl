@@ -179,7 +179,7 @@ task ConcatVcfs {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes runtime_attributes = {}
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
     Int disk_size_gb = 3 * ceil(size(vcf_gzs, "GB"))
