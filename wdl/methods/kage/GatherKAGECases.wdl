@@ -25,9 +25,6 @@ workflow GatherKAGECases {
 
         String kage_docker
         File? monitoring_script
-
-        RuntimeAttributes glimpse_case_chromosome_runtime_attributes = {}
-        RuntimeAttributes glimpse_case_runtime_attributes = {}
     }
 
     call CreateBatches {
