@@ -18,6 +18,9 @@ workflows:
 - name: KAGECasePerChromosome
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/KAGECasePerChromosome.wdl
+- name: GatherKAGECases
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/kage/GatherKAGECases.wdl
 - name: GLIMPSEBatchedCasePerChromosome
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/GLIMPSEBatchedCasePerChromosome.wdl
