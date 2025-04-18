@@ -137,8 +137,6 @@ workflow LeaveOutEvaluation {
         String leave_out_sample_name = leave_out_sample_names[j]
         File leave_out_cram = leave_out_crams[leave_out_sample_name]
 
-        # TODO if !do_genotype_SVs, add missing GTs for SVs for GLIMPSE input
-        
         call KAGECasePerChromosome.KAGECasePerChromosome as KAGECasePerChromosome {
             input:
                 input_cram = leave_out_cram,
@@ -159,11 +157,30 @@ workflow LeaveOutEvaluation {
                 kage_genotype_runtime_attributes = kage_genotype_runtime_attributes,
         }
 
+        if (!do_genotype_SVs) {
+            scatter (c in range(length(KAGECasePerChromosome.chromosome_kage_vcf_gzs))) {
+                call CensorGenotypes {
+                    input:
+                        input_vcf_gz = KAGECasePerChromosome.chromosome_kage_vcf_gzs[c],
+                        input_vcf_gz_tbi = KAGECasePerChromosome.chromosome_kage_vcf_gz_tbis[c],
+                        output_prefix = leave_out_sample_name,
+                        retained_sv_tsv_gz = select_first([ReducePanelVCF.retained_sv_tsv_gz]),
+                        retained_sv_tsv_gz_tbi = select_first([ReducePanelVCF.retained_sv_tsv_gz_tbi]),
+                        num_short_variants_to_genotype = num_short_variants_to_genotype,
+                        docker = samtools_docker,
+                        monitoring_script = monitoring_script
+                }
+            }
+        }
+
+        File sample_by_chromosome_kage_vcf_gzs_tsv = write_tsv([select_first([CensorGenotypes.censored_vcf_gz, KAGECasePerChromosome.chromosome_kage_vcf_gzs])])
+        File sample_by_chromosome_kage_vcf_gz_tbis_tsv = write_tsv([select_first([CensorGenotypes.censored_vcf_gz_tbi, KAGECasePerChromosome.chromosome_kage_vcf_gz_tbis])])
+
         # run single sample through batched workflow
         call GLIMPSEBatchedCasePerChromosome.GLIMPSEBatchedCasePerChromosome as GLIMPSEBatchedCasePerChromosome {
             input:
-                sample_by_chromosome_kage_vcf_gzs_tsv = write_tsv([KAGECasePerChromosome.chromosome_kage_vcf_gzs]),
-                sample_by_chromosome_kage_vcf_gz_tbis_tsv = write_tsv([KAGECasePerChromosome.chromosome_kage_vcf_gz_tbis]),
+                sample_by_chromosome_kage_vcf_gzs_tsv = sample_by_chromosome_kage_vcf_gzs_tsv,
+                sample_by_chromosome_kage_vcf_gz_tbis_tsv = sample_by_chromosome_kage_vcf_gz_tbis_tsv,
                 sample_names_file = write_lines([leave_out_sample_name]),
                 reference_fasta = case_reference_fasta,
                 reference_fasta_fai = case_reference_fasta_fai,
@@ -437,16 +454,18 @@ task ReducePanelVCF {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools query -f'%CHROM\t%POS\t%REF,%ALT\n' ~{input_vcf_gz} | \
+        bcftools view ~{input_vcf_gz} | \
             grep -v SVLEN | \
+            bcftools query -f'%CHROM\t%POS\t%REF,%ALT\n' | \
             shuf | \
             head -n ~{num_short_variants_to_retain} | \
             sort -k1V -k2h | \
             bgzip -c > ~{output_prefix}.retained.short.tsv.gz
         tabix -s1 -b2 -e2 ~{output_prefix}.retained.short.tsv.gz
 
-        bcftools query -f'%CHROM\t%POS\t%REF,%ALT\n' ~{input_vcf_gz} | \
-            grep SVLEN | \
+        bcftools view ~{input_vcf_gz} | \
+            grep -E 'SVLEN|#' | \
+            bcftools query -f'%CHROM\t%POS\t%REF,%ALT\n' | \
             bgzip -c > ~{output_prefix}.retained.sv.tsv.gz
         tabix -s1 -b2 -e2 ~{output_prefix}.retained.sv.tsv.gz
 
@@ -550,6 +569,58 @@ task CreateLeaveOneOutPanelVCF {
         File leave_out_panel_bi_vcf_gz_tbi = "~{output_prefix}.preprocessed.LO.bi.vcf.gz.tbi"
         File leave_out_panel_multi_split_vcf_gz = "~{output_prefix}.preprocessed.LO.multi.split.vcf.gz"
         File leave_out_panel_multi_split_vcf_gz_tbi = "~{output_prefix}.preprocessed.LO.multi.split.vcf.gz.tbi"
+    }
+}
+
+# set SV GTs to missing
+# TODO further subsample retained short variants and set remainder of GTs to missing
+task CensorGenotypes {
+    input {
+        File input_vcf_gz
+        File input_vcf_gz_tbi
+        String output_prefix
+        File retained_sv_tsv_gz
+        File retained_sv_tsv_gz_tbi
+        Int? num_short_variants_to_genotype
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    command {
+        set -e
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        bcftools +setGT -T ~{retained_sv_tsv_gz} --targets-overlap 1 ~{input_vcf_gz} -Oz -o ~{output_prefix}.censored.sv.vcf.gz -- -t a -n .
+        bcftools view -T ^~{retained_sv_tsv_gz} --targets-overlap 1 ~{input_vcf_gz} -Oz -o ~{output_prefix}.retained.short.vcf.gz -- -t a -n .
+
+        bcftools concat ~{output_prefix}.censored.sv.vcf.gz ~{output_prefix}.retained.short.vcf.gz | bcftools sort -Oz -o ~{output_prefix}.censored.vcf.gz
+        bcftools index -t ~{output_prefix}.censored.vcf.gz
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        # File genotyped_short_tsv_gz = "~{output_prefix}.genotyped.short.tsv.gz"
+        # File genotyped_short_tsv_gz_tbi = "~{output_prefix}.genotyped.short.tsv.gz.tbi"
+        File censored_vcf_gz = "~{output_prefix}.censored.vcf.gz"
+        File censored_vcf_gz_tbi = "~{output_prefix}.censored.vcf.gz.tbi"
     }
 }
 
