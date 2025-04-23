@@ -62,6 +62,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         String kage_docker
         String pangenie_docker
         Int? cpu_make_count_model
+        Map[String, Int] chromosome_to_glimpse_command_mem_gb
         RuntimeAttributes? leave_out_runtime_attributes
         RuntimeAttributes? leave_out_medium_runtime_attributes
         RuntimeAttributes? leave_out_large_runtime_attributes
@@ -269,6 +270,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             pangenie_docker = pangenie_docker,
             monitoring_script = monitoring_script,
             cpu_make_count_model = cpu_make_count_model,
+            chromosome_to_glimpse_command_mem_gb = chromosome_to_glimpse_command_mem_gb,
             runtime_attributes = leave_out_runtime_attributes,
             medium_runtime_attributes = leave_out_medium_runtime_attributes,
             large_runtime_attributes = leave_out_large_runtime_attributes,
@@ -281,7 +283,11 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             num_short_variants_to_retain = num_short_variants_to_retain,
             num_short_variants_to_genotype = num_short_variants_to_genotype,
             do_genotype_SVs = do_genotype_SVs,
-            samtools_docker = samtools_docker
+            samtools_docker = samtools_docker,
+            fix_variant_collisions_java = fix_variant_collisions_java,
+            operation = operation,
+            weight_tag = weight_tag,
+            is_weight_format_field = is_weight_format_field
         }
 
         # merge GLIMPSE VCFs
