@@ -36,6 +36,9 @@ workflows:
 - name: ConcatAndEvaluate
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/ConcatAndEvaluate.wdl
+- name: ConcatAndEvaluateReduced
+  subclass: wdl
+  primaryDescriptorPath: /wdl/evaluation/phased-panel/ConcatAndEvaluateReduced.wdl
 - name: LeaveOutEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/kage/LeaveOutEvaluation.wdl
