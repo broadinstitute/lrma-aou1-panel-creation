@@ -175,13 +175,14 @@ workflow LeaveOutEvaluation {
 
         File sample_by_chromosome_kage_vcf_gzs_tsv = write_tsv([select_first([CensorGenotypes.censored_vcf_gz, KAGECasePerChromosome.chromosome_kage_vcf_gzs])])
         File sample_by_chromosome_kage_vcf_gz_tbis_tsv = write_tsv([select_first([CensorGenotypes.censored_vcf_gz_tbi, KAGECasePerChromosome.chromosome_kage_vcf_gz_tbis])])
+        File sample_names_file = write_lines([leave_out_sample_name])
 
         # run single sample through batched workflow
         call GLIMPSEBatchedCasePerChromosome.GLIMPSEBatchedCasePerChromosome as GLIMPSEBatchedCasePerChromosome {
             input:
                 sample_by_chromosome_kage_vcf_gzs_tsv = sample_by_chromosome_kage_vcf_gzs_tsv,
                 sample_by_chromosome_kage_vcf_gz_tbis_tsv = sample_by_chromosome_kage_vcf_gz_tbis_tsv,
-                sample_names_file = write_lines([leave_out_sample_name]),
+                sample_names_file = sample_names_file,
                 reference_fasta = case_reference_fasta,
                 reference_fasta_fai = case_reference_fasta_fai,
                 reference_dict = case_reference_dict,
