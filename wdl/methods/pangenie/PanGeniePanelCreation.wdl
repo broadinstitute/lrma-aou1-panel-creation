@@ -77,8 +77,8 @@ task PanGeniePanelCreation {
         # validate variants against reference
         bcftools norm --check-ref e --fasta-ref ~{reference_fasta} ~{phased_bcf} &> validate-vcf.log
 
-        # atomize variants and run PanGenie prepare-vcf script
-        bcftools norm -a ~{phased_bcf} | \
+        # run PanGenie prepare-vcf script
+        bcftools view ~{phased_bcf} | \
             python3 ~{prepare_vcf_script} \
                 --missing ~{frac_missing} \
             2> prepare-vcf.log \
