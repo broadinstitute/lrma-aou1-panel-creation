@@ -14,6 +14,7 @@ struct RuntimeAttributes {
 workflow KAGECasePerChromosome {
     input {
         File input_cram
+        File? input_crai
         String sample_name
         File reference_fasta
         File reference_fasta_fai
@@ -36,11 +37,13 @@ workflow KAGECasePerChromosome {
         RuntimeAttributes kage_genotype_runtime_attributes = {}
     }
 
-    call IndexCaseReads {
-        # TODO we require the alignments to subset by chromosome; change to start from raw reads
-        input:
-            input_cram = input_cram,
-            monitoring_script = monitoring_script
+    if (!defined(input_crai)) {
+        call IndexCaseReads {
+            # TODO we require the alignments to subset by chromosome; change to start from raw reads
+            input:
+                input_cram = input_cram,
+                monitoring_script = monitoring_script
+        }
     }
 
     scatter (j in range(length(chromosomes))) {
@@ -49,7 +52,7 @@ workflow KAGECasePerChromosome {
         call KAGECountKmers {
             input:
                 input_cram = input_cram,
-                input_cram_idx = IndexCaseReads.cram_idx,
+                input_cram_idx = select_first([input_crai, IndexCaseReads.cram_idx]),
                 panel_kmer_index_only_variants_with_revcomp = panel_kmer_index_only_variants_with_revcomp[j],
                 reference_fasta = reference_fasta,
                 reference_fasta_fai = reference_fasta_fai,
