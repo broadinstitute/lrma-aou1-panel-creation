@@ -75,7 +75,6 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
 
         # reduced arguments
         Int? num_short_variants_to_retain
-        Int? num_short_variants_to_genotype
         Boolean do_genotype_SVs = true
         String samtools_docker
 
@@ -281,7 +280,6 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             glimpse_case_runtime_attributes = glimpse_case_runtime_attributes,
             calculate_metrics_runtime_attributes = calculate_metrics_runtime_attributes,
             num_short_variants_to_retain = num_short_variants_to_retain,
-            num_short_variants_to_genotype = num_short_variants_to_genotype,
             do_genotype_SVs = do_genotype_SVs,
             samtools_docker = samtools_docker,
             fix_variant_collisions_java = fix_variant_collisions_java,

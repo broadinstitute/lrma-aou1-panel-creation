@@ -39,7 +39,6 @@ workflow LeaveOutEvaluation {
 
         # reduced arguments
         Int? num_short_variants_to_retain
-        Int? num_short_variants_to_genotype
         Boolean do_genotype_SVs = true
 
         # TODO we require the alignments to subset by chromosome; change to start from raw reads
@@ -166,7 +165,6 @@ workflow LeaveOutEvaluation {
                         output_prefix = leave_out_sample_name,
                         retained_sv_tsv_gz = select_first([ReducePanelVCF.retained_sv_tsv_gz]),
                         retained_sv_tsv_gz_tbi = select_first([ReducePanelVCF.retained_sv_tsv_gz_tbi]),
-                        num_short_variants_to_genotype = num_short_variants_to_genotype,
                         docker = samtools_docker,
                         monitoring_script = monitoring_script
                 }
@@ -596,7 +594,6 @@ task CensorGenotypes {
         String output_prefix
         File retained_sv_tsv_gz
         File retained_sv_tsv_gz_tbi
-        Int? num_short_variants_to_genotype
 
         String docker
         File? monitoring_script
