@@ -912,6 +912,9 @@ task GetChromosomeShortVariantKmers {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
+        # check /dev/shm implementation between Batch and Life Sciences
+        df -h /dev/shm
+
         bcftools view \
             -Oz \
             -r ~{chromosome} \
