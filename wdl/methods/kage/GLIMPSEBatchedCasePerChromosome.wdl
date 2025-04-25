@@ -1,7 +1,5 @@
 version 1.0
 
-import "../phasing/HierarchicallyMergeVcfs.wdl"
-
 struct RuntimeAttributes {
     Int? cpu
     Int? command_mem_gb
@@ -38,9 +36,6 @@ workflow GLIMPSEBatchedCasePerChromosome {
         String weight_tag
         Int is_weight_format_field
 
-        Array[String] merge_regions   # bcftools regions, e.g. ["chr1,chr2,chr3", "chr4,chr5,chr6", ...]
-        Int merge_batch_size
-
         String kage_docker
         File? monitoring_script
 
@@ -72,6 +67,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
                 vcf_gz_tbis = chromosome_kage_vcf_gz_tbis,
                 sample_names = read_lines(CreateBatches.sample_name_batch_files[b]),
                 output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".kage",
+                docker = kage_docker,
                 monitoring_script = monitoring_script
             }
 
@@ -122,58 +118,38 @@ workflow GLIMPSEBatchedCasePerChromosome {
         }
     }
 
-    call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as KAGEMergeAcrossSamplesFinal { input:
+    call Ivcfmerge as KAGEMergeAcrossSamplesFinal { input:
         vcf_gzs = KAGEConcatVcfs.vcf_gz,
         vcf_gz_tbis = KAGEConcatVcfs.vcf_gz_tbi,
         sample_names = sample_names,
         output_prefix = output_prefix + ".kage",
-        batch_size = merge_batch_size,
-        regions = merge_regions,
-        extra_merge_args = "",
-        extra_concat_args = "--threads $(nproc) --naive",
-        use_ivcfmerge = true,
         docker = kage_docker,
         monitoring_script = monitoring_script
     }
 
-    call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as GLIMPSEUnphasedMergeAcrossSamples { input:
+    call Ivcfmerge as GLIMPSEUnphasedMergeAcrossSamples { input:
         vcf_gzs = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz,
         vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi,
         sample_names = sample_names,
         output_prefix = output_prefix + ".kage.glimpse.unphased",
-        batch_size = merge_batch_size,
-        regions = merge_regions,
-        extra_merge_args = "",
-        extra_concat_args = "--threads $(nproc) --naive",
-        use_ivcfmerge = true,
         docker = kage_docker,
         monitoring_script = monitoring_script
     }
 
-    call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as GLIMPSEMergeAcrossSamples { input:
+    call Ivcfmerge as GLIMPSEMergeAcrossSamples { input:
         vcf_gzs = GLIMPSEBatchedCase.glimpse_vcf_gz,
         vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi,
         sample_names = sample_names,
         output_prefix = output_prefix + ".kage.glimpse",
-        batch_size = merge_batch_size,
-        regions = merge_regions,
-        extra_merge_args = "",
-        extra_concat_args = "--threads $(nproc) --naive",
-        use_ivcfmerge = true,
         docker = kage_docker,
         monitoring_script = monitoring_script
     }
 
-    call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as PhasedCollisionlessMergeAcrossSamples { input:
+    call Ivcfmerge as PhasedCollisionlessMergeAcrossSamples { input:
         vcf_gzs = GLIMPSEFixVariantCollisions.collisionless_vcf_gz,
         vcf_gz_tbis = GLIMPSEFixVariantCollisions.collisionless_vcf_gz_tbi,
         sample_names = sample_names,
         output_prefix = output_prefix + ".kage.glimpse.collisionless",
-        batch_size = merge_batch_size,
-        regions = merge_regions,
-        extra_merge_args = "",
-        extra_concat_args = "--threads $(nproc) --naive",
-        use_ivcfmerge = true,
         docker = kage_docker,
         monitoring_script = monitoring_script
     }
