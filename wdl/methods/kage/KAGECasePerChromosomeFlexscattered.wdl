@@ -198,9 +198,7 @@ task KAGE {
                 -t ~{cpu_resolved} \
                 -i $KMER_INDEX \
                 -f outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa \
-                -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kmer_counts.npy
-
-            rm outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa
+                -o ~{output_prefix}.output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kmer_counts.npy
 
             kage genotype \
                 -i $INDEX \
@@ -223,10 +221,10 @@ task KAGE {
             # create single-sample BCF w/ split multiallelics
             bcftools view <(cat outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.header.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt) --write-index -Ob -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf
 
-            bcftools concat --no-version -a outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf -Oz -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.vcf.gz
-            bcftools index -t outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.vcf.gz
+            bcftools concat --no-version -a outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf -Oz -o ~{output_prefix}.output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
+            bcftools index -t ~{output_prefix}.output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
 
-            rm outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.header.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf
+            rm -r outputs-$C_WITH_LEADING_ZEROS
         done
     >>>
 
@@ -242,8 +240,8 @@ task KAGE {
 
     output {
         File monitoring_log = "monitoring.log"
-        Array[File] chromosome_kmer_counts = glob("outputs-*/~{output_prefix}.*.kmer_counts.npy")
-        Array[File] chromosome_kage_vcf_gzs = glob("outputs-*/~{output_prefix}.*.kage.vcf.gz")
-        Array[File] chromosome_kage_vcf_gz_tbis = glob("outputs-*/~{output_prefix}.*.kage.vcf.gz.tbi")
+        Array[File] chromosome_kmer_counts = glob("~{output_prefix}.*.kmer_counts.npy")       # must be careful with globbing and lexicographical ordering here!
+        Array[File] chromosome_kage_vcf_gzs = glob("~{output_prefix}.*.kage.vcf.gz")
+        Array[File] chromosome_kage_vcf_gz_tbis = glob("~{output_prefix}.*.kage.vcf.gz.tbi")
     }
 }
