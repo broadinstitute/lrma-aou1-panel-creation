@@ -165,7 +165,7 @@ task KAGE {
         MULTI_SPLITS=(~{sep=" " panel_multi_split_vcf_gz})
 
         NUM_CHROMOSOMES=~{num_chromosomes}
-        NUM_DIGITS=${#NUM_SAMPLES}
+        NUM_DIGITS=${#NUM_CHROMOSOMES}
 
         for (( c = 0; c < ~{num_chromosomes}; c++ ))
         do
