@@ -202,7 +202,7 @@ task KAGE {
 
             kage genotype \
                 -i $INDEX \
-                -c outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kmer_counts.npy \
+                -c ~{output_prefix}.output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kmer_counts.npy \
                 --average-coverage ~{average_coverage} \
                 -s ~{sample_name} \
                 ~{true='-I true' false='-I false' ignore_helper_model} \
