@@ -220,7 +220,7 @@ task KAGE {
             # create single-sample BCF w/ split multiallelics
             bcftools view <(cat ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.header.txt ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.GT.txt) --write-index -Ob -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.bcf
 
-            bcftools concat --no-version -a ~{output_prefix}.$CHROMOSOME.kage.bi.bcf ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.bcf -Oz -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
+            bcftools concat --no-version -a ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.bi.bcf ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.bcf -Oz -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
             bcftools index -t ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
         done
     >>>
