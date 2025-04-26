@@ -610,7 +610,7 @@ task CensorGenotypes {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools +setGT -T ~{retained_sv_tsv_gz} --targets-overlap 1 ~{input_vcf_gz} -Oz -o ~{output_prefix}.censored.sv.vcf.gz -- -t a -n .
+        bcftools +setGT -T ~{retained_sv_tsv_gz} --targets-overlap 1 ~{input_vcf_gz} -Oz -o ~{output_prefix}.censored.sv.vcf.gz -- -t a -n .    # TODO set GLs to nan
         bcftools view -T ^~{retained_sv_tsv_gz} --targets-overlap 1 ~{input_vcf_gz} -Oz -o ~{output_prefix}.retained.short.vcf.gz
 
         bcftools concat ~{output_prefix}.censored.sv.vcf.gz ~{output_prefix}.retained.short.vcf.gz | bcftools sort -Oz -o ~{output_prefix}.censored.vcf.gz
