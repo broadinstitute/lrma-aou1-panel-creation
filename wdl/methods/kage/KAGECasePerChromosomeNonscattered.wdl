@@ -222,6 +222,8 @@ task KAGE {
 
             bcftools concat --no-version -a ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.bi.bcf ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.bcf -Oz -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
             bcftools index -t ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
+
+            rm ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.header.txt ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.GT.txt ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.bi.bcf ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.bcf
         done
     >>>
 
