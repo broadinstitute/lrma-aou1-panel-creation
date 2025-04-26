@@ -20,16 +20,14 @@ workflow KAGECasePerChromosome {
         File reference_fasta_fai
         File reference_dict
 
-        # per chromosome
-        Array[String]+ chromosomes
-        Array[File] panel_index
-        Array[File] panel_kmer_index_only_variants_with_revcomp
-        Array[File] panel_multi_split_vcf_gz # for filling in biallelic-only VCFs produced by KAGE
-        Array[File] panel_multi_split_vcf_gz_tbi
+        # per chromosome quantities, grouped into scatter chunks
+        Array[Array[String]+] chromosomes
+        Array[Array[File]+] panel_index
+        Array[Array[File]+] panel_kmer_index_only_variants_with_revcomp
+        Array[Array[File]+] panel_multi_split_vcf_gz # for filling in biallelic-only VCFs produced by KAGE
+        Array[Array[File]+] panel_multi_split_vcf_gz_tbi
 
         Float average_coverage
-
-        Array[Array[Int]] chunked_scatter_indices       # chromosome indices, e.g. [[0, 1, 2], [3, 4, 5, 6], ...]
 
         String kage_docker
         File? monitoring_script
@@ -46,19 +44,19 @@ workflow KAGECasePerChromosome {
         }
     }
 
-    scatter (scatter_indices in chunked_scatter_indices) {
+    scatter (scatter_index in range(length(chromosomes))) {
         call KAGE {
             input:
                 input_cram = input_cram,
                 input_cram_idx = select_first([input_crai, IndexCaseReads.cram_idx]),
-                panel_kmer_index_only_variants_with_revcomp = panel_kmer_index_only_variants_with_revcomp[scatter_indices],
-                panel_index = panel_index[scatter_indices],
-                panel_multi_split_vcf_gz = panel_multi_split_vcf_gz[scatter_indices],
-                panel_multi_split_vcf_gz_tbi = panel_multi_split_vcf_gz_tbi[scatter_indices],
+                panel_kmer_index_only_variants_with_revcomp = panel_kmer_index_only_variants_with_revcomp[scatter_index],
+                panel_index = panel_index[scatter_index],
+                panel_multi_split_vcf_gz = panel_multi_split_vcf_gz[scatter_index],
+                panel_multi_split_vcf_gz_tbi = panel_multi_split_vcf_gz_tbi[scatter_index],
                 reference_fasta = reference_fasta,
                 reference_fasta_fai = reference_fasta_fai,
                 reference_dict = reference_dict,
-                chromosomes = chromosomes[scatter_indices],
+                chromosomes = chromosomes[scatter_index],
                 subset_reads = true,
                 average_coverage = average_coverage,
                 output_prefix = sample_name,
