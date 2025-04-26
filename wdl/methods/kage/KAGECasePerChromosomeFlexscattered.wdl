@@ -29,6 +29,8 @@ workflow KAGECasePerChromosome {
 
         Float average_coverage
 
+        Array[Array[Int]] chunked_scatter_indices       # chromosome indices, e.g. [[0, 1, 2], [3, 4, 5, 6], ...]
+
         String kage_docker
         File? monitoring_script
 
@@ -44,30 +46,32 @@ workflow KAGECasePerChromosome {
         }
     }
 
-    call KAGE {
-        input:
-            input_cram = input_cram,
-            input_cram_idx = select_first([input_crai, IndexCaseReads.cram_idx]),
-            panel_kmer_index_only_variants_with_revcomp = panel_kmer_index_only_variants_with_revcomp,
-            panel_index = panel_index,
-            panel_multi_split_vcf_gz = panel_multi_split_vcf_gz,
-            panel_multi_split_vcf_gz_tbi = panel_multi_split_vcf_gz_tbi,
-            reference_fasta = reference_fasta,
-            reference_fasta_fai = reference_fasta_fai,
-            reference_dict = reference_dict,
-            chromosomes = chromosomes,
-            subset_reads = true,
-            average_coverage = average_coverage,
-            output_prefix = sample_name,
-            docker = kage_docker,
-            monitoring_script = monitoring_script,
-            runtime_attributes = kage_runtime_attributes
+    scatter (scatter_indices in chunked_scatter_indices) {
+        call KAGE {
+            input:
+                input_cram = input_cram,
+                input_cram_idx = select_first([input_crai, IndexCaseReads.cram_idx]),
+                panel_kmer_index_only_variants_with_revcomp = panel_kmer_index_only_variants_with_revcomp[scatter_indices],
+                panel_index = panel_index[scatter_indices],
+                panel_multi_split_vcf_gz = panel_multi_split_vcf_gz[scatter_indices],
+                panel_multi_split_vcf_gz_tbi = panel_multi_split_vcf_gz_tbi[scatter_indices],
+                reference_fasta = reference_fasta,
+                reference_fasta_fai = reference_fasta_fai,
+                reference_dict = reference_dict,
+                chromosomes = chromosomes[scatter_indices],
+                subset_reads = true,
+                average_coverage = average_coverage,
+                output_prefix = sample_name,
+                docker = kage_docker,
+                monitoring_script = monitoring_script,
+                runtime_attributes = kage_runtime_attributes
+        }
     }
 
     output {
-        Array[File] chromosome_kmer_counts = KAGE.chromosome_kmer_counts
-        Array[File] chromosome_kage_vcf_gzs = KAGE.chromosome_kage_vcf_gzs
-        Array[File] chromosome_kage_vcf_gz_tbis = KAGE.chromosome_kage_vcf_gz_tbis
+        Array[File] chromosome_kmer_counts = flatten(KAGE.chromosome_kmer_counts)
+        Array[File] chromosome_kage_vcf_gzs = flatten(KAGE.chromosome_kage_vcf_gzs)
+        Array[File] chromosome_kage_vcf_gz_tbis = flatten(KAGE.chromosome_kage_vcf_gz_tbis)
     }
 }
 
@@ -177,53 +181,54 @@ task KAGE {
             C_WITH_LEADING_ZEROS=$(printf "%0${NUM_DIGITS}d" $c)
 
             date
-            mkfifo ~{output_prefix}.preprocessed.fa
+            mkdir outputs-$C_WITH_LEADING_ZEROS
+            mkfifo outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa
             if ~{subset_reads}; then
                 # hacky way to get chromosomes into bed file
-                grep -P $CHROMOSOME ~{reference_fasta_fai} | cut -f 1,2 | sed -e 's/\t/\t1\t/g' > chromosome.bed
+                grep -P $CHROMOSOME ~{reference_fasta_fai} | cut -f 1,2 | sed -e 's/\t/\t1\t/g' > outputs-$C_WITH_LEADING_ZEROS/chromosome.bed
 
                 echo "Subsetting reads..."
-                samtools view --reference ~{reference_fasta} -@ $(nproc) ~{if subset_reads then "--regions-file chromosome.bed" else ""} -u -X ~{input_cram} ~{input_cram_idx} | \
-                    samtools fasta --reference ~{reference_fasta} -@ $(nproc) > ~{output_prefix}.preprocessed.fa &
+                samtools view --reference ~{reference_fasta} -@ $(nproc) ~{if subset_reads then "--regions-file outputs-$C_WITH_LEADING_ZEROS/chromosome.bed" else ""} -u -X ~{input_cram} ~{input_cram_idx} | \
+                    samtools fasta --reference ~{reference_fasta} -@ $(nproc) > outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa &
             else
                 echo "Not subsetting reads..."
-                samtools fasta --reference ~{reference_fasta} -@ $(nproc) -X ~{input_cram} ~{input_cram_idx} > ~{output_prefix}.preprocessed.fa &
+                samtools fasta --reference ~{reference_fasta} -@ $(nproc) -X ~{input_cram} ~{input_cram_idx} > outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa &
             fi
 
             kmer_mapper map \
                 ~{kmer_mapper_args} \
                 -t ~{cpu_resolved} \
                 -i $KMER_INDEX \
-                -f ~{output_prefix}.preprocessed.fa \
-                -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kmer_counts.npy
+                -f outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa \
+                -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kmer_counts.npy
 
-            rm ~{output_prefix}.preprocessed.fa
+            rm outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa
 
             kage genotype \
                 -i $INDEX \
-                -c ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kmer_counts.npy \
+                -c outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kmer_counts.npy \
                 --average-coverage ~{average_coverage} \
                 -s ~{sample_name} \
                 ~{true='-I true' false='-I false' ignore_helper_model} \
                 ~{kage_genotype_extra_args} \
-                -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.bi.vcf
-            bcftools view ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.bi.vcf --write-index -Ob -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.bi.bcf
+                -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.vcf
+            bcftools view outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.vcf --write-index -Ob -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf
 
             # we need to add split multiallelics to biallelic-only KAGE BCF
             # create single-sample header from LOO panel w/ split multiallelics
             bcftools view --no-version -h -G $MULTI_SPLIT | \
                 sed 's/##fileformat=VCFv4.2/##fileformat=VCFv4.2\n##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n##FORMAT=<ID=GL,Number=G,Type=Float,Description="Genotype likelihoods.">/g' | \
-                sed 's/INFO$/INFO\tFORMAT\t~{sample_name}/g' > ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.header.txt
+                sed 's/INFO$/INFO\tFORMAT\t~{sample_name}/g' > outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.header.txt
             # create single-sample missing genotypes from LOO panel w/ split multiallelics
             bcftools view --no-version -H -G $MULTI_SPLIT | \
-                sed 's/$/\tGT:GL\t.\/.:nan,nan,nan/g' > ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.GT.txt
+                sed 's/$/\tGT:GL\t.\/.:nan,nan,nan/g' > outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt
             # create single-sample BCF w/ split multiallelics
-            bcftools view <(cat ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.header.txt ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.GT.txt) --write-index -Ob -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.bcf
+            bcftools view <(cat outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.header.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt) --write-index -Ob -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf
 
-            bcftools concat --no-version -a ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.bi.bcf ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.bcf -Oz -o ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
-            bcftools index -t ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
+            bcftools concat --no-version -a outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf -Oz -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.vcf.gz
+            bcftools index -t outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.vcf.gz
 
-            rm ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.header.txt ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.GT.txt ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.bi.bcf ~{output_prefix}.shard-$C_WITH_LEADING_ZEROS.$CHROMOSOME.multi.split.bcf
+            rm outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.header.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf
         done
     >>>
 
@@ -231,7 +236,7 @@ task KAGE {
         docker: docker
         cpu: cpu_resolved
         memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 150]) + if select_first([runtime_attributes.use_ssd, true]) then " SSD" else " HDD"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 115]) + if select_first([runtime_attributes.use_ssd, true]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
         preemptible: select_first([runtime_attributes.preemptible, 2])
         maxRetries: select_first([runtime_attributes.max_retries, 1])
@@ -239,8 +244,8 @@ task KAGE {
 
     output {
         File monitoring_log = "monitoring.log"
-        Array[File] chromosome_kmer_counts = glob("~{output_prefix}.*.kmer_counts.npy")
-        Array[File] chromosome_kage_vcf_gzs = glob("~{output_prefix}.*.kage.vcf.gz")
-        Array[File] chromosome_kage_vcf_gz_tbis = glob("~{output_prefix}.*.kage.vcf.gz.tbi")
+        Array[File] chromosome_kmer_counts = glob("outputs-*/~{output_prefix}.*.kmer_counts.npy")
+        Array[File] chromosome_kage_vcf_gzs = glob("outputs-*/~{output_prefix}.*.kage.vcf.gz")
+        Array[File] chromosome_kage_vcf_gz_tbis = glob("outputs-*/~{output_prefix}.*.kage.vcf.gz.tbi")
     }
 }
