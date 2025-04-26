@@ -28,7 +28,6 @@ workflow KAGECasePerChromosome {
         Array[File] panel_multi_split_vcf_gz_tbi
 
         Float average_coverage
-        String output_prefix
 
         String kage_docker
         File? monitoring_script
