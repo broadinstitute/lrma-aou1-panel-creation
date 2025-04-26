@@ -183,7 +183,7 @@ task KAGE {
             mkfifo outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa
             if ~{subset_reads}; then
                 # hacky way to get chromosomes into bed file
-                grep -P '$CHROMOSOME\t' ~{reference_fasta_fai} | cut -f 1,2 | sed -e 's/\t/\t1\t/g' > outputs-$C_WITH_LEADING_ZEROS/chromosome.bed
+                grep -P "$CHROMOSOME\t" ~{reference_fasta_fai} | cut -f 1,2 | sed -e 's/\t/\t1\t/g' > outputs-$C_WITH_LEADING_ZEROS/chromosome.bed
 
                 echo "Subsetting reads..."
                 samtools view --reference ~{reference_fasta} -@ $(nproc) ~{if subset_reads then "--regions-file outputs-$C_WITH_LEADING_ZEROS/chromosome.bed" else ""} -u -X ~{input_cram} ~{input_cram_idx} | \
