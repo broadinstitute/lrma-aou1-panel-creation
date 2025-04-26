@@ -118,23 +118,23 @@ workflow GLIMPSEBatchedCasePerChromosome {
         }
     }
 
-    call Ivcfmerge as KAGEMergeAcrossSamplesFinal { input:
-        vcf_gzs = KAGEConcatVcfs.vcf_gz,
-        vcf_gz_tbis = KAGEConcatVcfs.vcf_gz_tbi,
-        sample_names = sample_names,
-        output_prefix = output_prefix + ".kage",
-        docker = kage_docker,
-        monitoring_script = monitoring_script
-    }
+#    call Ivcfmerge as KAGEMergeAcrossSamplesFinal { input:
+#        vcf_gzs = KAGEConcatVcfs.vcf_gz,
+#        vcf_gz_tbis = KAGEConcatVcfs.vcf_gz_tbi,
+#        sample_names = sample_names,
+#        output_prefix = output_prefix + ".kage",
+#        docker = kage_docker,
+#        monitoring_script = monitoring_script
+#    }
 
-    call Ivcfmerge as GLIMPSEUnphasedMergeAcrossSamples { input:
-        vcf_gzs = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz,
-        vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi,
-        sample_names = sample_names,
-        output_prefix = output_prefix + ".kage.glimpse.unphased",
-        docker = kage_docker,
-        monitoring_script = monitoring_script
-    }
+#    call Ivcfmerge as GLIMPSEUnphasedMergeAcrossSamples { input:
+#        vcf_gzs = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz,
+#        vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi,
+#        sample_names = sample_names,
+#        output_prefix = output_prefix + ".kage.glimpse.unphased",
+#        docker = kage_docker,
+#        monitoring_script = monitoring_script
+#    }
 
     call Ivcfmerge as GLIMPSEMergeAcrossSamples { input:
         vcf_gzs = GLIMPSEBatchedCase.glimpse_vcf_gz,
@@ -164,10 +164,10 @@ workflow GLIMPSEBatchedCasePerChromosome {
         Array[File] batch_phased_collisionless_vcf_gzs = GLIMPSEFixVariantCollisions.collisionless_vcf_gz
         Array[File] batch_phased_collisionless_vcf_gz_tbis = GLIMPSEFixVariantCollisions.collisionless_vcf_gz_tbi
 
-        File kage_vcf_gz = KAGEMergeAcrossSamplesFinal.merged_vcf_gz
-        File kage_vcf_gz_tbi = KAGEMergeAcrossSamplesFinal.merged_vcf_gz_tbi
-        File glimpse_unphased_vcf_gz = GLIMPSEUnphasedMergeAcrossSamples.merged_vcf_gz
-        File glimpse_unphased_vcf_gz_tbi = GLIMPSEUnphasedMergeAcrossSamples.merged_vcf_gz_tbi
+#        File kage_vcf_gz = KAGEMergeAcrossSamplesFinal.merged_vcf_gz
+#        File kage_vcf_gz_tbi = KAGEMergeAcrossSamplesFinal.merged_vcf_gz_tbi
+#        File glimpse_unphased_vcf_gz = GLIMPSEUnphasedMergeAcrossSamples.merged_vcf_gz
+#        File glimpse_unphased_vcf_gz_tbi = GLIMPSEUnphasedMergeAcrossSamples.merged_vcf_gz_tbi
         File glimpse_vcf_gz = GLIMPSEMergeAcrossSamples.merged_vcf_gz
         File glimpse_vcf_gz_tbi = GLIMPSEMergeAcrossSamples.merged_vcf_gz_tbi
         File phased_collisionless_vcf_gz = PhasedCollisionlessMergeAcrossSamples.merged_vcf_gz
