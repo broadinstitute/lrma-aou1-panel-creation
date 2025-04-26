@@ -47,6 +47,7 @@ workflow KAGECasePerChromosome {
     scatter (scatter_index in range(length(chromosomes))) {
         call KAGE {
             input:
+                scatter_index = scatter_index,
                 input_cram = input_cram,
                 input_cram_idx = select_first([input_crai, IndexCaseReads.cram_idx]),
                 panel_kmer_index_only_variants_with_revcomp = panel_kmer_index_only_variants_with_revcomp[scatter_index],
@@ -118,6 +119,7 @@ task IndexCaseReads {
 
 task KAGE {
     input {
+        Int scatter_index
         File input_cram
         File input_cram_idx
         Array[File] panel_kmer_index_only_variants_with_revcomp
@@ -198,11 +200,11 @@ task KAGE {
                 -t ~{cpu_resolved} \
                 -i $KMER_INDEX \
                 -f outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa \
-                -o ~{output_prefix}.output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kmer_counts.npy
+                -o ~{output_prefix}.shard-~{scatter_index}-output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kmer_counts.npy
 
             kage genotype \
                 -i $INDEX \
-                -c ~{output_prefix}.output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kmer_counts.npy \
+                -c ~{output_prefix}.shard-~{scatter_index}-output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kmer_counts.npy \
                 --average-coverage ~{average_coverage} \
                 -s ~{sample_name} \
                 ~{true='-I true' false='-I false' ignore_helper_model} \
@@ -221,8 +223,8 @@ task KAGE {
             # create single-sample BCF w/ split multiallelics
             bcftools view <(cat outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.header.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt) --write-index -Ob -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf
 
-            bcftools concat --no-version -a outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf -Oz -o ~{output_prefix}.output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
-            bcftools index -t ~{output_prefix}.output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
+            bcftools concat --no-version -a outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf -Oz -o ~{output_prefix}.shard-~{scatter_index}-output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
+            bcftools index -t ~{output_prefix}.shard-~{scatter_index}-output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
 
             rm -r outputs-$C_WITH_LEADING_ZEROS
         done
