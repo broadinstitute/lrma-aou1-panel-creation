@@ -49,7 +49,6 @@ task PanGenieIndex {
     input {
         File panel_vcf_gz
         File panel_vcf_gz_tbi
-        File input_fasta
         File reference_fasta
         Array[String] chromosomes
         String output_prefix
