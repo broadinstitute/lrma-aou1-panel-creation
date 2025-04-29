@@ -20,7 +20,6 @@ workflow PanGenieIndex {
         Array[String] chromosomes
         String output_prefix
 
-        String docker
         String pangenie_docker
         File? monitoring_script
         RuntimeAttributes? pangenie_runtime_attributes
