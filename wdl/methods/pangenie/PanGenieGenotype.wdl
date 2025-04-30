@@ -271,7 +271,7 @@ task PanGenieGenotype {
         mv ~{pangenie_index_path_segments_fasta} .
 
         /pangenie/build/src/PanGenie \
-            -f ~{input_fasta} \
+            -i ~{input_fasta} \
             -f ~{index_prefix} \
             -o ~{output_prefix} \
             -s ~{sample_name} \
