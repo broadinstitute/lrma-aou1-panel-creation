@@ -278,6 +278,9 @@ task PanGenieGenotype {
             -t $NUM_THREADS \
             -j $NUM_THREADS \
             ~{extra_args}
+
+        bgzip -c ~{output_prefix}_genotyping.vcf > ~{output_prefix}_genotyping.vcf.gz
+        bcftools index -t ~{output_prefix}_genotyping.vcf.gz
     }
 
     runtime {
