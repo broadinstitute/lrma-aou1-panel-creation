@@ -92,7 +92,7 @@ workflow PanGenieGenotype {
         File genotyping_naively_phased_vcf_gz = PanGenieGenotype.genotyping_naively_phased_vcf_gz
         File genotyping_naively_phased_vcf_gz_tbi = PanGenieGenotype.genotyping_naively_phased_vcf_gz_tbi
         File histogram = PanGenieGenotype.histogram
-        File path_segments_fasta = PanGenieGenotype.path_segments_fasta
+#        File path_segments_fasta = PanGenieGenotype.path_segments_fasta
     }
 }
 
@@ -306,6 +306,6 @@ task PanGenieGenotype {
         File genotyping_naively_phased_vcf_gz = "~{output_prefix}_genotyping_naively_phased.vcf.gz"
         File genotyping_naively_phased_vcf_gz_tbi = "~{output_prefix}_genotyping_naively_phased.vcf.gz.tbi"
         File histogram = "~{output_prefix}_histogram.histo"
-        File path_segments_fasta = "~{output_prefix}_path_segments.fasta"
+#        File path_segments_fasta = "~{output_prefix}_path_segments.fasta"
     }
 }
