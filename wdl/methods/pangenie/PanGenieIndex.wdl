@@ -79,7 +79,7 @@ task PanGenieIndex {
         NPROC=$(nproc)
         # NUM_CHROMOSOMES=~{num_chromosomes}
         # NUM_THREADS=$(( NPROC < NUM_CHROMOSOMES ? NPROC : NUM_CHROMOSOMES ))
-        NUM_THREADS=$(NPROC)
+        NUM_THREADS=$NPROC
 
         /pangenie/build/src/PanGenie-index \
             -o ~{output_prefix} \
