@@ -81,7 +81,6 @@ workflow PanGenieGenotype {
             sample_name = sample_name,
             output_prefix = sample_name,
             docker = pangenie_docker,
-            kmer_length = kmer_length,
             extra_args = pangenie_extra_args,
             monitoring_script = monitoring_script,
             runtime_attributes = pangenie_runtime_attributes
