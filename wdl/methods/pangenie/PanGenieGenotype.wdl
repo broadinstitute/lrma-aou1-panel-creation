@@ -24,7 +24,6 @@ workflow PanGenieGenotype {
         File input_cram
         Boolean subset_reads = true
         String sample_name
-        String output_prefix
 
         Int? kmer_length
         String? pangenie_extra_args
@@ -81,7 +80,7 @@ workflow PanGenieGenotype {
             index_prefix = index_prefix,
             input_fasta = select_first([PreprocessCaseReads.preprocessed_fasta, PreprocessCaseReadsWithoutSubsetting.preprocessed_fasta]),
             sample_name = sample_name,
-            output_prefix = output_prefix,
+            output_prefix = sample_name,
             docker = pangenie_docker,
             kmer_length = kmer_length,
             extra_args = pangenie_extra_args,
