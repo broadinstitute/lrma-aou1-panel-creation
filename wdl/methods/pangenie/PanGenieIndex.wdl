@@ -77,8 +77,9 @@ task PanGenieIndex {
         bcftools view ~{panel_vcf_gz} -r ~{sep="," chromosomes} > panel.subset.vcf
 
         NPROC=$(nproc)
-        NUM_CHROMOSOMES=~{num_chromosomes}
-        NUM_THREADS=$(( NPROC < NUM_CHROMOSOMES ? NPROC : NUM_CHROMOSOMES ))
+        # NUM_CHROMOSOMES=~{num_chromosomes}
+        # NUM_THREADS=$(( NPROC < NUM_CHROMOSOMES ? NPROC : NUM_CHROMOSOMES ))
+        NUM_THREADS=$(NPROC)
 
         /pangenie/build/src/PanGenie-index \
             -o ~{output_prefix} \
