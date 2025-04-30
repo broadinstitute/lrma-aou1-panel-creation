@@ -270,8 +270,8 @@ task PanGenieGenotype {
 
         mv ~{sep=" " pangenie_index_chromosome_graphs} .
         mv ~{sep=" " pangenie_index_chromosome_kmers} .
-        mv pangenie_index_unique_kmers_map .
-        mv pangenie_index_path_segments_fasta .
+        mv ~{pangenie_index_unique_kmers_map} .
+        mv ~{pangenie_index_path_segments_fasta} .
 
         /pangenie/build/src/PanGenie \
             -f ~{index_prefix} \
