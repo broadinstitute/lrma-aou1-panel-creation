@@ -25,7 +25,6 @@ workflow PanGenieGenotype {
         Boolean subset_reads = true
         String sample_name
 
-        Int? kmer_length
         String? pangenie_extra_args
 
         String docker
@@ -250,7 +249,6 @@ task PanGenieGenotype {
 
         String docker
         File? monitoring_script
-        Int? kmer_length = 31
         String? extra_args
 
         RuntimeAttributes runtime_attributes = {}
@@ -279,7 +277,6 @@ task PanGenieGenotype {
             -s ~{sample_name} \
             -t $NUM_THREADS \
             -j $NUM_THREADS \
-            -k ~{kmer_length} \
             ~{extra_args}
     }
 
