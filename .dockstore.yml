@@ -30,6 +30,9 @@ workflows:
 - name: PanGenieIndex
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/pangenie/PanGenieIndex.wdl
+- name: PanGenieGenotype
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/pangenie/PanGenieGenotype.wdl
 - name: PanGeniePanelCreation
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/pangenie/PanGeniePanelCreation.wdl
