@@ -89,6 +89,8 @@ workflow PanGenieGenotype {
     output {
         File genotyping_vcf_gz = PanGenieGenotype.genotyping_vcf_gz
         File genotyping_vcf_gz_tbi = PanGenieGenotype.genotyping_vcf_gz_tbi
+        File genotyping_naively_phased_vcf_gz = PanGenieGenotype.genotyping_naively_phased_vcf_gz
+        File genotyping_naively_phased_vcf_gz_tbi = PanGenieGenotype.genotyping_naively_phased_vcf_gz_tbi
         File histogram = PanGenieGenotype.histogram
         File path_segments_fasta = PanGenieGenotype.path_segments_fasta
     }
@@ -281,6 +283,10 @@ task PanGenieGenotype {
 
         bgzip -c ~{output_prefix}_genotyping.vcf > ~{output_prefix}_genotyping.vcf.gz
         bcftools index -t ~{output_prefix}_genotyping.vcf.gz
+
+        # naively set all GTs to phased for Vcfdist evaluation
+        bcftools +setGT ~{output_prefix}_genotyping.vcf.gz -Oz -o ~{output_prefix}_genotyping_naively_phased.vcf.gz -- -t a -n p
+        bcftools index -t ~{output_prefix}_genotyping_naively_phased.vcf.gz
     }
 
     runtime {
@@ -297,6 +303,8 @@ task PanGenieGenotype {
         File monitoring_log = "monitoring.log"
         File genotyping_vcf_gz = "~{output_prefix}_genotyping.vcf.gz"
         File genotyping_vcf_gz_tbi = "~{output_prefix}_genotyping.vcf.gz.tbi"
+        File genotyping_naively_phased_vcf_gz = "~{output_prefix}_genotyping_naively_phased.vcf.gz"
+        File genotyping_naively_phased_vcf_gz_tbi = "~{output_prefix}_genotyping_naively_phased.vcf.gz.tbi"
         File histogram = "~{output_prefix}_histogram.histo"
         File path_segments_fasta = "~{output_prefix}_path_segments.fasta"
     }
