@@ -249,7 +249,8 @@ task FilterAndConcatVcfs {
         # filter short singletons and split to biallelic
         bcftools view ~{filter_and_concat_short_filter_args} ~{short_vcf} \
             -r ~{region} | \
-            bcftools norm -m-any -f ~{reference_fasta} \
+            bcftools norm -m-any -f ~{reference_fasta} | \
+            bcftools sort \
             --write-index -Oz -o ~{prefix}.short.vcf.gz
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
