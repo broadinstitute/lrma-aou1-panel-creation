@@ -2,7 +2,8 @@ version 1.0
 
 import "../../methods/kage/KAGEPanelWithPreprocessing.wdl" as KAGEPanelWithPreprocessing
 import "../../methods/kage/KAGEPlusGLIMPSECase.wdl" as KAGEPlusGLIMPSECase
-import "../../methods/pangenie/PanGenieCase.wdl" as PanGenieCase
+import "../../methods/pangenie/PanGenieIndex.wdl" as PanGenieIndex
+import "../../methods/pangenie/PanGenieGenotype.wdl" as PanGenieGenotype
 
 struct RuntimeAttributes {
     Int? cpu
@@ -103,6 +104,21 @@ workflow LeaveOutEvaluation {
             cpu_make_count_model = cpu_make_count_model
     }
 
+    if (do_pangenie) {
+        call PanGenieIndex.PanGenieIndex as PanGenieIndex {
+            input:
+                panel_vcf_gz = CreateLeaveOneOutPanelVCF.leave_out_panel_vcf_gz,
+                panel_vcf_gz_tbi = CreateLeaveOneOutPanelVCF.leave_out_panel_vcf_gz_tbi,
+                reference_fasta = reference_fasta,
+                reference_fasta_fai = reference_fasta_fai,
+                chromosomes = chromosomes,
+                output_prefix = leave_out_output_prefix,
+                pangenie_docker = pangenie_docker,
+                monitoring_script = monitoring_script,
+                pangenie_runtime_attributes = pangenie_runtime_attributes
+        }
+    }
+
     scatter (j in range(length(leave_out_sample_names))) {
         String leave_out_sample_name = leave_out_sample_names[j]
         File leave_out_cram = leave_out_crams[leave_out_sample_name]
@@ -164,39 +180,29 @@ workflow LeaveOutEvaluation {
         }
 
         if (do_pangenie) {
-            # PanGenie case
-
-            call PreprocessCaseReads {
+            call PanGenieGenotype.PanGenieGenotype as PanGenieGenotype {
                 input:
-                    input_cram = leave_out_cram,
-                    input_cram_idx = KAGEPlusGLIMPSECase.cram_idx,
+                    pangenie_index_chromosome_graphs = select_first([PanGenieIndex.pangenie_index_chromosome_graphs]),
+                    pangenie_index_chromosome_kmers = select_first([PanGenieIndex.pangenie_index_chromosome_kmers]),
+                    pangenie_index_unique_kmers_map = select_first([PanGenieIndex.pangenie_index_unique_kmers_map]),
+                    pangenie_index_path_segments_fasta = select_first([PanGenieIndex.pangenie_index_path_segments_fasta]),
+                    index_prefix = leave_out_output_prefix,
                     reference_fasta = case_reference_fasta,
-                    reference_fasta_fai = case_reference_fasta_fai,
+                    reference_fasta_fai = reference_fasta_fai,
                     chromosomes = chromosomes,
-                    output_prefix = leave_out_sample_name,
-                    docker = docker,
-                    monitoring_script = monitoring_script
-            }
-
-            call PanGenieCase.PanGenie as PanGenieCase {
-                input:
-                    panel_vcf_gz = CreateLeaveOneOutPanelVCF.leave_out_panel_vcf_gz,
-                    panel_vcf_gz_tbi = CreateLeaveOneOutPanelVCF.leave_out_panel_vcf_gz_tbi,
-                    input_fasta = PreprocessCaseReads.preprocessed_fasta,
-                    reference_fasta = reference_fasta,
-                    chromosomes = chromosomes,
+                    input_cram = leave_out_cram,
                     sample_name = leave_out_sample_name,
-                    output_prefix = leave_out_sample_name,
-                    docker = pangenie_docker,
+                    docker = docker,
+                    pangenie_docker = pangenie_docker,
                     monitoring_script = monitoring_script,
-                    runtime_attributes = pangenie_runtime_attributes
+                    pangenie_runtime_attributes = pangenie_runtime_attributes
             }
 
             # PanGenie evaluation
             call CalculateMetrics as CalculateMetricsPanGenie {
                 input:
-                    case_vcf_gz = PanGenieCase.genotyping_vcf_gz,
-                    case_vcf_gz_tbi = PanGenieCase.genotyping_vcf_gz_tbi,
+                    case_vcf_gz = PanGenieGenotype.genotyping_vcf_gz,
+                    case_vcf_gz_tbi = PanGenieGenotype.genotyping_vcf_gz_tbi,
                     truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
                     truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
                     chromosomes = chromosomes,
@@ -216,8 +222,10 @@ workflow LeaveOutEvaluation {
         Array[File] glimpse_unphased_vcf_gz_tbis = KAGEPlusGLIMPSECase.glimpse_unphased_vcf_gz_tbi
         Array[File] glimpse_vcf_gzs = KAGEPlusGLIMPSECase.glimpse_vcf_gz
         Array[File] glimpse_vcf_gz_tbis = KAGEPlusGLIMPSECase.glimpse_vcf_gz_tbi
-        Array[File?] pangenie_vcf_gzs = PanGenieCase.genotyping_vcf_gz
-        Array[File?] pangenie_vcf_gz_tbis = PanGenieCase.genotyping_vcf_gz_tbi
+        Array[File?] pangenie_vcf_gzs = PanGenieGenotype.genotyping_vcf_gz
+        Array[File?] pangenie_vcf_gz_tbis = PanGenieGenotype.genotyping_vcf_gz_tbi
+        Array[File?] pangenie_naively_phased_vcf_gzs = PanGenieGenotype.genotyping_naively_phased_vcf_gz
+        Array[File?] pangenie_naively_phased_vcf_gz_tbis = PanGenieGenotype.genotyping_naively_phased_vcf_gz_tbi
 
         Array[File] kage_metrics_tsvs = CalculateMetricsKAGE.metrics_tsv
         Array[File] glimpse_metrics_tsvs = CalculateMetricsKAGEPlusGLIMPSE.metrics_tsv

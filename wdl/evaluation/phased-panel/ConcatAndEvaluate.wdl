@@ -292,6 +292,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             is_weight_format_field = is_weight_format_field,
             output_prefix = output_prefix + ".glimpse.merged.phased.collisionless"
         }
+
         # evaluate panel short + SV
         call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
             samples = vcfdist_samples,
@@ -349,8 +350,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         if (do_pangenie) {
             # merge PanGenie VCFs
             call Ivcfmerge as PanGenieMergeAcrossSamples { input:
-                vcf_gzs = select_all(LeaveOutEvaluation.pangenie_vcf_gzs),
-                vcf_gz_tbis = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
+                vcf_gzs = select_all(LeaveOutEvaluation.pangenie_naively_phased_vcf_gzs),
+                vcf_gz_tbis = select_all(LeaveOutEvaluation.pangenie_naively_phased_vcf_gz_tbis),
                 sample_names = leave_out_sample_names,
                 output_prefix = output_prefix + ".pangenie.merged",
                 docker = ivcfmerge_docker,
