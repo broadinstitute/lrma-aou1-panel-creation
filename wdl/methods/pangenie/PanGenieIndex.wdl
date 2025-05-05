@@ -25,7 +25,7 @@ workflow PanGenieIndex {
         RuntimeAttributes? pangenie_runtime_attributes
     }
 
-    call PanGenieIndex {
+    call Index {
         input:
             panel_vcf_gz = panel_vcf_gz,
             panel_vcf_gz_tbi = panel_vcf_gz_tbi,
@@ -38,14 +38,14 @@ workflow PanGenieIndex {
     }
 
     output {
-        Array[File] pangenie_index_chromosome_graphs = PanGenieIndex.pangenie_index_chromosome_graphs
-        Array[File] pangenie_index_chromosome_kmers = PanGenieIndex.pangenie_index_chromosome_kmers
-        File pangenie_index_unique_kmers_map = PanGenieIndex.pangenie_index_unique_kmers_map
-        File pangenie_index_path_segments_fasta = PanGenieIndex.pangenie_index_path_segments_fasta
+        Array[File] pangenie_index_chromosome_graphs = Index.pangenie_index_chromosome_graphs
+        Array[File] pangenie_index_chromosome_kmers = Index.pangenie_index_chromosome_kmers
+        File pangenie_index_unique_kmers_map = Index.pangenie_index_unique_kmers_map
+        File pangenie_index_path_segments_fasta = Index.pangenie_index_path_segments_fasta
     }
 }
 
-task PanGenieIndex {
+task Index {
     input {
         File panel_vcf_gz
         File panel_vcf_gz_tbi

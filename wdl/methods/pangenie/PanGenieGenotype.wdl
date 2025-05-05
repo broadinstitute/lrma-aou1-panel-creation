@@ -70,7 +70,7 @@ workflow PanGenieGenotype {
         }
     }
 
-    call PanGenieGenotype {
+    call Genotype {
         input:
             pangenie_index_chromosome_graphs = pangenie_index_chromosome_graphs,
             pangenie_index_chromosome_kmers = pangenie_index_chromosome_kmers,
@@ -87,12 +87,12 @@ workflow PanGenieGenotype {
     }
 
     output {
-        File genotyping_vcf_gz = PanGenieGenotype.genotyping_vcf_gz
-        File genotyping_vcf_gz_tbi = PanGenieGenotype.genotyping_vcf_gz_tbi
-        File genotyping_naively_phased_vcf_gz = PanGenieGenotype.genotyping_naively_phased_vcf_gz
-        File genotyping_naively_phased_vcf_gz_tbi = PanGenieGenotype.genotyping_naively_phased_vcf_gz_tbi
-        File histogram = PanGenieGenotype.histogram
-#        File path_segments_fasta = PanGenieGenotype.path_segments_fasta
+        File genotyping_vcf_gz = Genotype.genotyping_vcf_gz
+        File genotyping_vcf_gz_tbi = Genotype.genotyping_vcf_gz_tbi
+        File genotyping_naively_phased_vcf_gz = Genotype.genotyping_naively_phased_vcf_gz
+        File genotyping_naively_phased_vcf_gz_tbi = Genotype.genotyping_naively_phased_vcf_gz_tbi
+        File histogram = Genotype.histogram
+#        File path_segments_fasta = Genotype.path_segments_fasta
     }
 }
 
@@ -237,7 +237,7 @@ task PreprocessCaseReadsWithoutSubsetting {
     }
 }
 
-task PanGenieGenotype {
+task Genotype {
     input {
         Array[File] pangenie_index_chromosome_graphs
         Array[File] pangenie_index_chromosome_kmers
