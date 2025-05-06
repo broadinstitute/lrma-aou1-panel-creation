@@ -234,11 +234,17 @@ workflow LeaveOutEvaluation {
             docker = docker
     }
 
+    call WriteLines as WriteLinesSampleNames {
+        input:
+            array = leave_out_sample_names,
+            docker = docker
+    }
+
     call GLIMPSEBatchedCasePerChromosome.GLIMPSEBatchedCasePerChromosome as GLIMPSEBatchedCasePerChromosome {
         input:
             sample_by_chromosome_kage_vcf_gzs_tsv = WriteTsvVcfs.tsv,
             sample_by_chromosome_kage_vcf_gz_tbis_tsv = WriteTsvTbis.tsv,
-            sample_names_file = write_lines(leave_out_sample_names),
+            sample_names_file = WriteLinesSampleNames.tsv,
             chromosomes = chromosomes,
             genetic_maps = genetic_maps,
             panel_split_vcf_gz = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz),
@@ -940,6 +946,24 @@ task WriteTsv {
 
     output {
         File tsv = write_tsv(array)
+    }
+
+    runtime {
+        docker: docker
+    }
+}
+
+task WriteLines {
+    input {
+        Array[String] array
+        String docker
+    }
+
+    command <<<
+    >>>
+
+    output {
+        File tsv = write_lines(array)
     }
 
     runtime {
