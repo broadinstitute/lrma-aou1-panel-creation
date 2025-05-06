@@ -224,13 +224,13 @@ workflow LeaveOutEvaluation {
 
     call WriteTsv as WriteTsvVcfs {
         input:
-            array = if !do_genotype_SVs then select_all(CensorGenotypes.censored_vcf_gz) else select_all(KAGECasePerChromosome.chromosome_kage_vcf_gzs),
+            array = if !do_genotype_SVs then select_all(CensorGenotypes.censored_vcf_gz) else KAGECasePerChromosome.chromosome_kage_vcf_gzs,
             docker = docker
     }
 
     call WriteTsv as WriteTsvTbis {
         input:
-            array = if !do_genotype_SVs then select_all(CensorGenotypes.censored_vcf_gz_tbi) else select_all(KAGECasePerChromosome.chromosome_kage_vcf_gz_tbis),
+            array = if !do_genotype_SVs then select_all(CensorGenotypes.censored_vcf_gz_tbi) else KAGECasePerChromosome.chromosome_kage_vcf_gz_tbis,
             docker = docker
     }
 
