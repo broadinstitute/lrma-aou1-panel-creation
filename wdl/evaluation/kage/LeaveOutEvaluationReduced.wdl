@@ -35,6 +35,7 @@ workflow LeaveOutEvaluation {
         Array[String] chromosomes
         Array[String] leave_out_sample_names
         Int case_average_coverage
+        Int batch_size
         Boolean do_pangenie
         String? extra_view_args
 
@@ -147,7 +148,6 @@ workflow LeaveOutEvaluation {
         }
     }
 
-
     scatter (j in range(length(leave_out_sample_names))) {
         String leave_out_sample_name = leave_out_sample_names[j]
         File leave_out_cram = leave_out_crams[leave_out_sample_name]
@@ -186,95 +186,6 @@ workflow LeaveOutEvaluation {
             }
         }
 
-        call WriteTsv as WriteTsvVcfs {
-            input:
-                array = [select_first([CensorGenotypes.censored_vcf_gz, KAGECasePerChromosome.chromosome_kage_vcf_gzs])],
-                docker = docker
-        }
-
-        call WriteTsv as WriteTsvTbis {
-            input:
-                array = [select_first([CensorGenotypes.censored_vcf_gz, KAGECasePerChromosome.chromosome_kage_vcf_gz_tbis])],
-                docker = docker
-        }
-
-        call WriteTsv as WriteTsvSamples {
-            input:
-                array = [[leave_out_sample_name]],
-                docker = docker
-        }
-
-        # run single sample through batched workflow
-        call GLIMPSEBatchedCasePerChromosome.GLIMPSEBatchedCasePerChromosome as GLIMPSEBatchedCasePerChromosome {
-            input:
-                sample_by_chromosome_kage_vcf_gzs_tsv = WriteTsvVcfs.tsv,
-                sample_by_chromosome_kage_vcf_gz_tbis_tsv = WriteTsvTbis.tsv,
-                sample_names_file = WriteTsvSamples.tsv,
-                reference_fasta = case_reference_fasta,
-                reference_fasta_fai = case_reference_fasta_fai,
-                reference_dict = case_reference_dict,
-                chromosomes = chromosomes,
-                genetic_maps = genetic_maps,
-                panel_split_vcf_gz = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz),
-                panel_split_vcf_gz_tbi = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz_tbi),
-                chromosome_to_glimpse_command_mem_gb = chromosome_to_glimpse_command_mem_gb,
-                batch_size = 1,
-                output_prefix = leave_out_sample_name,
-                fix_variant_collisions_java = fix_variant_collisions_java,
-                operation = operation,
-                weight_tag = weight_tag,
-                is_weight_format_field = is_weight_format_field,
-                kage_docker = kage_docker,
-                monitoring_script = monitoring_script,
-                glimpse_case_chromosome_runtime_attributes = glimpse_case_chromosome_runtime_attributes,
-                glimpse_case_runtime_attributes = glimpse_case_runtime_attributes
-        }
-
-        # KAGE evaluation
-        call CalculateMetrics as CalculateMetricsKAGE {
-            input:
-                case_vcf_gz = GLIMPSEBatchedCasePerChromosome.kage_vcf_gz,
-                case_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.kage_vcf_gz_tbi,
-                truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
-                truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
-                chromosomes = chromosomes,
-                label = "KAGE",
-                sample_name = leave_out_sample_name,
-                docker = docker,
-                monitoring_script = monitoring_script,
-                runtime_attributes = calculate_metrics_runtime_attributes
-        }
-
-        # KAGE+GLIMPSE evaluation
-        call CalculateMetrics as CalculateMetricsKAGEPlusGLIMPSE {
-            input:
-                case_vcf_gz = GLIMPSEBatchedCasePerChromosome.glimpse_vcf_gz,
-                case_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.glimpse_vcf_gz_tbi,
-                truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
-                truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
-                chromosomes = chromosomes,
-                label = "KAGE+GLIMPSE",
-                sample_name = leave_out_sample_name,
-                docker = docker,
-                monitoring_script = monitoring_script,
-                runtime_attributes = calculate_metrics_runtime_attributes
-        }
-
-        # KAGE+GLIMPSE+FixVariantCollisions evaluation
-        call CalculateMetrics as CalculateMetricsPhasedCollisionless {
-            input:
-                case_vcf_gz = GLIMPSEBatchedCasePerChromosome.phased_collisionless_vcf_gz,
-                case_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.phased_collisionless_vcf_gz_tbi,
-                truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
-                truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
-                chromosomes = chromosomes,
-                label = "KAGE+GLIMPSE",
-                sample_name = leave_out_sample_name,
-                docker = docker,
-                monitoring_script = monitoring_script,
-                runtime_attributes = calculate_metrics_runtime_attributes
-        }
-
         if (do_pangenie) {
             call PanGenieGenotype.PanGenieGenotype as PanGenieGenotype {
                 input:
@@ -311,15 +222,107 @@ workflow LeaveOutEvaluation {
         }
     }
 
+    call WriteTsv as WriteTsvVcfs {
+        input:
+            array = select_first([select_all(CensorGenotypes.censored_vcf_gz), select_all(KAGECasePerChromosome.chromosome_kage_vcf_gzs)]),
+            docker = docker
+    }
+
+    call WriteTsv as WriteTsvTbis {
+        input:
+            array = select_first([select_all(CensorGenotypes.censored_vcf_gz_tbi), select_all(KAGECasePerChromosome.chromosome_kage_vcf_gz_tbis)]),
+            docker = docker
+    }
+
+    call WriteTsv as WriteTsvSamples {
+        input:
+            array = [leave_out_sample_names],
+            docker = docker
+    }
+
+    call GLIMPSEBatchedCasePerChromosome.GLIMPSEBatchedCasePerChromosome as GLIMPSEBatchedCasePerChromosome {
+        input:
+            sample_by_chromosome_kage_vcf_gzs_tsv = WriteTsvVcfs.tsv,
+            sample_by_chromosome_kage_vcf_gz_tbis_tsv = WriteTsvTbis.tsv,
+            sample_names_file = WriteTsvSamples.tsv,
+            reference_fasta = case_reference_fasta,
+            reference_fasta_fai = case_reference_fasta_fai,
+            reference_dict = case_reference_dict,
+            chromosomes = chromosomes,
+            genetic_maps = genetic_maps,
+            panel_split_vcf_gz = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz),
+            panel_split_vcf_gz_tbi = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz_tbi),
+            chromosome_to_glimpse_command_mem_gb = chromosome_to_glimpse_command_mem_gb,
+            batch_size = batch_size,
+            output_prefix = "leave-out.batch",
+            fix_variant_collisions_java = fix_variant_collisions_java,
+            operation = operation,
+            weight_tag = weight_tag,
+            is_weight_format_field = is_weight_format_field,
+            kage_docker = kage_docker,
+            monitoring_script = monitoring_script,
+            glimpse_case_chromosome_runtime_attributes = glimpse_case_chromosome_runtime_attributes,
+            glimpse_case_runtime_attributes = glimpse_case_runtime_attributes
+    }
+
+    scatter (j in range(length(leave_out_sample_names))) {
+        # KAGE evaluation
+        call CalculateMetrics as CalculateMetricsKAGE {
+            input:
+                case_vcf_gz = GLIMPSEBatchedCasePerChromosome.kage_vcf_gz,
+                case_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.kage_vcf_gz_tbi,
+                truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
+                truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
+                chromosomes = chromosomes,
+                label = "KAGE",
+                sample_name = leave_out_sample_names[j],
+                docker = docker,
+                monitoring_script = monitoring_script,
+                runtime_attributes = calculate_metrics_runtime_attributes
+        }
+
+        # KAGE+GLIMPSE evaluation
+        call CalculateMetrics as CalculateMetricsKAGEPlusGLIMPSE {
+            input:
+                case_vcf_gz = GLIMPSEBatchedCasePerChromosome.glimpse_vcf_gz,
+                case_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.glimpse_vcf_gz_tbi,
+                truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
+                truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
+                chromosomes = chromosomes,
+                label = "KAGE+GLIMPSE",
+                sample_name = leave_out_sample_names[j],
+                docker = docker,
+                monitoring_script = monitoring_script,
+                runtime_attributes = calculate_metrics_runtime_attributes
+        }
+
+        # KAGE+GLIMPSE+FixVariantCollisions evaluation
+        call CalculateMetrics as CalculateMetricsPhasedCollisionless {
+            input:
+                case_vcf_gz = GLIMPSEBatchedCasePerChromosome.phased_collisionless_vcf_gz,
+                case_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.phased_collisionless_vcf_gz_tbi,
+                truth_vcf_gz = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz,
+                truth_vcf_gz_tbi = PreprocessPanelVCF.preprocessed_panel_split_vcf_gz_tbi,
+                chromosomes = chromosomes,
+                label = "KAGE+GLIMPSE",
+                sample_name = leave_out_sample_names[j],
+                docker = docker,
+                monitoring_script = monitoring_script,
+                runtime_attributes = calculate_metrics_runtime_attributes
+        }
+    }
+
     output {
-        Array[File] kage_vcf_gzs = GLIMPSEBatchedCasePerChromosome.kage_vcf_gz
-        Array[File] kage_vcf_gz_tbis = GLIMPSEBatchedCasePerChromosome.kage_vcf_gz_tbi
-        Array[File] glimpse_unphased_vcf_gzs = GLIMPSEBatchedCasePerChromosome.glimpse_unphased_vcf_gz
-        Array[File] glimpse_unphased_vcf_gz_tbis = GLIMPSEBatchedCasePerChromosome.glimpse_unphased_vcf_gz_tbi
-        Array[File] glimpse_vcf_gzs = GLIMPSEBatchedCasePerChromosome.glimpse_vcf_gz
-        Array[File] glimpse_vcf_gz_tbis = GLIMPSEBatchedCasePerChromosome.glimpse_vcf_gz_tbi
-        Array[File] phased_collisionless_vcf_gzs = GLIMPSEBatchedCasePerChromosome.phased_collisionless_vcf_gz
-        Array[File] phased_collisionless_vcf_gz_tbis = GLIMPSEBatchedCasePerChromosome.phased_collisionless_vcf_gz_tbi
+        # merged
+        File kage_vcf_gz = GLIMPSEBatchedCasePerChromosome.kage_vcf_gz
+        File kage_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.kage_vcf_gz_tbi
+        File glimpse_unphased_vcf_gz = GLIMPSEBatchedCasePerChromosome.glimpse_unphased_vcf_gz
+        File glimpse_unphased_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.glimpse_unphased_vcf_gz_tbi
+        File glimpse_vcf_gz = GLIMPSEBatchedCasePerChromosome.glimpse_vcf_gz
+        File glimpse_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.glimpse_vcf_gz_tbi
+        File phased_collisionless_vcf_gz = GLIMPSEBatchedCasePerChromosome.phased_collisionless_vcf_gz
+        File phased_collisionless_vcf_gz_tbi = GLIMPSEBatchedCasePerChromosome.phased_collisionless_vcf_gz_tbi
+        # per-sample
         Array[File?] pangenie_vcf_gzs = PanGenieGenotype.genotyping_vcf_gz
         Array[File?] pangenie_vcf_gz_tbis = PanGenieGenotype.genotyping_vcf_gz_tbi
 
@@ -669,7 +672,7 @@ task CalculateMetrics {
         fi
 
         # split multiallelics in case (may be redundant)
-        bcftools norm --no-version -r ~{sep="," chromosomes} -m- -N ~{case_vcf_gz} -Oz -o case.split.vcf.gz
+        bcftools norm --no-version -r ~{sep="," chromosomes} -s ~{sample_name} -m- -N ~{case_vcf_gz} -Oz -o case.split.vcf.gz
         bcftools index -t case.split.vcf.gz
 
         # mark case variants in panel

@@ -55,20 +55,20 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         Array[String] leave_out_chromosomes
         Array[String] leave_out_sample_names
         Int case_average_coverage
+        Int batch_size
         Boolean do_pangenie
         String? extra_view_args
         Map[String, File] leave_out_crams
         String leave_out_docker
         String kage_docker
+        String samtools_docker
         String pangenie_docker
         Int? cpu_make_count_model
-        Map[String, Int] chromosome_to_glimpse_command_mem_gb
         RuntimeAttributes? leave_out_runtime_attributes
         RuntimeAttributes? leave_out_medium_runtime_attributes
         RuntimeAttributes? leave_out_large_runtime_attributes
         RuntimeAttributes? pangenie_runtime_attributes
-        RuntimeAttributes? kage_count_kmers_runtime_attributes
-        RuntimeAttributes? kage_genotype_runtime_attributes
+        RuntimeAttributes? kage_runtime_attributes
         RuntimeAttributes? glimpse_case_chromosome_runtime_attributes
         RuntimeAttributes? glimpse_case_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
@@ -76,7 +76,6 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         # reduced arguments
         Int? num_short_variants_to_retain
         Boolean do_genotype_SVs = true
-        String samtools_docker
 
         # inputs for Ivcfmerge
         String ivcfmerge_docker
@@ -261,51 +260,45 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             chromosomes = leave_out_chromosomes,
             leave_out_sample_names = leave_out_sample_names,
             case_average_coverage = case_average_coverage,
+            batch_size = batch_size,
             do_pangenie = do_pangenie,
             extra_view_args = extra_view_args,
             leave_out_crams = leave_out_crams,
             docker = leave_out_docker,
+            samtools_docker = samtools_docker,
             kage_docker = kage_docker,
             pangenie_docker = pangenie_docker,
             monitoring_script = monitoring_script,
             cpu_make_count_model = cpu_make_count_model,
-            chromosome_to_glimpse_command_mem_gb = chromosome_to_glimpse_command_mem_gb,
             runtime_attributes = leave_out_runtime_attributes,
             medium_runtime_attributes = leave_out_medium_runtime_attributes,
             large_runtime_attributes = leave_out_large_runtime_attributes,
             pangenie_runtime_attributes = pangenie_runtime_attributes,
-            kage_count_kmers_runtime_attributes = kage_count_kmers_runtime_attributes,
-            kage_genotype_runtime_attributes = kage_genotype_runtime_attributes,
+            kage_runtime_attributes = kage_runtime_attributes,
             glimpse_case_chromosome_runtime_attributes = glimpse_case_chromosome_runtime_attributes,
             glimpse_case_runtime_attributes = glimpse_case_runtime_attributes,
             calculate_metrics_runtime_attributes = calculate_metrics_runtime_attributes,
             num_short_variants_to_retain = num_short_variants_to_retain,
-            do_genotype_SVs = do_genotype_SVs,
-            samtools_docker = samtools_docker,
-            fix_variant_collisions_java = fix_variant_collisions_java,
-            operation = operation,
-            weight_tag = weight_tag,
-            is_weight_format_field = is_weight_format_field
+            do_genotype_SVs = do_genotype_SVs
         }
 
-        # merge GLIMPSE VCFs
-        call Ivcfmerge as GLIMPSEMergeAcrossSamples { input:
-            vcf_gzs = LeaveOutEvaluation.glimpse_vcf_gzs,
-            vcf_gz_tbis = LeaveOutEvaluation.glimpse_vcf_gz_tbis,
-            sample_names = leave_out_sample_names,
-            output_prefix = output_prefix + ".glimpse.merged",
-            docker = ivcfmerge_docker,
+        # naively phased unphased GLIMPSE VCFs
+        call NaivelyPhase as GLIMPSENaivelyPhased { input:
+            vcf_gz = LeaveOutEvaluation.glimpse_unphased_vcf_gz,
+            vcf_gz_tbi = LeaveOutEvaluation.glimpse_unphased_vcf_gz_tbi,
+            docker = kage_docker,
             monitoring_script = monitoring_script
         }
 
-        call ChromosomePhasedPanelCreationFromHiPhase.FixVariantCollisions as GenotypingFixVariantCollisions { input:
-            phased_bcf = GLIMPSEMergeAcrossSamples.merged_vcf_gz,
+        call ChromosomePhasedPanelCreationFromHiPhase.FixVariantCollisions as GLIMPSEFixVariantCollisions { input:
+            phased_bcf = LeaveOutEvaluation.glimpse_vcf_gz,
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,
             weight_tag = weight_tag,
             is_weight_format_field = is_weight_format_field,
             output_prefix = output_prefix + ".glimpse.merged.phased.collisionless"
         }
+
         # evaluate panel short + SV
         call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
             samples = vcfdist_samples,
@@ -324,14 +317,32 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             overlap_metrics_docker = overlap_metrics_docker
         }
 
-        # evaluate GLIMPSE
-        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotyping { input:
+        # evaluate naively phased GLIMPSE
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSENaivelyPhased { input:
             samples = vcfdist_samples,
             confident_regions_bed_files = confident_regions_bed_files,
             truth_vcf = vcfdist_truth_vcf,
             truth_vcf_idx = vcfdist_truth_vcf_idx,
-            eval_vcf = GLIMPSEMergeAcrossSamples.merged_vcf_gz,
-            eval_vcf_idx = GLIMPSEMergeAcrossSamples.merged_vcf_gz_tbi,
+            eval_vcf = GLIMPSENaivelyPhased.naively_phased_vcf_gz,
+            eval_vcf_idx = GLIMPSENaivelyPhased.naively_phased_vcf_gz_tbi,
+            region = evaluation_chromosomes_regions_arg,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
+            overlap_phase_tag = "NONE",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
+
+        # evaluate GLIMPSE
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSE { input:
+            samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
+            truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
+            eval_vcf = LeaveOutEvaluation.glimpse_vcf_gz,
+            eval_vcf_idx = LeaveOutEvaluation.glimpse_vcf_gz_tbi,
             region = evaluation_chromosomes_regions_arg,
             reference_fasta = reference_fasta,
             reference_fasta_fai = reference_fasta_fai,
@@ -343,13 +354,13 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         }
 
         # evaluate collisionless GLIMPSE
-        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGenotypingFixVariantCollisions { input:
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSEFixVariantCollisions { input:
             samples = vcfdist_samples,
             confident_regions_bed_files = confident_regions_bed_files,
             truth_vcf = vcfdist_truth_vcf,
             truth_vcf_idx = vcfdist_truth_vcf_idx,
-            eval_vcf = GenotypingFixVariantCollisions.collisionless_bcf,
-            eval_vcf_idx = GenotypingFixVariantCollisions.collisionless_bcf_csi,
+            eval_vcf = GLIMPSEFixVariantCollisions.collisionless_bcf,
+            eval_vcf_idx = GLIMPSEFixVariantCollisions.collisionless_bcf_csi,
             region = evaluation_chromosomes_regions_arg,
             reference_fasta = reference_fasta,
             reference_fasta_fai = reference_fasta_fai,
@@ -361,24 +372,34 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         }
 
         if (do_pangenie) {
-            # merge PanGenie VCFs
-            call Ivcfmerge as PanGenieMergeAcrossSamples { input:
-                vcf_gzs = select_all(LeaveOutEvaluation.pangenie_vcf_gzs),
-                vcf_gz_tbis = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
+            # naively phase unphased PanGenie VCFs
+            scatter (i in range(length(LeaveOutEvaluation.pangenie_vcf_gzs))) {
+                call NaivelyPhase as PanGenieNaivelyPhased { input:
+                    vcf_gz = select_first([LeaveOutEvaluation.pangenie_vcf_gzs[i]]),
+                    vcf_gz_tbi = select_first([LeaveOutEvaluation.pangenie_vcf_gz_tbis[i]]),
+                    docker = kage_docker,
+                    monitoring_script = monitoring_script
+                }
+            }
+
+            # merge naively phased PanGenie VCFs
+            call Ivcfmerge as PanGenieNaivelyPhasedMergeAcrossSamples { input:
+                vcf_gzs = PanGenieNaivelyPhased.naively_phased_vcf_gz,
+                vcf_gz_tbis = PanGenieNaivelyPhased.naively_phased_vcf_gz_tbi,
                 sample_names = leave_out_sample_names,
                 output_prefix = output_prefix + ".pangenie.merged",
                 docker = ivcfmerge_docker,
                 monitoring_script = monitoring_script
             }
 
-            # evaluate PanGenie
-            call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanGenie { input:
+            # evaluate naively phased PanGenie
+            call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanGenieNaivelyPhased { input:
                 samples = vcfdist_samples,
                 confident_regions_bed_files = confident_regions_bed_files,
                 truth_vcf = vcfdist_truth_vcf,
                 truth_vcf_idx = vcfdist_truth_vcf_idx,
-                eval_vcf = PanGenieMergeAcrossSamples.merged_vcf_gz,
-                eval_vcf_idx = PanGenieMergeAcrossSamples.merged_vcf_gz_tbi,
+                eval_vcf = PanGenieNaivelyPhasedMergeAcrossSamples.merged_vcf_gz,
+                eval_vcf_idx = PanGenieNaivelyPhasedMergeAcrossSamples.merged_vcf_gz_tbi,
                 region = evaluation_chromosomes_regions_arg,
                 reference_fasta = reference_fasta,
                 reference_fasta_fai = reference_fasta_fai,
@@ -389,12 +410,13 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
                 overlap_metrics_docker = overlap_metrics_docker
             }
 
-            String pangenie_label = "PanGenie"
+            String pangenie_naively_phased_label = "PanGenieNaivelyPhased"
         }
 
         String panel_label = "Panel"
-        String genotyping_label = "Genotyping"
-        String genotyping_fix_variant_collisions_label = "GenotypingFixVariantCollisions"
+        String glimpse_naively_phased_label = "GLIMPSENaivelyPhased"
+        String glimpse_label = "GLIMPSE"
+        String glimpse_fix_variant_collisions_label = "GLIMPSEFixVariantCollisions"
     }
 
     Array[String] labels_per_vcf = select_all([
@@ -405,9 +427,10 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         "Shapeit4",
         "FixVariantCollisions",
         panel_label,
-        genotyping_label,
-        genotyping_fix_variant_collisions_label,
-        pangenie_label
+        glimpse_naively_phased_label,
+        glimpse_label,
+        glimpse_fix_variant_collisions_label,
+        pangenie_naively_phased_label
     ])
     call SummarizeEvaluations { input:
         labels_per_vcf = labels_per_vcf,
@@ -419,9 +442,10 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             EvaluateShapeit4.vcfdist_outputs_per_sample,
             EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
             EvaluatePanel.vcfdist_outputs_per_sample,
-            EvaluateGenotyping.vcfdist_outputs_per_sample,
-            EvaluateGenotypingFixVariantCollisions.vcfdist_outputs_per_sample,
-            EvaluatePanGenie.vcfdist_outputs_per_sample
+            EvaluateGLIMPSENaivelyPhased.vcfdist_outputs_per_sample,
+            EvaluateGLIMPSE.vcfdist_outputs_per_sample,
+            EvaluateGLIMPSEFixVariantCollisions.vcfdist_outputs_per_sample,
+            EvaluatePanGenieNaivelyPhased.vcfdist_outputs_per_sample
         ]),
         overlap_metrics_outputs_per_vcf = select_all([
             EvaluateHiPhaseShort.overlap_metrics_outputs,
@@ -431,9 +455,10 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             EvaluateShapeit4.overlap_metrics_outputs,
             EvaluateFixVariantCollisions.overlap_metrics_outputs,
             EvaluatePanel.overlap_metrics_outputs,
-            EvaluateGenotyping.overlap_metrics_outputs,
-            EvaluateGenotypingFixVariantCollisions.overlap_metrics_outputs,
-            EvaluatePanGenie.overlap_metrics_outputs
+            EvaluateGLIMPSENaivelyPhased.overlap_metrics_outputs,
+            EvaluateGLIMPSE.overlap_metrics_outputs,
+            EvaluateGLIMPSEFixVariantCollisions.overlap_metrics_outputs,
+            EvaluatePanGenieNaivelyPhased.overlap_metrics_outputs
         ]),
         docker = summarize_evaluations_docker
     }
@@ -695,5 +720,49 @@ task Ivcfmerge {
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
         preemptible: select_first([runtime_attributes.preemptible, 2])
         maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+}
+
+task NaivelyPhase {
+    input {
+        File vcf_gz
+        File vcf_gz_tbi
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    String output_prefix = basename(vcf_gz, ".vcf.gz")
+
+    command {
+        set -e
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        # naively set all GTs to phased for Vcfdist evaluation
+        bcftools +setGT ~{vcf_gz} -Oz -o ~{output_prefix}.naively_phased.vcf.gz -- -t a -n p
+        bcftools index -t ~{output_prefix}.naively_phased.vcf.gz
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 500]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        File naively_phased_vcf_gz = "~{output_prefix}.naively_phased.vcf.gz"
+        File naively_phased_vcf_gz_tbi = "~{output_prefix}.naively_phased.vcf.gz.tbi"
     }
 }
