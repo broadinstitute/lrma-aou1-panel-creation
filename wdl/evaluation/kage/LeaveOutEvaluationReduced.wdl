@@ -669,7 +669,7 @@ task CalculateMetrics {
         fi
 
         # split multiallelics in case (may be redundant)
-        bcftools norm --no-version -r ~{sep="," chromosomes} -s ~{sample_name} -m- -N ~{case_vcf_gz} -Oz -o case.split.vcf.gz
+        bcftools view --no-version -r ~{sep="," chromosomes} -s ~{sample_name} ~{case_vcf_gz} | bcftools norm --no-version -m- -N -Oz -o case.split.vcf.gz
         bcftools index -t case.split.vcf.gz
 
         # mark case variants in panel
