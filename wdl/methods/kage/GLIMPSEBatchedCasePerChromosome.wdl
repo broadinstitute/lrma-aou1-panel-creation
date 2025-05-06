@@ -16,9 +16,6 @@ workflow GLIMPSEBatchedCasePerChromosome {
         File sample_by_chromosome_kage_vcf_gzs_tsv
         File sample_by_chromosome_kage_vcf_gz_tbis_tsv
         File sample_names_file
-        File reference_fasta
-        File reference_fasta_fai
-        File reference_dict
 
         # per chromosome
         Array[String]+ chromosomes
@@ -27,6 +24,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
         Array[File] panel_split_vcf_gz_tbi
         Map[String, Int] chromosome_to_glimpse_command_mem_gb
 
+        String? extra_chunk_args
         Int batch_size
         String output_prefix
 
@@ -56,35 +54,69 @@ workflow GLIMPSEBatchedCasePerChromosome {
             docker = kage_docker
     }
 
+    scatter (j in range(length(chromosomes))) {
+        call GLIMPSEChunk as ChromosomeGLIMPSEChunk {
+            input:
+                vcf = panel_split_vcf_gz[j],
+                tbi = panel_split_vcf_gz_tbi[j],
+                region = chromosomes[j],
+                prefix = output_prefix + "." + chromosomes[j],
+                extra_chunk_args = extra_chunk_args
+        }
+    }
+
     scatter (b in range(length(CreateBatches.chromosome_vcf_gz_batch_files))) {
         scatter (j in range(length(chromosomes))) {
             String chromosome = chromosomes[j]
             Array[String] chromosome_kage_vcf_gzs = transpose(read_tsv(CreateBatches.chromosome_vcf_gz_batch_files[b]))[j]
             Array[String] chromosome_kage_vcf_gz_tbis = transpose(read_tsv(CreateBatches.chromosome_vcf_gz_tbi_batch_files[b]))[j]
 
-            call Ivcfmerge as ChromosomeKAGEMergeAcrossSamples { input:
-                vcf_gzs = chromosome_kage_vcf_gzs,
-                vcf_gz_tbis = chromosome_kage_vcf_gz_tbis,
-                sample_names = read_lines(CreateBatches.sample_name_batch_files[b]),
-                output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".kage",
-                docker = kage_docker,
-                monitoring_script = monitoring_script
+            call Ivcfmerge as ChromosomeKAGEMergeAcrossSamples {
+                input:
+                    vcf_gzs = chromosome_kage_vcf_gzs,
+                    vcf_gz_tbis = chromosome_kage_vcf_gz_tbis,
+                    sample_names = read_lines(CreateBatches.sample_name_batch_files[b]),
+                    output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".kage",
+                    docker = kage_docker,
+                    monitoring_script = monitoring_script
             }
 
-            call GLIMPSECaseChromosome as GLIMPSEBatchedCaseChromosome {
+            Array[String] input_regions = read_lines(ChromosomeGLIMPSEChunk.input_regions[j])
+            Array[String] output_regions = read_lines(ChromosomeGLIMPSEChunk.output_regions[j])
+
+            scatter (k in range(length(input_regions))) {
+                call GLIMPSEPhase as ChunkedGLIMPSEPhase {
+                    input:
+                        kage_vcf_gz = ChromosomeKAGEMergeAcrossSamples.merged_vcf_gz,
+                        kage_vcf_gz_tbi = ChromosomeKAGEMergeAcrossSamples.merged_vcf_gz_tbi,
+                        panel_split_vcf_gz = panel_split_vcf_gz[j],
+                        panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi[j],
+                        input_region = input_regions[k],
+                        output_region = output_regions[k],
+                        genetic_map = genetic_maps[j],
+                        output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".shard-" + k + ".phased",
+                        docker = kage_docker,
+                        monitoring_script = monitoring_script,
+                        command_mem_gb = chromosome_to_glimpse_command_mem_gb[chromosome],
+                        runtime_attributes = glimpse_case_chromosome_runtime_attributes
+                }
+            }
+
+            call GLIMPSELigate as ChromosomeGLIMPSELigate {
                 input:
-                    kage_vcf_gz = ChromosomeKAGEMergeAcrossSamples.merged_vcf_gz,
-                    kage_vcf_gz_tbi = ChromosomeKAGEMergeAcrossSamples.merged_vcf_gz_tbi,
-                    panel_split_vcf_gz = panel_split_vcf_gz[j],
-                    panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi[j],
-                    reference_fasta_fai = reference_fasta_fai,
-                    chromosome = chromosome,
-                    genetic_map = genetic_maps[j],
-                    output_prefix = output_prefix + ".batch-" + b,
+                    vcfs = ChunkedGLIMPSEPhase.phased_vcf_gz,
+                    vcf_idxs = ChunkedGLIMPSEPhase.phased_vcf_gz_tbi,
+                    prefix = output_prefix + ".batch-" + b + "." + chromosome + ".ligated"
+            }
+
+            call GLIMPSESample as ChromosomeGLIMPSESample {
+                input:
+                    ligated_vcf_gz = ChromosomeGLIMPSELigate.ligated_vcf_gz,
+                    ligated_vcf_gz_tbi = ChromosomeGLIMPSELigate.ligated_vcf_gz_tbi,
+                    output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".sampled",
                     docker = kage_docker,
                     monitoring_script = monitoring_script,
-                    command_mem_gb = chromosome_to_glimpse_command_mem_gb[chromosome],
-                    runtime_attributes = glimpse_case_chromosome_runtime_attributes
+                    runtime_attributes = glimpse_case_runtime_attributes
             }
         }
 
@@ -97,19 +129,27 @@ workflow GLIMPSEBatchedCasePerChromosome {
                 monitoring_script = monitoring_script
         }
 
-        call GLIMPSECase as GLIMPSEBatchedCase {
+        call ConcatVcfs as GLIMPSEUnphasedConcatVcfs {
             input:
-                chromosome_glimpse_vcf_gzs = GLIMPSEBatchedCaseChromosome.chromosome_glimpse_vcf_gz,
-                chromosome_glimpse_vcf_gz_tbis = GLIMPSEBatchedCaseChromosome.chromosome_glimpse_vcf_gz_tbi,
-                output_prefix = output_prefix + ".batch-" + b,
+                vcf_gzs = ChromosomeGLIMPSELigate.ligated_vcf_gz,
+                vcf_gz_tbis = ChromosomeGLIMPSELigate.ligated_vcf_gz_tbi,
+                output_prefix = output_prefix + ".batch-" + b + ".kage.glimpse.unphased",
                 docker = kage_docker,
-                monitoring_script = monitoring_script,
-                runtime_attributes = glimpse_case_runtime_attributes
+                monitoring_script = monitoring_script
+        }
+
+        call ConcatVcfs as GLIMPSEConcatVcfs {
+            input:
+                vcf_gzs = ChromosomeGLIMPSESample.glimpse_vcf_gz,
+                vcf_gz_tbis = ChromosomeGLIMPSESample.glimpse_vcf_gz_tbi,
+                output_prefix = output_prefix + ".batch-" + b + ".kage.glimpse",
+                docker = kage_docker,
+                monitoring_script = monitoring_script
         }
 
         call FixVariantCollisions as GLIMPSEFixVariantCollisions { input:
-            vcf_gz = GLIMPSEBatchedCase.glimpse_vcf_gz,
-            vcf_gz_tbi = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi,
+            vcf_gz = GLIMPSEConcatVcfs.vcf_gz,
+            vcf_gz_tbi = GLIMPSEConcatVcfs.vcf_gz_tbi,
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,
             weight_tag = weight_tag,
@@ -129,8 +169,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
     }
 
     call Ivcfmerge as GLIMPSEUnphasedMergeAcrossSamples { input:
-        vcf_gzs = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz,
-        vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi,
+        vcf_gzs = GLIMPSEUnphasedConcatVcfs.vcf_gz,
+        vcf_gz_tbis = GLIMPSEUnphasedConcatVcfs.vcf_gz_tbi,
         sample_names = sample_names,
         output_prefix = output_prefix + ".kage.glimpse.unphased",
         docker = kage_docker,
@@ -138,8 +178,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
     }
 
     call Ivcfmerge as GLIMPSEMergeAcrossSamples { input:
-        vcf_gzs = GLIMPSEBatchedCase.glimpse_vcf_gz,
-        vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi,
+        vcf_gzs = GLIMPSEConcatVcfs.vcf_gz,
+        vcf_gz_tbis = GLIMPSEConcatVcfs.vcf_gz_tbi,
         sample_names = sample_names,
         output_prefix = output_prefix + ".kage.glimpse",
         docker = kage_docker,
@@ -158,10 +198,10 @@ workflow GLIMPSEBatchedCasePerChromosome {
     output {
         Array[File] batch_kage_vcf_gzs = KAGEConcatVcfs.vcf_gz
         Array[File] batch_kage_vcf_gz_tbis = KAGEConcatVcfs.vcf_gz_tbi
-        Array[File] batch_glimpse_unphased_vcf_gzs = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz
-        Array[File] batch_glimpse_unphased_vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_unphased_vcf_gz_tbi
-        Array[File] batch_glimpse_vcf_gzs = GLIMPSEBatchedCase.glimpse_vcf_gz
-        Array[File] batch_glimpse_vcf_gz_tbis = GLIMPSEBatchedCase.glimpse_vcf_gz_tbi
+        Array[File] batch_glimpse_unphased_vcf_gzs = GLIMPSEUnphasedConcatVcfs.vcf_gz
+        Array[File] batch_glimpse_unphased_vcf_gz_tbis = GLIMPSEUnphasedConcatVcfs.vcf_gz_tbi
+        Array[File] batch_glimpse_vcf_gzs = GLIMPSEConcatVcfs.vcf_gz
+        Array[File] batch_glimpse_vcf_gz_tbis = GLIMPSEConcatVcfs.vcf_gz_tbi
         Array[File] batch_phased_collisionless_vcf_gzs = GLIMPSEFixVariantCollisions.collisionless_vcf_gz
         Array[File] batch_phased_collisionless_vcf_gz_tbis = GLIMPSEFixVariantCollisions.collisionless_vcf_gz_tbi
 
@@ -306,14 +346,60 @@ task ConcatVcfs {
     }
 }
 
-task GLIMPSECaseChromosome {
+task GLIMPSEChunk {
+    input {
+        File vcf
+        File tbi
+        String region
+        String prefix
+        String? extra_chunk_args = "--thread $(nproc) --window-size 5000000 --buffer-size 500000"
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    Int disk_size_gb = 2*ceil(size([vcf, tbi], "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_chunk_static
+        chmod +x GLIMPSE_chunk_static
+
+        ./GLIMPSE_chunk_static \
+            -I ~{vcf} \
+            --region ~{region} \
+            ~{extra_chunk_args} \
+            -O chunks.txt
+
+        # cut chunks + buffers
+        cut -f 3 chunks.txt > input-regions.txt
+        cut -f 4 chunks.txt > output-regions.txt
+    >>>
+
+    output {
+        File input_regions = "input-regions.txt"
+        File output_regions = "output-regions.txt"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+        cpu: select_first([runtime_attributes.cpu, 4])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 10])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+}
+
+task GLIMPSEPhase {
     input {
         File kage_vcf_gz
         File kage_vcf_gz_tbi
         File panel_split_vcf_gz       # for GLIMPSE
         File panel_split_vcf_gz_tbi
-        File reference_fasta_fai
-        String chromosome
+        String input_region
+        String output_region
         File genetic_map
         String output_prefix
 
@@ -333,33 +419,32 @@ task GLIMPSECaseChromosome {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools view --no-version -r ~{chromosome} ~{kage_vcf_gz} | \
+        bcftools view --no-version -r ~{input_region},~{output_region} ~{kage_vcf_gz} | \
             sed -e 's/nan/-1000000.0/g' | sed -e 's/-inf/-1000000.0/g' | sed -e 's/inf/-1000000.0/g' | \
-            bcftools view -Ob -o ~{output_prefix}.kage.nonan.~{chromosome}.bcf
-        bcftools index ~{output_prefix}.kage.nonan.~{chromosome}.bcf
+            bcftools view -Ob -o ~{output_prefix}.kage.nonan.bcf
+        bcftools index ~{output_prefix}.kage.nonan.bcf
 
         # TODO update to GLIMPSE2; first figure out why it complains about AC/AN and GT being inconsistent?
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_phase_static
         chmod +x GLIMPSE_phase_static
 
-        CHROMOSOME_LENGTH=$(grep -P "~{chromosome}\t" ~{reference_fasta_fai} | cut -f 2)
         ./GLIMPSE_phase_static \
-            -I ~{output_prefix}.kage.nonan.~{chromosome}.bcf \
+            -I ~{output_prefix}.kage.nonan.bcf \
             -R ~{panel_split_vcf_gz} \
-            --input-region ~{chromosome}:1-$CHROMOSOME_LENGTH \
-            --output-region ~{chromosome}:1-$CHROMOSOME_LENGTH \
+            --input-region ~{input_region} \
+            --output-region ~{output_region} \
             --map ~{genetic_map} \
             --input-GL \
             --thread $(nproc) \
-            --output ~{output_prefix}.~{chromosome}.kage.glimpse.raw.vcf.gz
+            --output ~{output_prefix}.kage.glimpse.raw.vcf.gz
 
         # take KAGE VCF header and add GLIMPSE INFO and FORMAT lines (GLIMPSE header only contains a single chromosome and breaks bcftools concat --naive)
         bcftools view --no-version -h ~{kage_vcf_gz} | grep '^##' > kage.header.txt
-        bcftools view --no-version -h ~{output_prefix}.~{chromosome}.kage.glimpse.raw.vcf.gz | grep -E '^##INFO|^##FORMAT|^##NMAIN|^##FPLOIDY' > glimpse.header.txt
+        bcftools view --no-version -h ~{output_prefix}.kage.glimpse.raw.vcf.gz | grep -E '^##INFO|^##FORMAT|^##NMAIN|^##FPLOIDY' > glimpse.header.txt
         bcftools view --no-version -h ~{kage_vcf_gz} | grep '^#CHROM' > kage.columns.txt
         cat kage.header.txt glimpse.header.txt kage.columns.txt > header.txt
-        bcftools reheader -h header.txt ~{output_prefix}.~{chromosome}.kage.glimpse.raw.vcf.gz > ~{output_prefix}.~{chromosome}.kage.glimpse.vcf.gz
-        bcftools index -t ~{output_prefix}.~{chromosome}.kage.glimpse.vcf.gz
+        bcftools reheader -h header.txt ~{output_prefix}.kage.glimpse.raw.vcf.gz > ~{output_prefix}.vcf.gz
+        bcftools index -t ~{output_prefix}.vcf.gz
     }
 
     runtime {
@@ -374,15 +459,55 @@ task GLIMPSECaseChromosome {
 
     output {
         File monitoring_log = "monitoring.log"
-        File chromosome_glimpse_vcf_gz = "~{output_prefix}.~{chromosome}.kage.glimpse.vcf.gz"
-        File chromosome_glimpse_vcf_gz_tbi = "~{output_prefix}.~{chromosome}.kage.glimpse.vcf.gz.tbi"
+        File phased_vcf_gz = "~{output_prefix}.vcf.gz"          # note that this actually contains unphased */* GTs; these are converted to phased *|* GTs later on in the sample step
+        File phased_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
     }
 }
 
-task GLIMPSECase {
+task GLIMPSELigate {
     input {
-        Array[File] chromosome_glimpse_vcf_gzs
-        Array[File] chromosome_glimpse_vcf_gz_tbis
+        Array[File] vcfs
+        Array[File]? vcf_idxs
+        String prefix
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    Int disk_size_gb = 2*ceil(size(vcfs, "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+        if ! ~{defined(vcf_idxs)}; then
+            for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
+        fi
+
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_ligate_static
+        chmod +x GLIMPSE_ligate_static
+
+        ./GLIMPSE_ligate_static --input ~{write_lines(vcfs)} --output ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File ligated_vcf_gz = "~{prefix}.vcf.gz"
+        File ligated_vcf_gz_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+        cpu: select_first([runtime_attributes.cpu, 2])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 10])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+}
+
+task GLIMPSESample {
+    input {
+        File ligated_vcf_gz
+        File ligated_vcf_gz_tbi
         String output_prefix
 
         String docker
@@ -400,20 +525,14 @@ task GLIMPSECase {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools concat \
-            -f ~{write_lines(chromosome_glimpse_vcf_gzs)} \
-            --naive \
-            -Oz -o ~{output_prefix}.kage.glimpse.unphased.vcf.gz
-        bcftools index -t ~{output_prefix}.kage.glimpse.unphased.vcf.gz
-
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_sample_static
         chmod +x GLIMPSE_sample_static
 
-        ./GLIMPSE_sample_static --input ~{output_prefix}.kage.glimpse.unphased.vcf.gz \
+        ./GLIMPSE_sample_static --input ~{ligated_vcf_gz} \
             --solve \
-            --output ~{output_prefix}.kage.glimpse.vcf.gz \
+            --output ~{output_prefix}.vcf.gz \
             --log ~{output_prefix}.sample.log
-        bcftools index -t ~{output_prefix}.kage.glimpse.vcf.gz
+        bcftools index -t ~{output_prefix}.vcf.gz
     }
 
     runtime {
@@ -428,10 +547,8 @@ task GLIMPSECase {
 
     output {
         File monitoring_log = "monitoring.log"
-        File glimpse_unphased_vcf_gz = "~{output_prefix}.kage.glimpse.unphased.vcf.gz"
-        File glimpse_unphased_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.unphased.vcf.gz.tbi"
-        File glimpse_vcf_gz = "~{output_prefix}.kage.glimpse.vcf.gz"
-        File glimpse_vcf_gz_tbi = "~{output_prefix}.kage.glimpse.vcf.gz.tbi"
+        File glimpse_vcf_gz = "~{output_prefix}.vcf.gz"
+        File glimpse_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
     }
 }
 
@@ -488,7 +605,7 @@ task FixVariantCollisions {
         memory:  "16 GiB"
         disks: "local-disk 100 HDD"
         bootDiskSizeGb: 10
-        preemptible_tries:     3
+        preemptible:     3
         max_retries:           2
         docker:"us.gcr.io/broad-gatk/gatk:4.6.0.0"
     }
