@@ -69,8 +69,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         RuntimeAttributes? leave_out_large_runtime_attributes
         RuntimeAttributes? pangenie_runtime_attributes
         RuntimeAttributes? kage_runtime_attributes
-        RuntimeAttributes? glimpse_case_chromosome_runtime_attributes
-        RuntimeAttributes? glimpse_case_runtime_attributes
+        RuntimeAttributes? glimpse_phase_runtime_attributes
+        RuntimeAttributes? glimpse_sample_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
 
         # reduced arguments
@@ -275,8 +275,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             large_runtime_attributes = leave_out_large_runtime_attributes,
             pangenie_runtime_attributes = pangenie_runtime_attributes,
             kage_runtime_attributes = kage_runtime_attributes,
-            glimpse_case_chromosome_runtime_attributes = glimpse_case_chromosome_runtime_attributes,
-            glimpse_case_runtime_attributes = glimpse_case_runtime_attributes,
+            glimpse_phase_runtime_attributes = glimpse_phase_runtime_attributes,
+            glimpse_sample_runtime_attributes = glimpse_sample_runtime_attributes,
             calculate_metrics_runtime_attributes = calculate_metrics_runtime_attributes,
             num_short_variants_to_retain = num_short_variants_to_retain,
             do_genotype_SVs = do_genotype_SVs

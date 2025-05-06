@@ -59,14 +59,13 @@ workflow LeaveOutEvaluation {
         File? monitoring_script
 
         Int? cpu_make_count_model
-        Map[String, Int] chromosome_to_glimpse_command_mem_gb
         RuntimeAttributes? runtime_attributes
         RuntimeAttributes? medium_runtime_attributes
         RuntimeAttributes? large_runtime_attributes
         RuntimeAttributes? pangenie_runtime_attributes
         RuntimeAttributes? kage_runtime_attributes
-        RuntimeAttributes? glimpse_case_chromosome_runtime_attributes
-        RuntimeAttributes? glimpse_case_runtime_attributes
+        RuntimeAttributes? glimpse_phase_runtime_attributes
+        RuntimeAttributes? glimpse_sample_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
     }
 
@@ -249,7 +248,6 @@ workflow LeaveOutEvaluation {
             genetic_maps = genetic_maps,
             panel_split_vcf_gz = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz),
             panel_split_vcf_gz_tbi = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz_tbi),
-            chromosome_to_glimpse_command_mem_gb = chromosome_to_glimpse_command_mem_gb,
             batch_size = batch_size,
             output_prefix = "leave-out.batch",
             fix_variant_collisions_java = fix_variant_collisions_java,
@@ -258,8 +256,8 @@ workflow LeaveOutEvaluation {
             is_weight_format_field = is_weight_format_field,
             kage_docker = kage_docker,
             monitoring_script = monitoring_script,
-            glimpse_case_chromosome_runtime_attributes = glimpse_case_chromosome_runtime_attributes,
-            glimpse_case_runtime_attributes = glimpse_case_runtime_attributes
+            glimpse_phase_runtime_attributes = glimpse_phase_runtime_attributes,
+            glimpse_sample_runtime_attributes = glimpse_sample_runtime_attributes
     }
 
     scatter (j in range(length(leave_out_sample_names))) {

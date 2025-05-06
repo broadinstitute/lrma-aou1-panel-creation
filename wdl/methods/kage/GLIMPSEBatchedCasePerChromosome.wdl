@@ -22,7 +22,6 @@ workflow GLIMPSEBatchedCasePerChromosome {
         Array[File]+ genetic_maps
         Array[File] panel_split_vcf_gz # for GLIMPSE
         Array[File] panel_split_vcf_gz_tbi
-        Map[String, Int] chromosome_to_glimpse_command_mem_gb
 
         String? extra_chunk_args
         Int batch_size
@@ -37,8 +36,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
         String kage_docker
         File? monitoring_script
 
-        RuntimeAttributes glimpse_case_chromosome_runtime_attributes = {}
-        RuntimeAttributes glimpse_case_runtime_attributes = {}
+        RuntimeAttributes glimpse_phase_runtime_attributes = {}
+        RuntimeAttributes glimpse_sample_runtime_attributes = {}
     }
 
     Array[Array[String]] sample_by_chromosome_kage_vcf_gzs = read_tsv(sample_by_chromosome_kage_vcf_gzs_tsv)
@@ -97,8 +96,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
                         output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".shard-" + k + ".phased",
                         docker = kage_docker,
                         monitoring_script = monitoring_script,
-                        command_mem_gb = chromosome_to_glimpse_command_mem_gb[chromosome],
-                        runtime_attributes = glimpse_case_chromosome_runtime_attributes
+                        runtime_attributes = glimpse_phase_runtime_attributes
                 }
             }
 
@@ -116,7 +114,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
                     output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".sampled",
                     docker = kage_docker,
                     monitoring_script = monitoring_script,
-                    runtime_attributes = glimpse_case_runtime_attributes
+                    runtime_attributes = glimpse_sample_runtime_attributes
             }
         }
 
@@ -406,7 +404,6 @@ task GLIMPSEPhase {
         String docker
         File? monitoring_script
 
-        Int command_mem_gb
         RuntimeAttributes runtime_attributes = {}
     }
 
@@ -450,7 +447,7 @@ task GLIMPSEPhase {
     runtime {
         docker: docker
         cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, command_mem_gb]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        memory: select_first([runtime_attributes.command_mem_gb, 7]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
         disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
         preemptible: select_first([runtime_attributes.preemptible, 2])
@@ -484,7 +481,7 @@ task GLIMPSELigate {
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_ligate_static
         chmod +x GLIMPSE_ligate_static
 
-        ./GLIMPSE_ligate_static --input ~{write_lines(vcfs)} --output ~{prefix}.vcf.gz
+        ./GLIMPSE_ligate_static --input ~{write_lines(vcfs)} --output ~{prefix}.vcf.gz --thread $(nproc)
         bcftools index -t ~{prefix}.vcf.gz
     >>>
 
@@ -496,7 +493,7 @@ task GLIMPSELigate {
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
         cpu: select_first([runtime_attributes.cpu, 2])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        memory: select_first([runtime_attributes.command_mem_gb, 7]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
         disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 10])
         preemptible: select_first([runtime_attributes.preemptible, 2])
