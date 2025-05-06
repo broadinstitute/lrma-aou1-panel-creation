@@ -213,7 +213,8 @@ task KAGE {
                 ~{true='-I true' false='-I false' ignore_helper_model} \
                 ~{kage_genotype_extra_args} \
                 -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.vcf
-            bcftools view outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.vcf --write-index -Ob -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf
+            bcftools view outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.vcf -Ob -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf
+            bcftools index outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf
 
             # we need to add split multiallelics to biallelic-only KAGE BCF
             # create single-sample header from LOO panel w/ split multiallelics
@@ -224,7 +225,8 @@ task KAGE {
             bcftools view --no-version -H -G $MULTI_SPLIT | \
                 sed 's/$/\tGT:GL\t.\/.:nan,nan,nan/g' > outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt
             # create single-sample BCF w/ split multiallelics
-            bcftools view <(cat outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.header.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt) --write-index -Ob -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf
+            bcftools view <(cat outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.header.txt outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.GT.txt) -Ob -o outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf
+            bcftools index outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf
 
             bcftools concat --no-version -a outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.kage.bi.bcf outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.$CHROMOSOME.multi.split.bcf -Oz -o ~{output_prefix}.shard-~{scatter_index}-output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
             bcftools index -t ~{output_prefix}.shard-~{scatter_index}-output-$C_WITH_LEADING_ZEROS.$CHROMOSOME.kage.vcf.gz
