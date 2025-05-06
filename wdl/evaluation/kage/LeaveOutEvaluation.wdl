@@ -224,8 +224,6 @@ workflow LeaveOutEvaluation {
         Array[File] glimpse_vcf_gz_tbis = KAGEPlusGLIMPSECase.glimpse_vcf_gz_tbi
         Array[File?] pangenie_vcf_gzs = PanGenieGenotype.genotyping_vcf_gz
         Array[File?] pangenie_vcf_gz_tbis = PanGenieGenotype.genotyping_vcf_gz_tbi
-        Array[File?] pangenie_naively_phased_vcf_gzs = PanGenieGenotype.genotyping_naively_phased_vcf_gz
-        Array[File?] pangenie_naively_phased_vcf_gz_tbis = PanGenieGenotype.genotyping_naively_phased_vcf_gz_tbi
 
         Array[File] kage_metrics_tsvs = CalculateMetricsKAGE.metrics_tsv
         Array[File] glimpse_metrics_tsvs = CalculateMetricsKAGEPlusGLIMPSE.metrics_tsv
