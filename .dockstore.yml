@@ -15,9 +15,9 @@ workflows:
 - name: KAGEPanelWithPreprocessing
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/KAGEPanelWithPreprocessing.wdl
-- name: KAGECasePerChromosome
+- name: KAGECasePerChromosomeFlexscattered
   subclass: wdl
-  primaryDescriptorPath: /wdl/methods/kage/KAGECasePerChromosome.wdl
+  primaryDescriptorPath: /wdl/methods/kage/KAGECasePerChromosomeFlexscattered.wdl
 - name: GatherKAGECases
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/GatherKAGECases.wdl

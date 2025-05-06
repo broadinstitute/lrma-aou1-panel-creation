@@ -1,7 +1,7 @@
 version 1.0
 
 import "../../methods/kage/KAGEPanelWithPreprocessing.wdl" as KAGEPanelWithPreprocessing
-import "../../methods/kage/KAGECasePerChromosomeFlexScattered.wdl" as KAGECasePerChromosome
+import "../../methods/kage/KAGECasePerChromosomeFlexscattered.wdl" as KAGECasePerChromosome
 import "../../methods/kage/GLIMPSEBatchedCasePerChromosome.wdl" as GLIMPSEBatchedCasePerChromosome
 import "../../methods/pangenie/PanGenieIndex.wdl" as PanGenieIndex
 import "../../methods/pangenie/PanGenieGenotype.wdl" as PanGenieGenotype
