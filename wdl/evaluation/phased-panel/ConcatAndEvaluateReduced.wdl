@@ -482,50 +482,56 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
 }
 
 task ConcatVcfs {
-
     input {
-        Array[File] vcfs
-        Array[File]? vcf_idxs
-        String prefix
+        Array[File] vcf_gzs
+        Array[File] vcf_gz_tbis
+        String output_prefix
 
-        RuntimeAttr? runtime_attr_override
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
-    Int disk_size = 2*ceil(size(vcfs, "GB")) + 1
+    Int disk_size_gb = 3 * ceil(size(vcf_gzs, "GB"))
 
-    command <<<
-        set -euxo pipefail
-        if ! ~{defined(vcf_idxs)}; then
-            for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
+    command {
+        set -euox pipefail
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
         fi
-        bcftools concat ~{sep=" " vcfs} -Oz -o ~{prefix}.vcf.gz
-        bcftools index -t ~{prefix}.vcf.gz
-    >>>
+
+        mkdir inputs
+        mv ~{sep=' ' vcf_gzs} inputs
+        mv ~{sep=' ' vcf_gz_tbis} inputs
+
+        if [ $(ls inputs/*.vcf.gz | wc -l) == 1 ]
+        then
+            cp $(ls inputs/*.vcf.gz) ~{output_prefix}.vcf.gz
+            cp $(ls inputs/*.vcf.gz.tbi) ~{output_prefix}.vcf.gz.tbi
+        else
+            bcftools concat $(ls inputs/*.vcf.gz) --naive -Oz -o ~{output_prefix}.vcf.gz
+            bcftools index -t ~{output_prefix}.vcf.gz
+        fi
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
 
     output {
-        File vcf_gz = "~{prefix}.vcf.gz"
-        File vcf_gz_tbi = "~{prefix}.vcf.gz.tbi"
-    }
-
-    #########################
-    RuntimeAttr default_attr = object {
-        cpu_cores:          2,
-        mem_gb:             8,
-        disk_gb:            disk_size,
-        boot_disk_gb:       10,
-        preemptible_tries:  2,
-        max_retries:        1,
-        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
-    }
-    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
-    runtime {
-        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
-        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
-        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
-        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
-        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
-        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+        File monitoring_log = "monitoring.log"
+        File vcf_gz = "~{output_prefix}.vcf.gz"
+        File vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
     }
 }
 
@@ -538,10 +544,18 @@ task FixVariantCollisions {
         String weight_tag = "UNIT_WEIGHT"   # ID of the weight field; if this field is not found, all weights are set to one; weights are assumed to be non-negative
         Int is_weight_format_field = 0      # given a VCF record in a sample, assign it a weight encoded in the sample column (1) or in the INFO field (0)
         String output_prefix
+
+        File? monitoring_script
     }
 
     command <<<
         set -euxo pipefail
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
 
         # convert bcf to vcf.gz
         bcftools view ~{phased_bcf} -Oz -o phased.vcf.gz
@@ -568,6 +582,7 @@ task FixVariantCollisions {
     >>>
 
     output {
+        File monitoring_log = "monitoring.log"
         File collisionless_bcf = "~{output_prefix}.bcf"
         File collisionless_bcf_csi = "~{output_prefix}.bcf.csi"
         File windows = "windows.txt"
@@ -690,6 +705,7 @@ task Ivcfmerge {
         Array[File] vcf_gz_tbis
         Array[String] sample_names
         String output_prefix
+        String? region_args
 
         String docker
         File? monitoring_script
@@ -709,11 +725,21 @@ task Ivcfmerge {
         wget https://github.com/iqbal-lab-org/ivcfmerge/archive/refs/tags/v1.0.0.tar.gz
         tar -xvf v1.0.0.tar.gz
 
-        mkdir decompressed
-        cat ~{write_lines(vcf_gzs)} | xargs -I % sh -c 'bcftools annotate --no-version -x INFO % -Ov -o decompressed/$(basename % .gz)'
-        time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
-        bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf -Oz -o ~{output_prefix}.vcf.gz
-        bcftools index -t ~{output_prefix}.vcf.gz
+        mkdir compressed
+        mv ~{sep=' ' vcf_gzs} compressed
+        mv ~{sep=' ' vcf_gz_tbis} compressed
+
+        if [ $(ls compressed/*.vcf.gz | wc -l) == 1 ]
+        then
+            cp $(ls compressed/*.vcf.gz) ~{output_prefix}.vcf.gz
+            cp $(ls compressed/*.vcf.gz.tbi) ~{output_prefix}.vcf.gz.tbi
+        else
+            mkdir decompressed
+            ls compressed/*.vcf.gz | xargs -I % sh -c 'bcftools annotate --no-version ~{region_args} -x INFO % --threads 2 -Ov -o decompressed/$(basename % .gz)'
+            time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
+            bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf --threads 2 -Oz -o ~{output_prefix}.vcf.gz
+            bcftools index -t ~{output_prefix}.vcf.gz
+        fi
     }
 
     output {
@@ -724,7 +750,7 @@ task Ivcfmerge {
 
     runtime {
         docker: docker
-        cpu: select_first([runtime_attributes.cpu, 1])
+        cpu: select_first([runtime_attributes.cpu, 4])
         memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
         disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 250]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
