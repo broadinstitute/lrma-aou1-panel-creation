@@ -108,10 +108,12 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         vcf_gzs = filter_and_concat_vcf_gzs,
         vcf_gz_tbis = filter_and_concat_vcf_gz_tbis,
         output_prefix = output_prefix + ".filter_and_concat",
+        extra_concat_args = "--naive",
         docker = samtools_docker,
         monitoring_script = monitoring_script
     }
 
+    # cannot naive concat .bcf to .vcf.gz
     call ConcatVcfs as ConcatVcfsBeforeShapeit4FixVariantCollisions { input:
         vcf_gzs = before_shapeit4_collisionless_bcfs,
         vcf_gz_tbis = before_shapeit4_collisionless_bcf_csis,
@@ -124,10 +126,12 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         vcf_gzs = phased_vcf_gzs,
         vcf_gz_tbis = phased_vcf_gz_tbis,
         output_prefix = output_prefix + ".phased",
+        extra_concat_args = "--naive",
         docker = samtools_docker,
         monitoring_script = monitoring_script
     }
 
+    # cannot naive concat .bcf to .vcf.gz
     call ConcatVcfs as ConcatVcfsFixVariantCollisions { input:
         vcf_gzs = collisionless_bcfs,
         vcf_gz_tbis = collisionless_bcf_csis,
@@ -140,6 +144,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         vcf_gzs = panel_vcf_gzs,
         vcf_gz_tbis = panel_vcf_gz_tbis,
         output_prefix = output_prefix + ".panel",
+        extra_concat_args = "--naive",
         docker = samtools_docker,
         monitoring_script = monitoring_script
     }
@@ -496,6 +501,7 @@ task ConcatVcfs {
         Array[File] vcf_gzs
         Array[File] vcf_gz_tbis
         String output_prefix
+        String? extra_concat_args
 
         String docker
         File? monitoring_script
@@ -514,7 +520,7 @@ task ConcatVcfs {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools concat ~{sep=' ' vcf_gzs} --naive -Oz -o ~{output_prefix}.vcf.gz
+        bcftools concat ~{sep=' ' vcf_gzs} ~{extra_concat_args} -Oz -o ~{output_prefix}.vcf.gz
         bcftools index -t ~{output_prefix}.vcf.gz
     }
 
