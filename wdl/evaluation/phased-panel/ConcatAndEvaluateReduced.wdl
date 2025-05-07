@@ -203,7 +203,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             operation = operation,
             weight_tag = weight_tag,
             is_weight_format_field = is_weight_format_field,
-            output_prefix = output_prefix + ".glimpse.merged.phased.collisionless"
+            output_prefix = output_prefix + ".glimpse.merged.phased.collisionless",
+            monitoring_script = monitoring_script
         }
 
         if (do_pangenie) {
