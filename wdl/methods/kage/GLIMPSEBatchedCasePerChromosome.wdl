@@ -128,6 +128,17 @@ workflow GLIMPSEBatchedCasePerChromosome {
                     monitoring_script = monitoring_script,
                     runtime_attributes = glimpse_sample_runtime_attributes
             }
+
+            call FixVariantCollisions as ChromosomeGLIMPSEFixVariantCollisions { input:
+                vcf_gz = ChromosomeGLIMPSESample.glimpse_vcf_gz,
+                vcf_gz_tbi = ChromosomeGLIMPSESample.glimpse_vcf_gz_tbi,
+                fix_variant_collisions_java = fix_variant_collisions_java,
+                operation = operation,
+                weight_tag = weight_tag,
+                is_weight_format_field = is_weight_format_field,
+                output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".kage.glimpse.collisionless",
+                monitoring_script = monitoring_script
+            }
         }
 
         call ConcatVcfs as KAGEConcatVcfs {
@@ -157,15 +168,13 @@ workflow GLIMPSEBatchedCasePerChromosome {
                 monitoring_script = monitoring_script
         }
 
-        call FixVariantCollisions as GLIMPSEFixVariantCollisions { input:
-            vcf_gz = GLIMPSEConcatVcfs.vcf_gz,
-            vcf_gz_tbi = GLIMPSEConcatVcfs.vcf_gz_tbi,
-            fix_variant_collisions_java = fix_variant_collisions_java,
-            operation = operation,
-            weight_tag = weight_tag,
-            is_weight_format_field = is_weight_format_field,
-            output_prefix = output_prefix + ".batch-" + b + ".kage.glimpse.collisionless",
-            monitoring_script = monitoring_script
+        call ConcatVcfs as PhasedCollisionlessConcatVcfs {
+            input:
+                vcf_gzs = ChromosomeGLIMPSEFixVariantCollisions.collisionless_vcf_gz,
+                vcf_gz_tbis = ChromosomeGLIMPSEFixVariantCollisions.collisionless_vcf_gz_tbi,
+                output_prefix = output_prefix + ".batch-" + b + ".kage.glimpse.collisionless",
+                docker = kage_docker,
+                monitoring_script = monitoring_script
         }
     }
 
@@ -197,8 +206,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
     }
 
     call HierarchicallyMergeVcfs.Ivcfmerge as PhasedCollisionlessMergeAcrossSamples { input:
-        vcf_gzs = GLIMPSEFixVariantCollisions.collisionless_vcf_gz,
-        vcf_gz_tbis = GLIMPSEFixVariantCollisions.collisionless_vcf_gz_tbi,
+        vcf_gzs = PhasedCollisionlessConcatVcfs.vcf_gz,
+        vcf_gz_tbis = PhasedCollisionlessConcatVcfs.vcf_gz_tbi,
         sample_names = sample_names,
         output_prefix = output_prefix + ".kage.glimpse.collisionless",
         docker = kage_docker,
@@ -212,8 +221,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
         Array[File] batch_glimpse_unphased_vcf_gz_tbis = GLIMPSEUnphasedConcatVcfs.vcf_gz_tbi
         Array[File] batch_glimpse_vcf_gzs = GLIMPSEConcatVcfs.vcf_gz
         Array[File] batch_glimpse_vcf_gz_tbis = GLIMPSEConcatVcfs.vcf_gz_tbi
-        Array[File] batch_phased_collisionless_vcf_gzs = GLIMPSEFixVariantCollisions.collisionless_vcf_gz
-        Array[File] batch_phased_collisionless_vcf_gz_tbis = GLIMPSEFixVariantCollisions.collisionless_vcf_gz_tbi
+        Array[File] batch_phased_collisionless_vcf_gzs = PhasedCollisionlessConcatVcfs.vcf_gz
+        Array[File] batch_phased_collisionless_vcf_gz_tbis = PhasedCollisionlessConcatVcfs.vcf_gz_tbi
 
         File kage_vcf_gz = KAGEMergeAcrossSamples.merged_vcf_gz
         File kage_vcf_gz_tbi = KAGEMergeAcrossSamples.merged_vcf_gz_tbi
