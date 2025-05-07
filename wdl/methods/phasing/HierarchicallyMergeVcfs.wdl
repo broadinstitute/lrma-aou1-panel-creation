@@ -222,8 +222,12 @@ task Ivcfmerge {
         wget https://github.com/iqbal-lab-org/ivcfmerge/archive/refs/tags/v1.0.0.tar.gz
         tar -xvf v1.0.0.tar.gz
 
+        mkdir compressed
+        mv ~{sep=' ' vcf_gzs} compressed
+        mv ~{sep=' ' vcf_gz_tbis} compressed
+
         mkdir decompressed
-        cat ~{write_lines(vcf_gzs)} | xargs -I % sh -c 'bcftools annotate --no-version ~{region_args} -x INFO % -Ov -o decompressed/$(basename % .gz)'
+        ls compressed/*.vcf.gz | xargs -I % sh -c 'bcftools annotate --no-version ~{region_args} -x INFO % -Ov -o decompressed/$(basename % .gz)'
         time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
         bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf -Oz -o ~{output_prefix}.vcf.gz
         bcftools index -t ~{output_prefix}.vcf.gz
