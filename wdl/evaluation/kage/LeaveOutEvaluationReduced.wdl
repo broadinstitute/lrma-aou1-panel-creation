@@ -350,7 +350,7 @@ task PreprocessCaseReads {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes runtime_attributes = {}
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
     String filter_N_regex = "/^>/{N;/^>.*\\n.*N.*/d}"
@@ -405,7 +405,7 @@ task PreprocessPanelVCF {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes runtime_attributes = {}
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
     command {
@@ -470,7 +470,7 @@ task ReducePanelVCF {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes runtime_attributes = {}
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
     command {
@@ -541,7 +541,7 @@ task CreateLeaveOneOutPanelVCF {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes runtime_attributes = {}
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
     command {
@@ -613,7 +613,7 @@ task CensorGenotypes {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes runtime_attributes = {}
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
     command {
