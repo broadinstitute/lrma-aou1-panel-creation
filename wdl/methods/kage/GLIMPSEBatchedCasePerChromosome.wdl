@@ -383,7 +383,7 @@ task GLIMPSEPhase {
         String output_region
         File genetic_map
         String output_prefix
-        String? extra_phase_args
+        String? extra_phase_args = ""
 
         String docker
         File? monitoring_script
