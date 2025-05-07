@@ -602,7 +602,7 @@ task FixVariantCollisions {
     runtime {
         cpu: 1
         memory:  "16 GiB"
-        disks: "local-disk 100 HDD"
+        disks: "local-disk 100 SSD"
         bootDiskSizeGb: 10
         preemptible_tries:     3
         max_retries:           2
