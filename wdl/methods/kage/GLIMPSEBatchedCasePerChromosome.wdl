@@ -25,8 +25,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
         Array[File] panel_split_vcf_gz # for GLIMPSE
         Array[File] panel_split_vcf_gz_tbi
 
-        String? extra_chunk_args
-        String? extra_phase_args
+        String extra_chunk_args = "--thread $(nproc) --window-size 5000000 --buffer-size 500000"
+        String extra_phase_args = ""
         Int kage_merge_batch_size
         Int glimpse_batch_size
         String output_prefix
@@ -333,7 +333,7 @@ task GLIMPSEChunk {
         File tbi
         String region
         String prefix
-        String? extra_chunk_args = "--thread $(nproc) --window-size 5000000 --buffer-size 500000"
+        String? extra_chunk_args
 
         RuntimeAttributes runtime_attributes = {}
     }
@@ -383,7 +383,7 @@ task GLIMPSEPhase {
         String output_region
         File genetic_map
         String output_prefix
-        String? extra_phase_args = " "
+        String? extra_phase_args
 
         String docker
         File? monitoring_script
