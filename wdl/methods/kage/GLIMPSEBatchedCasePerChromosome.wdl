@@ -285,8 +285,18 @@ task ConcatVcfs {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools concat ~{sep=" " vcf_gzs} --naive -Oz -o ~{output_prefix}.vcf.gz
-        bcftools index -t ~{output_prefix}.vcf.gz
+        mkdir inputs
+        mv ~{sep=' ' vcf_gzs} inputs
+        mv ~{sep=' ' vcf_gz_tbis} inputs
+
+        if [ $(ls inputs/*.vcf.gz | wc -l) == 1 ]
+        then
+            cp $(ls inputs/*.vcf.gz) ~{output_prefix}.vcf.gz
+            cp $(ls inputs/*.vcf.gz.tbi) ~{output_prefix}.vcf.gz.tbi
+        else
+            bcftools concat $(ls inputs/*.vcf.gz) --naive -Oz -o ~{output_prefix}.vcf.gz
+            bcftools index -t ~{output_prefix}.vcf.gz
+        fi
     }
 
     runtime {

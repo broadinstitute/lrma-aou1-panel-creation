@@ -234,10 +234,10 @@ task Ivcfmerge {
         mv ~{sep=' ' vcf_gzs} compressed
         mv ~{sep=' ' vcf_gz_tbis} compressed
 
-        if [ $(ls *.vcf.gz | wc -l) == 1 ]
+        if [ $(ls compressed/*.vcf.gz | wc -l) == 1 ]
         then
-            cp $(ls *.vcf.gz) ~{output_prefix}.vcf.gz
-            cp $(ls *.vcf.gz.tbi) ~{output_prefix}.vcf.gz.tbi
+            cp $(ls compressed/*.vcf.gz) ~{output_prefix}.vcf.gz
+            cp $(ls compressed/*.vcf.gz.tbi) ~{output_prefix}.vcf.gz.tbi
         else
             mkdir decompressed
             ls compressed/*.vcf.gz | xargs -I % sh -c 'bcftools annotate --no-version ~{region_args} -x INFO % --threads 2 -Ov -o decompressed/$(basename % .gz)'
