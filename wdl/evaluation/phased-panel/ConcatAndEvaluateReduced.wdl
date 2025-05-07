@@ -107,31 +107,41 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
     call ConcatVcfs as ConcatVcfsFilterAndConcatVcfs { input:
         vcf_gzs = filter_and_concat_vcf_gzs,
         vcf_gz_tbis = filter_and_concat_vcf_gz_tbis,
-        output_prefix = output_prefix + ".filter_and_concat"
+        output_prefix = output_prefix + ".filter_and_concat",
+        docker = samtools_docker,
+        monitoring_script = monitoring_script
     }
 
     call ConcatVcfs as ConcatVcfsBeforeShapeit4FixVariantCollisions { input:
         vcf_gzs = before_shapeit4_collisionless_bcfs,
         vcf_gz_tbis = before_shapeit4_collisionless_bcf_csis,
-        output_prefix = output_prefix + ".before_shapeit4_collisionless"
+        output_prefix = output_prefix + ".before_shapeit4_collisionless",
+        docker = samtools_docker,
+        monitoring_script = monitoring_script
     }
 
     call ConcatVcfs as ConcatVcfsShapeit4 { input:
         vcf_gzs = phased_vcf_gzs,
         vcf_gz_tbis = phased_vcf_gz_tbis,
-        output_prefix = output_prefix + ".phased"
+        output_prefix = output_prefix + ".phased",
+        docker = samtools_docker,
+        monitoring_script = monitoring_script
     }
 
     call ConcatVcfs as ConcatVcfsFixVariantCollisions { input:
         vcf_gzs = collisionless_bcfs,
         vcf_gz_tbis = collisionless_bcf_csis,
-        output_prefix = output_prefix + ".phased.collisionless"
+        output_prefix = output_prefix + ".phased.collisionless",
+        docker = samtools_docker,
+        monitoring_script = monitoring_script
     }
 
     call ConcatVcfs as ConcatVcfsPanGeniePanelCreation { input:
         vcf_gzs = panel_vcf_gzs,
         vcf_gz_tbis = panel_vcf_gz_tbis,
-        output_prefix = output_prefix + ".panel"
+        output_prefix = output_prefix + ".panel",
+        docker = samtools_docker,
+        monitoring_script = monitoring_script
     }
 
     if (do_short_read_stages) {
