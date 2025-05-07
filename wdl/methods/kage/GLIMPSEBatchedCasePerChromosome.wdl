@@ -26,6 +26,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
         Array[File] panel_split_vcf_gz_tbi
 
         String? extra_chunk_args
+        String? extra_phase_args
         Int kage_merge_batch_size
         Int glimpse_batch_size
         String output_prefix
@@ -104,6 +105,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
                         output_region = output_regions[k],
                         genetic_map = genetic_maps[j],
                         output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".shard-" + k + ".phased",
+                        extra_phase_args = extra_phase_args,
                         docker = kage_docker,
                         monitoring_script = monitoring_script,
                         runtime_attributes = glimpse_phase_runtime_attributes
@@ -381,6 +383,7 @@ task GLIMPSEPhase {
         String output_region
         File genetic_map
         String output_prefix
+        String? extra_phase_args
 
         String docker
         File? monitoring_script
@@ -414,6 +417,7 @@ task GLIMPSEPhase {
             --map ~{genetic_map} \
             --input-GL \
             --thread $(nproc) \
+            ~{extra_phase_args} \
             --output ~{output_prefix}.kage.glimpse.raw.vcf.gz
 
         # take KAGE VCF header and add GLIMPSE INFO and FORMAT lines (GLIMPSE header only contains a single chromosome and breaks bcftools concat --naive)

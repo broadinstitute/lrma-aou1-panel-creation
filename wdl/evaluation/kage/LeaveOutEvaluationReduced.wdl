@@ -37,6 +37,8 @@ workflow LeaveOutEvaluation {
         Int case_average_coverage
         Int kage_merge_batch_size
         Int glimpse_batch_size
+        String? extra_chunk_args
+        String? extra_phase_args
         Boolean do_pangenie
         String? extra_view_args
 
@@ -253,6 +255,8 @@ workflow LeaveOutEvaluation {
             panel_split_vcf_gz_tbi = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz_tbi),
             kage_merge_batch_size = kage_merge_batch_size,
             glimpse_batch_size = glimpse_batch_size,
+            extra_chunk_args = extra_chunk_args,
+            extra_phase_args = extra_phase_args,
             output_prefix = "leave-out.batch",
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,

@@ -57,6 +57,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         Int case_average_coverage
         Int kage_merge_batch_size
         Int glimpse_batch_size
+        String? extra_chunk_args
+        String? extra_phase_args
         Boolean do_pangenie
         String? extra_view_args
         Map[String, File] leave_out_crams
@@ -265,6 +267,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             case_average_coverage = case_average_coverage,
             kage_merge_batch_size = kage_merge_batch_size,
             glimpse_batch_size = glimpse_batch_size,
+            extra_chunk_args = extra_chunk_args,
+            extra_phase_args = extra_phase_args,
             do_pangenie = do_pangenie,
             extra_view_args = extra_view_args,
             leave_out_crams = leave_out_crams,
