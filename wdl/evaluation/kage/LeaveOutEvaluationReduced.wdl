@@ -35,7 +35,8 @@ workflow LeaveOutEvaluation {
         Array[String] chromosomes
         Array[String] leave_out_sample_names
         Int case_average_coverage
-        Int batch_size
+        Int kage_merge_batch_size
+        Int glimpse_batch_size
         Boolean do_pangenie
         String? extra_view_args
 
@@ -248,7 +249,8 @@ workflow LeaveOutEvaluation {
             genetic_maps = genetic_maps,
             panel_split_vcf_gz = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz),
             panel_split_vcf_gz_tbi = select_all(ChromosomeKAGELeaveOneOutPanel.preprocessed_panel_split_vcf_gz_tbi),
-            batch_size = batch_size,
+            kage_merge_batch_size = kage_merge_batch_size,
+            glimpse_batch_size = glimpse_batch_size,
             output_prefix = "leave-out.batch",
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,

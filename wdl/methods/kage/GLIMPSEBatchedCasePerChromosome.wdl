@@ -1,5 +1,7 @@
 version 1.0
 
+import "../../methods/phasing/HierarchicallyMergeVcfs.wdl" as HierarchicallyMergeVcfs
+
 struct RuntimeAttributes {
     Int? cpu
     Int? command_mem_gb
@@ -24,7 +26,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
         Array[File] panel_split_vcf_gz_tbi
 
         String? extra_chunk_args
-        Int batch_size
+        Int kage_merge_batch_size
+        Int glimpse_batch_size
         String output_prefix
 
         # inputs for FixVariantCollisions
@@ -49,7 +52,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
             sample_by_chromosome_vcf_gzs = sample_by_chromosome_kage_vcf_gzs,
             sample_by_chromosome_vcf_gz_tbis = sample_by_chromosome_kage_vcf_gzs_kage_vcf_gz_tbis,
             sample_names = sample_names,
-            batch_size = batch_size,
+            batch_size = glimpse_batch_size,
             docker = kage_docker
     }
 
@@ -70,10 +73,13 @@ workflow GLIMPSEBatchedCasePerChromosome {
             Array[String] chromosome_kage_vcf_gzs = transpose(read_tsv(CreateBatches.chromosome_vcf_gz_batch_files[b]))[j]
             Array[String] chromosome_kage_vcf_gz_tbis = transpose(read_tsv(CreateBatches.chromosome_vcf_gz_tbi_batch_files[b]))[j]
 
-            call Ivcfmerge as ChromosomeKAGEMergeAcrossSamples {
+            call HierarchicallyMergeVcfs.HierarchicallyMergeVcfs as ChromosomeKAGEMergeAcrossSamples {
                 input:
                     vcf_gzs = chromosome_kage_vcf_gzs,
                     vcf_gz_tbis = chromosome_kage_vcf_gz_tbis,
+                    regions = [chromosome],
+                    batch_size = kage_merge_batch_size,
+                    use_ivcfmerge = true,
                     sample_names = read_lines(CreateBatches.sample_name_batch_files[b]),
                     output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".kage",
                     docker = kage_docker,

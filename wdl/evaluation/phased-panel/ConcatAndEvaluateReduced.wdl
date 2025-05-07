@@ -55,7 +55,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         Array[String] leave_out_chromosomes
         Array[String] leave_out_sample_names
         Int case_average_coverage
-        Int batch_size
+        Int kage_merge_batch_size
+        Int glimpse_batch_size
         Boolean do_pangenie
         String? extra_view_args
         Map[String, File] leave_out_crams
@@ -260,7 +261,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             chromosomes = leave_out_chromosomes,
             leave_out_sample_names = leave_out_sample_names,
             case_average_coverage = case_average_coverage,
-            batch_size = batch_size,
+            kage_merge_batch_size = kage_merge_batch_size,
+            glimpse_batch_size = glimpse_batch_size,
             do_pangenie = do_pangenie,
             extra_view_args = extra_view_args,
             leave_out_crams = leave_out_crams,
