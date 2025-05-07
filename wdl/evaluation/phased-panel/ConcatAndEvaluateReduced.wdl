@@ -1,7 +1,6 @@
 version 1.0
 
 import "./VcfdistAndOverlapMetricsEvaluation.wdl"
-import "../../methods/phasing/ChromosomePhasedPanelCreationFromHiPhase.wdl"
 import "../kage/LeaveOutEvaluationReduced.wdl"
 
 struct RuntimeAttr {
@@ -97,8 +96,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         File vcfdist_truth_vcf
         File vcfdist_truth_vcf_idx
         String evaluation_chromosomes_regions_arg
-        File vcfdist_bed_file
-        String? vcfdist_extra_args
+        Array[File] vcfdist_bed_file_array
+        Array[String?] vcfdist_extra_args_array       # one for each element in vcfdist_bed_file_array
         Int? vcfdist_mem_gb
         String overlap_metrics_docker
 
@@ -106,145 +105,33 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
     }
 
     call ConcatVcfs as ConcatVcfsFilterAndConcatVcfs { input:
-        vcfs = filter_and_concat_vcf_gzs,
-        vcf_idxs = filter_and_concat_vcf_gz_tbis,
-        prefix = output_prefix + ".filter_and_concat"
+        vcf_gzs = filter_and_concat_vcf_gzs,
+        vcf_gz_tbis = filter_and_concat_vcf_gz_tbis,
+        output_prefix = output_prefix + ".filter_and_concat"
     }
 
     call ConcatVcfs as ConcatVcfsBeforeShapeit4FixVariantCollisions { input:
-        vcfs = before_shapeit4_collisionless_bcfs,
-        vcf_idxs = before_shapeit4_collisionless_bcf_csis,
-        prefix = output_prefix + ".before_shapeit4_collisionless"
+        vcf_gzs = before_shapeit4_collisionless_bcfs,
+        vcf_gz_tbis = before_shapeit4_collisionless_bcf_csis,
+        output_prefix = output_prefix + ".before_shapeit4_collisionless"
     }
 
     call ConcatVcfs as ConcatVcfsShapeit4 { input:
-        vcfs = phased_vcf_gzs,
-        vcf_idxs = phased_vcf_gz_tbis,
-        prefix = output_prefix + ".phased"
+        vcf_gzs = phased_vcf_gzs,
+        vcf_gz_tbis = phased_vcf_gz_tbis,
+        output_prefix = output_prefix + ".phased"
     }
 
     call ConcatVcfs as ConcatVcfsFixVariantCollisions { input:
-        vcfs = collisionless_bcfs,
-        vcf_idxs = collisionless_bcf_csis,
-        prefix = output_prefix + ".phased.collisionless"
+        vcf_gzs = collisionless_bcfs,
+        vcf_gz_tbis = collisionless_bcf_csis,
+        output_prefix = output_prefix + ".phased.collisionless"
     }
 
     call ConcatVcfs as ConcatVcfsPanGeniePanelCreation { input:
-        vcfs = panel_vcf_gzs,
-        vcf_idxs = panel_vcf_gz_tbis,
-        prefix = output_prefix + ".panel"
-    }
-
-    if (defined(hiphase_short_vcf_gz)) {
-        # evaluate HiPhase short
-        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
-            samples = vcfdist_samples,
-            confident_regions_bed_files = confident_regions_bed_files,
-            truth_vcf = vcfdist_truth_vcf,
-            truth_vcf_idx = vcfdist_truth_vcf_idx,
-            eval_vcf = select_first([hiphase_short_vcf_gz]),
-            eval_vcf_idx = select_first([hiphase_short_vcf_gz_tbi]),
-            region = evaluation_chromosomes_regions_arg,
-            reference_fasta = reference_fasta,
-            reference_fasta_fai = reference_fasta_fai,
-            vcfdist_bed_file = vcfdist_bed_file,
-            vcfdist_extra_args = vcfdist_extra_args,
-            vcfdist_mem_gb = vcfdist_mem_gb,
-            overlap_phase_tag = "PS",
-            overlap_metrics_docker = overlap_metrics_docker
-        }
-
-        String hiphase_short_label = "HiPhaseShort"
-    }
-
-    # evaluate HiPhase SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseSV { input:
-        samples = vcfdist_samples,
-        confident_regions_bed_files = confident_regions_bed_files,
-        truth_vcf = vcfdist_truth_vcf,
-        truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = hiphase_sv_vcf_gz,
-        eval_vcf_idx = hiphase_sv_vcf_gz_tbi,
-        region = evaluation_chromosomes_regions_arg,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        vcfdist_mem_gb = vcfdist_mem_gb,
-        overlap_phase_tag = "PS",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
-    # evaluate filtered short + SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFiltered { input:
-        samples = vcfdist_samples,
-        confident_regions_bed_files = confident_regions_bed_files,
-        truth_vcf = vcfdist_truth_vcf,
-        truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = ConcatVcfsFilterAndConcatVcfs.vcf_gz,
-        eval_vcf_idx = ConcatVcfsFilterAndConcatVcfs.vcf_gz_tbi,
-        region = evaluation_chromosomes_regions_arg,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        vcfdist_mem_gb = vcfdist_mem_gb,
-        overlap_phase_tag = "PS",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
-    # evaluate before Shapeit4 collisionless short + SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateBeforeShapeit4FixVariantCollisions { input:
-        samples = vcfdist_samples,
-        confident_regions_bed_files = confident_regions_bed_files,
-        truth_vcf = vcfdist_truth_vcf,
-        truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = ConcatVcfsBeforeShapeit4FixVariantCollisions.vcf_gz,
-        eval_vcf_idx = ConcatVcfsBeforeShapeit4FixVariantCollisions.vcf_gz_tbi,
-        region = evaluation_chromosomes_regions_arg,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        vcfdist_mem_gb = vcfdist_mem_gb,
-        overlap_phase_tag = "PS",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
-    # evaluate Shapeit4 short + SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
-        samples = vcfdist_samples,
-        confident_regions_bed_files = confident_regions_bed_files,
-        truth_vcf = vcfdist_truth_vcf,
-        truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = ConcatVcfsShapeit4.vcf_gz,
-        eval_vcf_idx = ConcatVcfsShapeit4.vcf_gz_tbi,
-        region = evaluation_chromosomes_regions_arg,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        vcfdist_mem_gb = vcfdist_mem_gb,
-        overlap_phase_tag = "NONE",
-        overlap_metrics_docker = overlap_metrics_docker
-    }
-
-    # evaluate collisionless short + SV
-    call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFixVariantCollisions { input:
-        samples = vcfdist_samples,
-        confident_regions_bed_files = confident_regions_bed_files,
-        truth_vcf = vcfdist_truth_vcf,
-        truth_vcf_idx = vcfdist_truth_vcf_idx,
-        eval_vcf = ConcatVcfsFixVariantCollisions.vcf_gz,
-        eval_vcf_idx = ConcatVcfsFixVariantCollisions.vcf_gz_tbi,
-        region = evaluation_chromosomes_regions_arg,
-        reference_fasta = reference_fasta,
-        reference_fasta_fai = reference_fasta_fai,
-        vcfdist_bed_file = vcfdist_bed_file,
-        vcfdist_extra_args = vcfdist_extra_args,
-        vcfdist_mem_gb = vcfdist_mem_gb,
-        overlap_phase_tag = "NONE",
-        overlap_metrics_docker = overlap_metrics_docker
+        vcf_gzs = panel_vcf_gzs,
+        vcf_gz_tbis = panel_vcf_gz_tbis,
+        output_prefix = output_prefix + ".panel"
     }
 
     if (do_short_read_stages) {
@@ -300,85 +187,13 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             monitoring_script = monitoring_script
         }
 
-        call ChromosomePhasedPanelCreationFromHiPhase.FixVariantCollisions as GLIMPSEFixVariantCollisions { input:
+        call FixVariantCollisions as GLIMPSEFixVariantCollisions { input:
             phased_bcf = LeaveOutEvaluation.glimpse_vcf_gz,
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,
             weight_tag = weight_tag,
             is_weight_format_field = is_weight_format_field,
             output_prefix = output_prefix + ".glimpse.merged.phased.collisionless"
-        }
-
-        # evaluate panel short + SV
-        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
-            samples = vcfdist_samples,
-            confident_regions_bed_files = confident_regions_bed_files,
-            truth_vcf = vcfdist_truth_vcf,
-            truth_vcf_idx = vcfdist_truth_vcf_idx,
-            eval_vcf = ConcatVcfsPanGeniePanelCreation.vcf_gz,
-            eval_vcf_idx = ConcatVcfsPanGeniePanelCreation.vcf_gz_tbi,
-            region = evaluation_chromosomes_regions_arg,
-            reference_fasta = reference_fasta,
-            reference_fasta_fai = reference_fasta_fai,
-            vcfdist_bed_file = vcfdist_bed_file,
-            vcfdist_extra_args = vcfdist_extra_args,
-            vcfdist_mem_gb = vcfdist_mem_gb,
-            overlap_phase_tag = "NONE",
-            overlap_metrics_docker = overlap_metrics_docker
-        }
-
-        # evaluate naively phased GLIMPSE
-        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSENaivelyPhased { input:
-            samples = vcfdist_samples,
-            confident_regions_bed_files = confident_regions_bed_files,
-            truth_vcf = vcfdist_truth_vcf,
-            truth_vcf_idx = vcfdist_truth_vcf_idx,
-            eval_vcf = GLIMPSENaivelyPhased.naively_phased_vcf_gz,
-            eval_vcf_idx = GLIMPSENaivelyPhased.naively_phased_vcf_gz_tbi,
-            region = evaluation_chromosomes_regions_arg,
-            reference_fasta = reference_fasta,
-            reference_fasta_fai = reference_fasta_fai,
-            vcfdist_bed_file = vcfdist_bed_file,
-            vcfdist_extra_args = vcfdist_extra_args,
-            vcfdist_mem_gb = vcfdist_mem_gb,
-            overlap_phase_tag = "NONE",
-            overlap_metrics_docker = overlap_metrics_docker
-        }
-
-        # evaluate GLIMPSE
-        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSE { input:
-            samples = vcfdist_samples,
-            confident_regions_bed_files = confident_regions_bed_files,
-            truth_vcf = vcfdist_truth_vcf,
-            truth_vcf_idx = vcfdist_truth_vcf_idx,
-            eval_vcf = LeaveOutEvaluation.glimpse_vcf_gz,
-            eval_vcf_idx = LeaveOutEvaluation.glimpse_vcf_gz_tbi,
-            region = evaluation_chromosomes_regions_arg,
-            reference_fasta = reference_fasta,
-            reference_fasta_fai = reference_fasta_fai,
-            vcfdist_bed_file = vcfdist_bed_file,
-            vcfdist_extra_args = vcfdist_extra_args,
-            vcfdist_mem_gb = vcfdist_mem_gb,
-            overlap_phase_tag = "NONE",
-            overlap_metrics_docker = overlap_metrics_docker
-        }
-
-        # evaluate collisionless GLIMPSE
-        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSEFixVariantCollisions { input:
-            samples = vcfdist_samples,
-            confident_regions_bed_files = confident_regions_bed_files,
-            truth_vcf = vcfdist_truth_vcf,
-            truth_vcf_idx = vcfdist_truth_vcf_idx,
-            eval_vcf = GLIMPSEFixVariantCollisions.collisionless_bcf,
-            eval_vcf_idx = GLIMPSEFixVariantCollisions.collisionless_bcf_csi,
-            region = evaluation_chromosomes_regions_arg,
-            reference_fasta = reference_fasta,
-            reference_fasta_fai = reference_fasta_fai,
-            vcfdist_bed_file = vcfdist_bed_file,
-            vcfdist_extra_args = vcfdist_extra_args,
-            vcfdist_mem_gb = vcfdist_mem_gb,
-            overlap_phase_tag = "NONE",
-            overlap_metrics_docker = overlap_metrics_docker
         }
 
         if (do_pangenie) {
@@ -401,15 +216,150 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
                 docker = ivcfmerge_docker,
                 monitoring_script = monitoring_script
             }
+        }
+    }
 
-            # evaluate naively phased PanGenie
-            call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanGenieNaivelyPhased { input:
+    scatter (i in range(length(vcfdist_bed_file_array))) {
+        File vcfdist_bed_file = vcfdist_bed_file_array[i]
+        String? vcfdist_extra_args = vcfdist_extra_args_array[i]
+
+        if (defined(hiphase_short_vcf_gz)) {
+            # evaluate HiPhase short
+            call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseShort { input:
                 samples = vcfdist_samples,
                 confident_regions_bed_files = confident_regions_bed_files,
                 truth_vcf = vcfdist_truth_vcf,
                 truth_vcf_idx = vcfdist_truth_vcf_idx,
-                eval_vcf = PanGenieNaivelyPhasedMergeAcrossSamples.merged_vcf_gz,
-                eval_vcf_idx = PanGenieNaivelyPhasedMergeAcrossSamples.merged_vcf_gz_tbi,
+                eval_vcf = select_first([hiphase_short_vcf_gz]),
+                eval_vcf_idx = select_first([hiphase_short_vcf_gz_tbi]),
+                region = evaluation_chromosomes_regions_arg,
+                reference_fasta = reference_fasta,
+                reference_fasta_fai = reference_fasta_fai,
+                vcfdist_bed_file = vcfdist_bed_file,
+                vcfdist_extra_args = vcfdist_extra_args,
+                vcfdist_mem_gb = vcfdist_mem_gb,
+                overlap_phase_tag = "PS",
+                overlap_metrics_docker = overlap_metrics_docker
+            }
+        }
+
+        # evaluate HiPhase SV
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateHiPhaseSV { input:
+            samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
+            truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
+            eval_vcf = hiphase_sv_vcf_gz,
+            eval_vcf_idx = hiphase_sv_vcf_gz_tbi,
+            region = evaluation_chromosomes_regions_arg,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
+            overlap_phase_tag = "PS",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
+
+        # evaluate filtered short + SV
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFiltered { input:
+            samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
+            truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
+            eval_vcf = ConcatVcfsFilterAndConcatVcfs.vcf_gz,
+            eval_vcf_idx = ConcatVcfsFilterAndConcatVcfs.vcf_gz_tbi,
+            region = evaluation_chromosomes_regions_arg,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
+            overlap_phase_tag = "PS",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
+
+        # evaluate before Shapeit4 collisionless short + SV
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateBeforeShapeit4FixVariantCollisions { input:
+            samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
+            truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
+            eval_vcf = ConcatVcfsBeforeShapeit4FixVariantCollisions.vcf_gz,
+            eval_vcf_idx = ConcatVcfsBeforeShapeit4FixVariantCollisions.vcf_gz_tbi,
+            region = evaluation_chromosomes_regions_arg,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
+            overlap_phase_tag = "PS",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
+
+        # evaluate Shapeit4 short + SV
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
+            samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
+            truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
+            eval_vcf = ConcatVcfsShapeit4.vcf_gz,
+            eval_vcf_idx = ConcatVcfsShapeit4.vcf_gz_tbi,
+            region = evaluation_chromosomes_regions_arg,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
+            overlap_phase_tag = "NONE",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
+
+        # evaluate collisionless short + SV
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateFixVariantCollisions { input:
+            samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
+            truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
+            eval_vcf = ConcatVcfsFixVariantCollisions.vcf_gz,
+            eval_vcf_idx = ConcatVcfsFixVariantCollisions.vcf_gz_tbi,
+            region = evaluation_chromosomes_regions_arg,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
+            overlap_phase_tag = "NONE",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
+
+        # evaluate panel short + SV
+        call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanel { input:
+            samples = vcfdist_samples,
+            confident_regions_bed_files = confident_regions_bed_files,
+            truth_vcf = vcfdist_truth_vcf,
+            truth_vcf_idx = vcfdist_truth_vcf_idx,
+            eval_vcf = ConcatVcfsPanGeniePanelCreation.vcf_gz,
+            eval_vcf_idx = ConcatVcfsPanGeniePanelCreation.vcf_gz_tbi,
+            region = evaluation_chromosomes_regions_arg,
+            reference_fasta = reference_fasta,
+            reference_fasta_fai = reference_fasta_fai,
+            vcfdist_bed_file = vcfdist_bed_file,
+            vcfdist_extra_args = vcfdist_extra_args,
+            vcfdist_mem_gb = vcfdist_mem_gb,
+            overlap_phase_tag = "NONE",
+            overlap_metrics_docker = overlap_metrics_docker
+        }
+
+        if (do_short_read_stages) {
+            # evaluate naively phased GLIMPSE
+            call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSENaivelyPhased { input:
+                samples = vcfdist_samples,
+                confident_regions_bed_files = confident_regions_bed_files,
+                truth_vcf = vcfdist_truth_vcf,
+                truth_vcf_idx = vcfdist_truth_vcf_idx,
+                eval_vcf = select_first([GLIMPSENaivelyPhased.naively_phased_vcf_gz]),
+                eval_vcf_idx = select_first([GLIMPSENaivelyPhased.naively_phased_vcf_gz_tbi]),
                 region = evaluation_chromosomes_regions_arg,
                 reference_fasta = reference_fasta,
                 reference_fasta_fai = reference_fasta_fai,
@@ -420,64 +370,113 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
                 overlap_metrics_docker = overlap_metrics_docker
             }
 
-            String pangenie_naively_phased_label = "PanGenieNaivelyPhased"
+            # evaluate GLIMPSE
+            call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSE { input:
+                samples = vcfdist_samples,
+                confident_regions_bed_files = confident_regions_bed_files,
+                truth_vcf = vcfdist_truth_vcf,
+                truth_vcf_idx = vcfdist_truth_vcf_idx,
+                eval_vcf = select_first([LeaveOutEvaluation.glimpse_vcf_gz]),
+                eval_vcf_idx = select_first([LeaveOutEvaluation.glimpse_vcf_gz_tbi]),
+                region = evaluation_chromosomes_regions_arg,
+                reference_fasta = reference_fasta,
+                reference_fasta_fai = reference_fasta_fai,
+                vcfdist_bed_file = vcfdist_bed_file,
+                vcfdist_extra_args = vcfdist_extra_args,
+                vcfdist_mem_gb = vcfdist_mem_gb,
+                overlap_phase_tag = "NONE",
+                overlap_metrics_docker = overlap_metrics_docker
+            }
+
+            # evaluate collisionless GLIMPSE
+            call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSEFixVariantCollisions { input:
+                samples = vcfdist_samples,
+                confident_regions_bed_files = confident_regions_bed_files,
+                truth_vcf = vcfdist_truth_vcf,
+                truth_vcf_idx = vcfdist_truth_vcf_idx,
+                eval_vcf = select_first([GLIMPSEFixVariantCollisions.collisionless_bcf]),
+                eval_vcf_idx = select_first([GLIMPSEFixVariantCollisions.collisionless_bcf_csi]),
+                region = evaluation_chromosomes_regions_arg,
+                reference_fasta = reference_fasta,
+                reference_fasta_fai = reference_fasta_fai,
+                vcfdist_bed_file = vcfdist_bed_file,
+                vcfdist_extra_args = vcfdist_extra_args,
+                vcfdist_mem_gb = vcfdist_mem_gb,
+                overlap_phase_tag = "NONE",
+                overlap_metrics_docker = overlap_metrics_docker
+            }
+
+            if (do_pangenie) {
+                # evaluate naively phased PanGenie
+                call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluatePanGenieNaivelyPhased { input:
+                    samples = vcfdist_samples,
+                    confident_regions_bed_files = confident_regions_bed_files,
+                    truth_vcf = vcfdist_truth_vcf,
+                    truth_vcf_idx = vcfdist_truth_vcf_idx,
+                    eval_vcf = select_first([PanGenieNaivelyPhasedMergeAcrossSamples.merged_vcf_gz]),
+                    eval_vcf_idx = select_first([PanGenieNaivelyPhasedMergeAcrossSamples.merged_vcf_gz_tbi]),
+                    region = evaluation_chromosomes_regions_arg,
+                    reference_fasta = reference_fasta,
+                    reference_fasta_fai = reference_fasta_fai,
+                    vcfdist_bed_file = vcfdist_bed_file,
+                    vcfdist_extra_args = vcfdist_extra_args,
+                    vcfdist_mem_gb = vcfdist_mem_gb,
+                    overlap_phase_tag = "NONE",
+                    overlap_metrics_docker = overlap_metrics_docker
+                }
+            }
         }
 
-        String panel_label = "Panel"
-        String glimpse_naively_phased_label = "GLIMPSENaivelyPhased"
-        String glimpse_label = "GLIMPSE"
-        String glimpse_fix_variant_collisions_label = "GLIMPSEFixVariantCollisions"
-    }
-
-    Array[String] labels_per_vcf = select_all([
-        hiphase_short_label,
-        "HiPhaseSV",
-        "ConcatAndFiltered",
-        "BeforeShapeit4FixVariantCollisions",
-        "Shapeit4",
-        "FixVariantCollisions",
-        panel_label,
-        glimpse_naively_phased_label,
-        glimpse_label,
-        glimpse_fix_variant_collisions_label,
-        pangenie_naively_phased_label
-    ])
-    call SummarizeEvaluations { input:
-        labels_per_vcf = labels_per_vcf,
-        vcfdist_outputs_per_vcf_and_sample = select_all([
-            EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
-            EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
-            EvaluateFiltered.vcfdist_outputs_per_sample,
-            EvaluateBeforeShapeit4FixVariantCollisions.vcfdist_outputs_per_sample,
-            EvaluateShapeit4.vcfdist_outputs_per_sample,
-            EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
-            EvaluatePanel.vcfdist_outputs_per_sample,
-            EvaluateGLIMPSENaivelyPhased.vcfdist_outputs_per_sample,
-            EvaluateGLIMPSE.vcfdist_outputs_per_sample,
-            EvaluateGLIMPSEFixVariantCollisions.vcfdist_outputs_per_sample,
-            EvaluatePanGenieNaivelyPhased.vcfdist_outputs_per_sample
-        ]),
-        overlap_metrics_outputs_per_vcf = select_all([
-            EvaluateHiPhaseShort.overlap_metrics_outputs,
-            EvaluateHiPhaseSV.overlap_metrics_outputs,
-            EvaluateFiltered.overlap_metrics_outputs,
-            EvaluateBeforeShapeit4FixVariantCollisions.overlap_metrics_outputs,
-            EvaluateShapeit4.overlap_metrics_outputs,
-            EvaluateFixVariantCollisions.overlap_metrics_outputs,
-            EvaluatePanel.overlap_metrics_outputs,
-            EvaluateGLIMPSENaivelyPhased.overlap_metrics_outputs,
-            EvaluateGLIMPSE.overlap_metrics_outputs,
-            EvaluateGLIMPSEFixVariantCollisions.overlap_metrics_outputs,
-            EvaluatePanGenieNaivelyPhased.overlap_metrics_outputs
-        ]),
-        docker = summarize_evaluations_docker
+        Array[String] labels_per_vcf = select_all([
+            "HiPhaseShort",
+            "HiPhaseSV",
+            "ConcatAndFiltered",
+            "BeforeShapeit4FixVariantCollisions",
+            "Shapeit4",
+            "FixVariantCollisions",
+            "Panel",
+            "GLIMPSENaivelyPhased",
+            "GLIMPSE",
+            "GLIMPSEFixVariantCollisions",
+            "PanGenieNaivelyPhased"
+        ])
+        call SummarizeEvaluations { input:
+            labels_per_vcf = labels_per_vcf,
+            vcfdist_outputs_per_vcf_and_sample = select_all([
+                EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
+                EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
+                EvaluateFiltered.vcfdist_outputs_per_sample,
+                EvaluateBeforeShapeit4FixVariantCollisions.vcfdist_outputs_per_sample,
+                EvaluateShapeit4.vcfdist_outputs_per_sample,
+                EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
+                EvaluatePanel.vcfdist_outputs_per_sample,
+                EvaluateGLIMPSENaivelyPhased.vcfdist_outputs_per_sample,
+                EvaluateGLIMPSE.vcfdist_outputs_per_sample,
+                EvaluateGLIMPSEFixVariantCollisions.vcfdist_outputs_per_sample,
+                EvaluatePanGenieNaivelyPhased.vcfdist_outputs_per_sample
+            ]),
+            overlap_metrics_outputs_per_vcf = select_all([
+                EvaluateHiPhaseShort.overlap_metrics_outputs,
+                EvaluateHiPhaseSV.overlap_metrics_outputs,
+                EvaluateFiltered.overlap_metrics_outputs,
+                EvaluateBeforeShapeit4FixVariantCollisions.overlap_metrics_outputs,
+                EvaluateShapeit4.overlap_metrics_outputs,
+                EvaluateFixVariantCollisions.overlap_metrics_outputs,
+                EvaluatePanel.overlap_metrics_outputs,
+                EvaluateGLIMPSENaivelyPhased.overlap_metrics_outputs,
+                EvaluateGLIMPSE.overlap_metrics_outputs,
+                EvaluateGLIMPSEFixVariantCollisions.overlap_metrics_outputs,
+                EvaluatePanGenieNaivelyPhased.overlap_metrics_outputs
+            ]),
+            docker = summarize_evaluations_docker
+        }
     }
 
     output {
         File panel_vcf_gz = ConcatVcfsPanGeniePanelCreation.vcf_gz
         File panel_vcf_gz_tbi = ConcatVcfsPanGeniePanelCreation.vcf_gz_tbi
 
-        File evaluation_summary_tsv = SummarizeEvaluations.evaluation_summary_tsv
+        Array[File] evaluation_summary_tsvs = SummarizeEvaluations.evaluation_summary_tsv
     }
 }
 
