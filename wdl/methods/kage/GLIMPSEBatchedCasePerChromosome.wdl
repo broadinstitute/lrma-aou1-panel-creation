@@ -39,6 +39,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
         String kage_docker
         File? monitoring_script
 
+        RuntimeAttributes merge_runtime_attributes = {}
+        RuntimeAttributes concat_runtime_attributes = {}
         RuntimeAttributes glimpse_phase_runtime_attributes = {}
         RuntimeAttributes glimpse_sample_runtime_attributes = {}
     }
@@ -83,7 +85,9 @@ workflow GLIMPSEBatchedCasePerChromosome {
                     sample_names = read_lines(CreateBatches.sample_name_batch_files[b]),
                     output_prefix = output_prefix + ".batch-" + b + "." + chromosome + ".kage",
                     docker = kage_docker,
-                    monitoring_script = monitoring_script
+                    monitoring_script = monitoring_script,
+                    merge_runtime_attributes = merge_runtime_attributes,
+                    concat_runtime_attributes = concat_runtime_attributes
             }
 
             Array[String] input_regions = read_lines(ChromosomeGLIMPSEChunk.input_regions[j])

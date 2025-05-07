@@ -23,6 +23,9 @@ workflow HierarchicallyMergeVcfs {
         Boolean use_ivcfmerge   # requires sample_names
         Array[String]? sample_names
 
+        RuntimeAttributes merge_runtime_attributes = {}
+        RuntimeAttributes concat_runtime_attributes = {}
+
         String docker
         File? monitoring_script
     }
@@ -46,7 +49,8 @@ workflow HierarchicallyMergeVcfs {
                         sample_names = select_first([sample_names]),
                         region_args = "-r " + regions[j],
                         docker = docker,
-                        monitoring_script = monitoring_script
+                        monitoring_script = monitoring_script,
+                        runtime_attributes = merge_runtime_attributes
                 }
             }
         }
@@ -61,7 +65,8 @@ workflow HierarchicallyMergeVcfs {
                         output_prefix = output_prefix + ".batch-" + i + ".region-" + i,
                         extra_args = "-r " + regions[j] + " " + extra_merge_args,
                         docker = docker,
-                        monitoring_script = monitoring_script
+                        monitoring_script = monitoring_script,
+                        runtime_attributes = merge_runtime_attributes
                 }
             }
         }
@@ -80,7 +85,8 @@ workflow HierarchicallyMergeVcfs {
                     output_prefix = output_prefix + ".region-" + j,
                     sample_names = select_first([sample_names]),
                     docker = docker,
-                    monitoring_script = monitoring_script
+                    monitoring_script = monitoring_script,
+                    runtime_attributes = merge_runtime_attributes
             }
         }
     }
@@ -94,7 +100,8 @@ workflow HierarchicallyMergeVcfs {
                     output_prefix = output_prefix + ".region-" + j,
                     extra_args = extra_merge_args,
                     docker = docker,
-                    monitoring_script = monitoring_script
+                    monitoring_script = monitoring_script,
+                    runtime_attributes = merge_runtime_attributes
             }
         }
     }
@@ -107,7 +114,8 @@ workflow HierarchicallyMergeVcfs {
             output_prefix = output_prefix,
             extra_args = extra_concat_args,
             docker = docker,
-            monitoring_script = monitoring_script
+            monitoring_script = monitoring_script,
+            runtime_attributes = concat_runtime_attributes
     }
 
     output {

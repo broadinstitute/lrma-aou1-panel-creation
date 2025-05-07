@@ -70,6 +70,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         RuntimeAttributes? leave_out_large_runtime_attributes
         RuntimeAttributes? pangenie_runtime_attributes
         RuntimeAttributes? kage_runtime_attributes
+        RuntimeAttributes? merge_runtime_attributes
+        RuntimeAttributes? concat_runtime_attributes
         RuntimeAttributes? glimpse_phase_runtime_attributes
         RuntimeAttributes? glimpse_sample_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
@@ -277,6 +279,8 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             large_runtime_attributes = leave_out_large_runtime_attributes,
             pangenie_runtime_attributes = pangenie_runtime_attributes,
             kage_runtime_attributes = kage_runtime_attributes,
+            merge_runtime_attributes = merge_runtime_attributes,
+            concat_runtime_attributes = concat_runtime_attributes,
             glimpse_phase_runtime_attributes = glimpse_phase_runtime_attributes,
             glimpse_sample_runtime_attributes = glimpse_sample_runtime_attributes,
             calculate_metrics_runtime_attributes = calculate_metrics_runtime_attributes,

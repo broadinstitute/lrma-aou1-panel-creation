@@ -65,6 +65,8 @@ workflow LeaveOutEvaluation {
         RuntimeAttributes? large_runtime_attributes
         RuntimeAttributes? pangenie_runtime_attributes
         RuntimeAttributes? kage_runtime_attributes
+        RuntimeAttributes? merge_runtime_attributes
+        RuntimeAttributes? concat_runtime_attributes
         RuntimeAttributes? glimpse_phase_runtime_attributes
         RuntimeAttributes? glimpse_sample_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
@@ -258,6 +260,8 @@ workflow LeaveOutEvaluation {
             is_weight_format_field = is_weight_format_field,
             kage_docker = kage_docker,
             monitoring_script = monitoring_script,
+            merge_runtime_attributes = merge_runtime_attributes,
+            concat_runtime_attributes = concat_runtime_attributes,
             glimpse_phase_runtime_attributes = glimpse_phase_runtime_attributes,
             glimpse_sample_runtime_attributes = glimpse_sample_runtime_attributes
     }
