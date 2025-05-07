@@ -114,7 +114,9 @@ workflow GLIMPSEBatchedCasePerChromosome {
                 input:
                     vcfs = ChunkedGLIMPSEPhase.phased_vcf_gz,
                     vcf_idxs = ChunkedGLIMPSEPhase.phased_vcf_gz_tbi,
-                    prefix = output_prefix + ".batch-" + b + "." + chromosome + ".ligated"
+                    prefix = output_prefix + ".batch-" + b + "." + chromosome + ".ligated",
+                    docker = kage_docker,
+                    monitoring_script = monitoring_script
             }
 
             call GLIMPSESample as ChromosomeGLIMPSESample {
@@ -319,7 +321,7 @@ task ConcatVcfs {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes runtime_attributes = {}
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
     }
 
     Int disk_size_gb = 3 * ceil(size(vcf_gzs, "GB"))
@@ -477,13 +479,23 @@ task GLIMPSELigate {
         Array[File]? vcf_idxs
         String prefix
 
+        String docker
+        File? monitoring_script
+
         RuntimeAttributes runtime_attributes = {}
     }
 
     Int disk_size_gb = 2*ceil(size(vcfs, "GB")) + 1
 
     command <<<
-        set -euxo pipefail
+        set -euox pipefail
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
         if ! ~{defined(vcf_idxs)}; then
             for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         fi
@@ -496,12 +508,13 @@ task GLIMPSELigate {
     >>>
 
     output {
+        File monitoring_log = "monitoring.log"
         File ligated_vcf_gz = "~{prefix}.vcf.gz"
         File ligated_vcf_gz_tbi = "~{prefix}.vcf.gz.tbi"
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+        docker: docker
         cpu: select_first([runtime_attributes.cpu, 2])
         memory: select_first([runtime_attributes.command_mem_gb, 7]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
         disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
