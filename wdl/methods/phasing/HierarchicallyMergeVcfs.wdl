@@ -234,11 +234,17 @@ task Ivcfmerge {
         mv ~{sep=' ' vcf_gzs} compressed
         mv ~{sep=' ' vcf_gz_tbis} compressed
 
-        mkdir decompressed
-        ls compressed/*.vcf.gz | xargs -I % sh -c 'bcftools annotate --no-version ~{region_args} -x INFO % --threads 2 -Ov -o decompressed/$(basename % .gz)'
-        time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
-        bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf --threads 2 -Oz -o ~{output_prefix}.vcf.gz
-        bcftools index -t ~{output_prefix}.vcf.gz
+        if [ $(ls *.vcf.gz | wc -l) == 1 ]
+        then
+            cp $(ls *.vcf.gz) ~{output_prefix}.vcf.gz
+            cp $(ls *.vcf.gz.tbi) ~{output_prefix}.vcf.gz.tbi
+        else
+            mkdir decompressed
+            ls compressed/*.vcf.gz | xargs -I % sh -c 'bcftools annotate --no-version ~{region_args} -x INFO % --threads 2 -Ov -o decompressed/$(basename % .gz)'
+            time python ivcfmerge-1.0.0/ivcfmerge.py <(ls decompressed/*.vcf) ~{output_prefix}.vcf
+            bcftools annotate --no-version -S ~{write_lines(sample_names)} -x FORMAT/FT ~{output_prefix}.vcf --threads 2 -Oz -o ~{output_prefix}.vcf.gz
+            bcftools index -t ~{output_prefix}.vcf.gz
+        fi
     }
 
     output {
