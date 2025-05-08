@@ -12,6 +12,11 @@ struct VcfdistOutputs {
     File phase_blocks_tsv
 }
 
+# TODO trivial wrapper so we can reuse code, refactor later
+struct VcfdistPrecisionRecallSummary {
+    File precision_recall_summary_tsv
+}
+
 struct OverlapMetricsOutputs {
     File inconsistent_tsv
     File metrics_tsv
@@ -83,6 +88,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
     output {
         # per-sample
         Array[VcfdistOutputs] vcfdist_outputs_per_sample = Vcfdist.outputs
+        Array[VcfdistPrecisionRecallSummary] precision_recall_summary_per_sample = Vcfdist.precision_recall_summary
 
         # per-cohort
         OverlapMetricsOutputs? overlap_metrics_outputs = CalculateOverlapMetrics.outputs
@@ -174,6 +180,10 @@ task Vcfdist {
             "switchflips_tsv": "~{sample}.switchflips.tsv",
             "superclusters_tsv": "~{sample}.superclusters.tsv",
             "phase_blocks_tsv": "~{sample}.phase-blocks.tsv"
+        }
+
+        VcfdistPrecisionRecallSummary precision_recall_summary = {
+            "precision_recall_summary_tsv": "~{sample}.precision-recall-summary.tsv"
         }
     }
 

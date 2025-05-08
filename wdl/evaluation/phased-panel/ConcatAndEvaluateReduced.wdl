@@ -464,17 +464,17 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         call SummarizeEvaluations { input:
             labels_per_vcf = labels_per_vcf,
             vcfdist_outputs_per_vcf_and_sample = select_all([
-                EvaluateHiPhaseShort.vcfdist_outputs_per_sample,
-                EvaluateHiPhaseSV.vcfdist_outputs_per_sample,
-                EvaluateFiltered.vcfdist_outputs_per_sample,
-#                EvaluateBeforeShapeit4FixVariantCollisions.vcfdist_outputs_per_sample,
-                EvaluateShapeit4.vcfdist_outputs_per_sample,
-#                EvaluateFixVariantCollisions.vcfdist_outputs_per_sample,
-                EvaluatePanel.vcfdist_outputs_per_sample,
-#                EvaluateGLIMPSENaivelyPhased.vcfdist_outputs_per_sample,
-#                EvaluateGLIMPSE.vcfdist_outputs_per_sample,
-                EvaluateGLIMPSEFixVariantCollisions.vcfdist_outputs_per_sample,
-                EvaluatePanGenieNaivelyPhased.vcfdist_outputs_per_sample
+                EvaluateHiPhaseShort.precision_recall_summary_per_sample,
+                EvaluateHiPhaseSV.precision_recall_summary_per_sample,
+                EvaluateFiltered.precision_recall_summary_per_sample,
+#                EvaluateBeforeShapeit4FixVariantCollisions.precision_recall_summary_per_sample,
+                EvaluateShapeit4.precision_recall_summary_per_sample,
+#                EvaluateFixVariantCollisions.precision_recall_summary_per_sample,
+                EvaluatePanel.precision_recall_summary_per_sample,
+#                EvaluateGLIMPSENaivelyPhased.precision_recall_summary_per_sample,
+#                EvaluateGLIMPSE.precision_recall_summary_per_sample,
+                EvaluateGLIMPSEFixVariantCollisions.precision_recall_summary_per_sample,
+                EvaluatePanGenieNaivelyPhased.precision_recall_summary_per_sample
             ]),
             overlap_metrics_outputs_per_vcf = select_all([
                 EvaluateHiPhaseShort.overlap_metrics_outputs,
@@ -614,7 +614,8 @@ task FixVariantCollisions {
 task SummarizeEvaluations {
     input {
         Array[String] labels_per_vcf
-        Array[Array[VcfdistOutputs]] vcfdist_outputs_per_vcf_and_sample
+#        Array[Array[VcfdistOutputs]] vcfdist_outputs_per_vcf_and_sample
+        Array[Array[VcfdistPrecisionRecallSummary]] vcfdist_outputs_per_vcf_and_sample
         Array[OverlapMetricsOutputs] overlap_metrics_outputs_per_vcf
 
         String docker
