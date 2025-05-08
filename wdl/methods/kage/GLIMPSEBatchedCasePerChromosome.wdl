@@ -95,6 +95,9 @@ workflow GLIMPSEBatchedCasePerChromosome {
             Array[String] input_regions = read_lines(ChromosomeGLIMPSEChunk.input_regions[j])
             Array[String] output_regions = read_lines(ChromosomeGLIMPSEChunk.output_regions[j])
 
+            if (defined(chromosome_to_glimpse_command_mem_gb)) {
+                Int command_mem_gb = select_first([chromosome_to_glimpse_command_mem_gb])[chromosome]
+            }
             scatter (k in range(length(input_regions))) {
                 call GLIMPSEPhase as BatchChunkedGLIMPSEPhase {
                     input:
@@ -110,7 +113,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
                         docker = kage_docker,
                         monitoring_script = monitoring_script,
                         runtime_attributes = glimpse_phase_runtime_attributes,
--                       command_mem_gb = chromosome_to_glimpse_command_mem_gb[chromosome]
+                        command_mem_gb = command_mem_gb
                 }
             }
 
