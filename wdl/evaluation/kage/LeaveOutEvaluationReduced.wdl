@@ -71,6 +71,7 @@ workflow LeaveOutEvaluation {
         RuntimeAttributes? concat_runtime_attributes
         RuntimeAttributes? glimpse_phase_runtime_attributes
         RuntimeAttributes? glimpse_sample_runtime_attributes
+        Map[String, Int]? chromosome_to_glimpse_command_mem_gb      # for running per-chromosome by choosing large chunk size; this will override glimpse_phase_runtime_attributes
         RuntimeAttributes? calculate_metrics_runtime_attributes
     }
 
@@ -267,7 +268,8 @@ workflow LeaveOutEvaluation {
             merge_runtime_attributes = merge_runtime_attributes,
             concat_runtime_attributes = concat_runtime_attributes,
             glimpse_phase_runtime_attributes = glimpse_phase_runtime_attributes,
-            glimpse_sample_runtime_attributes = glimpse_sample_runtime_attributes
+            glimpse_sample_runtime_attributes = glimpse_sample_runtime_attributes,
+            chromosome_to_glimpse_command_mem_gb = chromosome_to_glimpse_command_mem_gb
     }
 
     scatter (j in range(length(leave_out_sample_names))) {
