@@ -257,6 +257,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
                 overlap_phase_tag = "PS",
                 overlap_metrics_docker = overlap_metrics_docker
             }
+            String hiphase_short_label = "HiPhaseShort"
         }
 
         # evaluate HiPhase SV
@@ -385,6 +386,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
 #                overlap_phase_tag = "NONE",
 #                overlap_metrics_docker = overlap_metrics_docker
 #            }
+#            String glimpse_naively_phased_label = "GLIMPSENaivelyPhased"
 
 #            # evaluate GLIMPSE
 #            call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSE { input:
@@ -403,6 +405,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
 #                overlap_phase_tag = "NONE",
 #                overlap_metrics_docker = overlap_metrics_docker
 #            }
+#            String glimpse_label = "GLIMPSE"
 
             # evaluate collisionless GLIMPSE
             call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateGLIMPSEFixVariantCollisions { input:
@@ -421,6 +424,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
                 overlap_phase_tag = "NONE",
                 overlap_metrics_docker = overlap_metrics_docker
             }
+            String glimpse_fix_variant_collisions_label = "GLIMPSEFixVariantCollisions"
 
             if (do_pangenie) {
                 # evaluate naively phased PanGenie
@@ -440,21 +444,22 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
                     overlap_phase_tag = "NONE",
                     overlap_metrics_docker = overlap_metrics_docker
                 }
+                String pangenie_naively_phased_label = "PanGenieNaivelyPhased"
             }
         }
 
         Array[String] labels_per_vcf = select_all([
-            "HiPhaseShort",
+            hiphase_short_label,
             "HiPhaseSV",
             "ConcatAndFiltered",
 #            "BeforeShapeit4FixVariantCollisions",
             "Shapeit4",
 #            "FixVariantCollisions",
             "Panel",
-#            "GLIMPSENaivelyPhased",
-#            "GLIMPSE",
-            "GLIMPSEFixVariantCollisions",
-            "PanGenieNaivelyPhased"
+#            glimpse_naively_phased_label,
+#            glimpse_label,
+            glimpse_fix_variant_collisions_label,
+            pangenie_naively_phased_label
         ])
         call SummarizeEvaluations { input:
             labels_per_vcf = labels_per_vcf,
