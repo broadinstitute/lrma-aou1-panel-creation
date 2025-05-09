@@ -22,6 +22,7 @@ workflow PanGenieGenotype {
         File reference_fasta_fai
         Array[String] chromosomes
         File input_cram
+        File? input_crai
         Boolean subset_reads = true
         String sample_name
 
@@ -33,12 +34,14 @@ workflow PanGenieGenotype {
         RuntimeAttributes? pangenie_runtime_attributes
     }
 
-    call IndexCaseReads {
-        # TODO we require the alignments to subset by chromosome; change to start from raw reads
-        input:
-            input_cram = input_cram,
-            docker = docker,
-            monitoring_script = monitoring_script
+    if (!defined(input_crai)) {
+        call IndexCaseReads {
+            # TODO we require the alignments to subset by chromosome; change to start from raw reads
+            input:
+                input_cram = input_cram,
+                docker = docker,
+                monitoring_script = monitoring_script
+        }
     }
 
     if (subset_reads) {
@@ -46,7 +49,7 @@ workflow PanGenieGenotype {
             # TODO we require the alignments to subset by chromosome; change to start from raw reads
             input:
                 input_cram = input_cram,
-                input_cram_idx = IndexCaseReads.cram_idx,
+                input_cram_idx = select_first([input_crai, IndexCaseReads.cram_idx]),
                 reference_fasta = reference_fasta,
                 reference_fasta_fai = reference_fasta_fai,
                 output_prefix = sample_name,
@@ -61,7 +64,7 @@ workflow PanGenieGenotype {
             # TODO we require the alignments to subset by chromosome; change to start from raw reads
             input:
                 input_cram = input_cram,
-                input_cram_idx = IndexCaseReads.cram_idx,
+                input_cram_idx = select_first([input_crai, IndexCaseReads.cram_idx]),
                 reference_fasta = reference_fasta,
                 reference_fasta_fai = reference_fasta_fai,
                 output_prefix = sample_name,
@@ -87,6 +90,7 @@ workflow PanGenieGenotype {
     }
 
     output {
+        File? cram_idx = IndexCaseReads.cram_idx
         File genotyping_vcf_gz = Genotype.genotyping_vcf_gz
         File genotyping_vcf_gz_tbi = Genotype.genotyping_vcf_gz_tbi
         File genotyping_naively_phased_vcf_gz = Genotype.genotyping_naively_phased_vcf_gz
