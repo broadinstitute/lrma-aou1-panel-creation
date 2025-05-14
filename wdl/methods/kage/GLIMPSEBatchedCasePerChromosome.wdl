@@ -45,6 +45,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
         RuntimeAttributes glimpse_phase_runtime_attributes = {}
         RuntimeAttributes glimpse_sample_runtime_attributes = {}
         Map[String, Int]? chromosome_to_glimpse_command_mem_gb      # for running per-chromosome by choosing large chunk size; this will override glimpse_phase_runtime_attributes
+        Int? glimpse_phase_preemptible
     }
 
     Array[Array[String]] sample_by_chromosome_kage_vcf_gzs = read_tsv(sample_by_chromosome_kage_vcf_gzs_tsv)
@@ -113,7 +114,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
                         docker = kage_docker,
                         monitoring_script = monitoring_script,
                         runtime_attributes = glimpse_phase_runtime_attributes,
-                        command_mem_gb = command_mem_gb
+                        command_mem_gb = command_mem_gb,
+                        preemptible = glimpse_phase_preemptible
                 }
             }
 
@@ -318,6 +320,7 @@ task ConcatVcfs {
         mv ~{sep=' ' vcf_gzs} inputs
         mv ~{sep=' ' vcf_gz_tbis} inputs
 
+        # TODO FIX LEXICOGRAPHICAL BUG!
         if [ $(ls inputs/*.vcf.gz | wc -l) == 1 ]
         then
             cp $(ls inputs/*.vcf.gz) ~{output_prefix}.vcf.gz
@@ -408,6 +411,7 @@ task GLIMPSEPhase {
 
         RuntimeAttributes runtime_attributes = {}
         Int? command_mem_gb = 7
+        Int? preemptible = 2
     }
 
     command {
@@ -454,7 +458,7 @@ task GLIMPSEPhase {
         memory: select_first([runtime_attributes.command_mem_gb, command_mem_gb]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
         disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
+        preemptible: select_first([runtime_attributes.preemptible, preemptible])
         maxRetries: select_first([runtime_attributes.max_retries, 1])
     }
 
