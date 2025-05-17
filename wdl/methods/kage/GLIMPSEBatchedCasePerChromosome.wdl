@@ -67,7 +67,7 @@ workflow GLIMPSEBatchedCasePerChromosome {
                 vcf = panel_split_vcf_gz[j],
                 tbi = panel_split_vcf_gz_tbi[j],
                 region = chromosomes[j],
-                prefix = output_prefix + "." + chromosomes[j],
+                prefix = "chunk." + chromosomes[j],
                 extra_chunk_args = extra_chunk_args
         }
     }
