@@ -76,6 +76,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
         RuntimeAttributes? glimpse_phase_runtime_attributes
         RuntimeAttributes? glimpse_sample_runtime_attributes
         Map[String, Int]? chromosome_to_glimpse_command_mem_gb      # for running per-chromosome by choosing large chunk size; this will override glimpse_phase_runtime_attributes
+        Int? glimpse_phase_preemptible
         RuntimeAttributes? calculate_metrics_runtime_attributes
 
         # reduced arguments
@@ -191,6 +192,7 @@ workflow PhasedPanelEvaluation {    # TODO change name later, easier to share co
             glimpse_phase_runtime_attributes = glimpse_phase_runtime_attributes,
             glimpse_sample_runtime_attributes = glimpse_sample_runtime_attributes,
             chromosome_to_glimpse_command_mem_gb = chromosome_to_glimpse_command_mem_gb,
+            glimpse_phase_preemptible = glimpse_phase_preemptible,
             calculate_metrics_runtime_attributes = calculate_metrics_runtime_attributes,
             num_short_variants_to_retain = num_short_variants_to_retain,
             do_genotype_SVs = do_genotype_SVs
