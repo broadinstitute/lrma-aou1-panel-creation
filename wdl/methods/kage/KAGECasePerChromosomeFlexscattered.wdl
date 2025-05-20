@@ -89,7 +89,7 @@ workflow KAGECasePerChromosome {
     }
 
     output {
-        File? cram_idx = IndexCaseReads.cram_idx
+        File cram_idx = select_first([input_crai, IndexCaseReads.cram_idx])
         Array[File] chromosome_kmer_counts = flatten(KAGE.chromosome_kmer_counts)
         Array[File] chromosome_kage_vcf_gzs = flatten(KAGE.chromosome_kage_vcf_gzs)
         Array[File] chromosome_kage_vcf_gz_tbis = flatten(KAGE.chromosome_kage_vcf_gz_tbis)
