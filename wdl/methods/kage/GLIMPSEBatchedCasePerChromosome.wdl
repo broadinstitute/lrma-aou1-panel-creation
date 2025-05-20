@@ -286,12 +286,12 @@ task CreateTables {
 
     command {
         touch ~{prefix}.chromosome_kage_vcf_gzs.tsv
-        for txt in ~{vcfs_txts}; do
+        for txt in ~{sep=' ' vcfs_txts}; do
             paste -s $txt >> ~{prefix}.chromosome_kage_vcf_gzs.tsv
         done
 
         touch ~{prefix}.chromosome_kage_vcf_gzs.tsv
-        for txt in ~{tbis_txts}; do
+        for txt in ~{sep=' ' tbis_txts}; do
             paste -s $txt >> ~{prefix}.chromosome_kage_vcf_gz_tbis.tsv
         done
     }
