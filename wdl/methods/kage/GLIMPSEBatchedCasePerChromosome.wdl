@@ -19,9 +19,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
 #        File sample_by_chromosome_kage_vcf_gz_tbis_tsv
 #        File sample_names_file
 
-        # go back to data model inputs
-        Array[Array[String]] sample_by_chromosome_kage_vcf_gzs
-        Array[Array[String]] sample_by_chromosome_kage_vcf_gz_tbis
+        Array[File] chromosome_kage_vcf_gzs_tsvs         # per sample
+        Array[File] chromosome_kage_vcf_gz_tbis_tsvs     # per sample
         Array[String] sample_names
 
         # per chromosome
@@ -56,6 +55,16 @@ workflow GLIMPSEBatchedCasePerChromosome {
 #    Array[Array[String]] sample_by_chromosome_kage_vcf_gzs = read_tsv(sample_by_chromosome_kage_vcf_gzs_tsv)
 #    Array[Array[String]] sample_by_chromosome_kage_vcf_gz_tbis = read_tsv(sample_by_chromosome_kage_vcf_gz_tbis_tsv)
 #    Array[String] sample_names = read_lines(sample_names_file)
+
+    call DeserializeArray as DeserializeVCFs {
+        input:
+            array = chromosome_kage_vcf_gzs_tsvs
+    }
+
+    call DeserializeArray as DeserializeTBIs {
+        input:
+            array = chromosome_kage_vcf_gz_tbis_tsvs
+    }
 
     call CreateBatches {
         input:
