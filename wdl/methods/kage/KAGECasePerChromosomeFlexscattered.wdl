@@ -70,11 +70,33 @@ workflow KAGECasePerChromosome {
         }
     }
 
+    call SerializeArray as SerializeCounts {
+        input:
+            array = flatten(KAGE.chromosome_kmer_counts),
+            prefix = sample_name + ".chromosome_kmer_counts"
+    }
+
+    call SerializeArray as SerializeVCFs {
+        input:
+            array = flatten(KAGE.chromosome_kage_vcf_gzs),
+            prefix = sample_name + ".chromosome_kage_vcf_gzs"
+    }
+
+    call SerializeArray as SerializeTBIs {
+        input:
+            array = flatten(KAGE.chromosome_kage_vcf_gz_tbis),
+            prefix = sample_name + ".chromosome_kage_vcf_gz_tbis"
+    }
+
     output {
         File? cram_idx = IndexCaseReads.cram_idx
         Array[File] chromosome_kmer_counts = flatten(KAGE.chromosome_kmer_counts)
         Array[File] chromosome_kage_vcf_gzs = flatten(KAGE.chromosome_kage_vcf_gzs)
         Array[File] chromosome_kage_vcf_gz_tbis = flatten(KAGE.chromosome_kage_vcf_gz_tbis)
+        # serialized array outputs
+        File chromosome_kmer_counts_tsv = SerializeCounts.output_tsv
+        File chromosome_kage_vcf_gzs_tsv = SerializeVCFs.output_tsv
+        File chromosome_kage_vcf_gz_tbis_tsv = SerializeTBIs.output_tsv
     }
 }
 
@@ -250,5 +272,20 @@ task KAGE {
         Array[File] chromosome_kmer_counts = glob("~{output_prefix}.*.kmer_counts.npy")       # must be careful with globbing and lexicographical ordering here!
         Array[File] chromosome_kage_vcf_gzs = glob("~{output_prefix}.*.kage.vcf.gz")
         Array[File] chromosome_kage_vcf_gz_tbis = glob("~{output_prefix}.*.kage.vcf.gz.tbi")
+    }
+}
+
+task SerializeArray {
+    input {
+        Array[String] array
+        String prefix
+    }
+
+    command {
+        cat ~{write_lines(array)} > ~{prefix}.tsv
+    }
+
+    output {
+        File output_tsv = "~{prefix}.tsv"
     }
 }
