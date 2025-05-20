@@ -121,6 +121,7 @@ task CreateBatches {
 }
 
 # assumes all VCFs have identical variants
+# TODO make this work for identical filenames
 task Ivcfmerge {
     input{
         Array[File] vcf_gzs
