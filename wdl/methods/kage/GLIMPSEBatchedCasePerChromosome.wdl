@@ -56,20 +56,26 @@ workflow GLIMPSEBatchedCasePerChromosome {
 #    Array[Array[String]] sample_by_chromosome_kage_vcf_gz_tbis = read_tsv(sample_by_chromosome_kage_vcf_gz_tbis_tsv)
 #    Array[String] sample_names = read_lines(sample_names_file)
 
-    call DeserializeArray as DeserializeVCFs {
+    call CreateTable as CreateTableVCFs {
         input:
-            array = chromosome_kage_vcf_gzs_tsvs
+            txts = chromosome_kage_vcf_gzs_txts,
+            prefix = output_prefix,
+            docker = kage_docker
     }
 
-    call DeserializeArray as DeserializeTBIs {
+    call CreateTable as CreateTableTBIs {
         input:
-            array = chromosome_kage_vcf_gz_tbis_tsvs
+            txts = chromosome_kage_vcf_gz_tbis_txts,
+            prefix = output_prefix,
+            docker = kage_docker
     }
 
     call CreateBatches {
         input:
-            sample_by_chromosome_vcf_gzs = sample_by_chromosome_kage_vcf_gzs,
-            sample_by_chromosome_vcf_gz_tbis = sample_by_chromosome_kage_vcf_gz_tbis,
+#            sample_by_chromosome_vcf_gzs = sample_by_chromosome_kage_vcf_gzs,
+#            sample_by_chromosome_vcf_gz_tbis = sample_by_chromosome_kage_vcf_gz_tbis,
+            sample_by_chromosome_vcf_gzs = read_tsv(CreateTableVCFs.output_tsv),
+            sample_by_chromosome_vcf_gz_tbis = read_tsv(CreateTableTBIs.output_tsv),
             sample_names = sample_names,
             batch_size = glimpse_batch_size,
             docker = kage_docker
@@ -268,6 +274,40 @@ workflow GLIMPSEBatchedCasePerChromosome {
         File glimpse_vcf_gz_tbi = GLIMPSEConcatVcfs.vcf_gz_tbi
         File phased_collisionless_vcf_gz = PhasedCollisionlessConcatVcfs.vcf_gz
         File phased_collisionless_vcf_gz_tbi = PhasedCollisionlessConcatVcfs.vcf_gz_tbi
+    }
+}
+
+# input: array of per-sample list files (each list file is one per-chromosome path per line)
+# output: tsv of sample x chromosome paths (one row per sample, one column per chromosome)
+task CreateTable {
+    input {
+        Array[File] txts
+        String prefix
+
+        String docker
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    command {
+        touch ~{prefix}.tsv
+        for txt in ~{txts}; do
+            paste -s $txt >> ~{prefix}.tsv
+        done
+    }
+
+    output {
+        File output_tsv = "~{prefix}.tsv"
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 3]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 10]) + if select_first([runtime_attributes.use_ssd, true]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
     }
 }
 
