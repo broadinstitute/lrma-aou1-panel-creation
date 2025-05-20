@@ -70,24 +70,11 @@ workflow KAGECasePerChromosome {
         }
     }
 
-    call SerializeArray as SerializeCounts {
+    call SerializeArrays {
         input:
-            array = flatten(KAGE.chromosome_kmer_counts),
-            prefix = sample_name + ".chromosome_kmer_counts",
-            docker = samtools_docker
-    }
-
-    call SerializeArray as SerializeVCFs {
-        input:
-            array = flatten(KAGE.chromosome_kage_vcf_gzs),
-            prefix = sample_name + ".chromosome_kage_vcf_gzs",
-            docker = samtools_docker
-    }
-
-    call SerializeArray as SerializeTBIs {
-        input:
-            array = flatten(KAGE.chromosome_kage_vcf_gz_tbis),
-            prefix = sample_name + ".chromosome_kage_vcf_gz_tbis",
+            vcfs_array = flatten(KAGE.chromosome_kage_vcf_gzs),
+            tbis_array = flatten(KAGE.chromosome_kage_vcf_gz_tbis),
+            prefix = sample_name,
             docker = samtools_docker
     }
 
@@ -97,9 +84,8 @@ workflow KAGECasePerChromosome {
         Array[File] chromosome_kage_vcf_gzs = flatten(KAGE.chromosome_kage_vcf_gzs)
         Array[File] chromosome_kage_vcf_gz_tbis = flatten(KAGE.chromosome_kage_vcf_gz_tbis)
         # serialized array outputs
-        File chromosome_kmer_counts_txt = SerializeCounts.output_txt
-        File chromosome_kage_vcf_gzs_txt = SerializeVCFs.output_txt
-        File chromosome_kage_vcf_gz_tbis_txt = SerializeTBIs.output_txt
+        File chromosome_kage_vcf_gzs_txt = SerializeArrays.vcfs_txt
+        File chromosome_kage_vcf_gz_tbis_txt = SerializeArrays.tbis_txt
     }
 }
 
@@ -278,9 +264,10 @@ task KAGE {
     }
 }
 
-task SerializeArray {
+task SerializeArrays {
     input {
-        Array[String] array
+        Array[String] vcfs_array
+        Array[String] tbis_array
         String prefix
 
         String docker
@@ -289,11 +276,13 @@ task SerializeArray {
     }
 
     command {
-        mv ~{write_lines(array)} ~{prefix}.txt
+        mv ~{write_lines(vcfs_array)} ~{prefix}.chromosome_kage_vcf_gzs.txt
+        mv ~{write_lines(tbis_array)} ~{prefix}.chromosome_kage_vcf_gz_tbis.txt
     }
 
     output {
-        File output_txt = "~{prefix}.txt"
+        File vcfs_txt = "~{prefix}.chromosome_kage_vcf_gzs.txt"
+        File tbis_txt = "~{prefix}.chromosome_kage_vcf_gz_tbis.txt"
     }
 
     runtime {

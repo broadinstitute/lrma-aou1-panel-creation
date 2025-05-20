@@ -56,16 +56,10 @@ workflow GLIMPSEBatchedCasePerChromosome {
 #    Array[Array[String]] sample_by_chromosome_kage_vcf_gz_tbis = read_tsv(sample_by_chromosome_kage_vcf_gz_tbis_tsv)
 #    Array[String] sample_names = read_lines(sample_names_file)
 
-    call CreateTable as CreateTableVCFs {
+    call CreateTables {
         input:
-            txts = chromosome_kage_vcf_gzs_txts,
-            prefix = output_prefix,
-            docker = kage_docker
-    }
-
-    call CreateTable as CreateTableTBIs {
-        input:
-            txts = chromosome_kage_vcf_gz_tbis_txts,
+            vcfs_txts = chromosome_kage_vcf_gzs_txts,
+            tbis_txts = chromosome_kage_vcf_gz_tbis_txts,
             prefix = output_prefix,
             docker = kage_docker
     }
@@ -74,8 +68,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
         input:
 #            sample_by_chromosome_vcf_gzs = sample_by_chromosome_kage_vcf_gzs,
 #            sample_by_chromosome_vcf_gz_tbis = sample_by_chromosome_kage_vcf_gz_tbis,
-            sample_by_chromosome_vcf_gzs = read_tsv(CreateTableVCFs.output_tsv),
-            sample_by_chromosome_vcf_gz_tbis = read_tsv(CreateTableTBIs.output_tsv),
+            sample_by_chromosome_vcf_gzs = read_tsv(CreateTables.chromosome_kage_vcf_gzs_tsv),
+            sample_by_chromosome_vcf_gz_tbis = read_tsv(CreateTables.chromosome_kage_vcf_gz_tbis_tsv),
             sample_names = sample_names,
             batch_size = glimpse_batch_size,
             docker = kage_docker
@@ -277,11 +271,12 @@ workflow GLIMPSEBatchedCasePerChromosome {
     }
 }
 
-# input: array of per-sample list files (each list file is one per-chromosome path per line)
-# output: tsv of sample x chromosome paths (one row per sample, one column per chromosome)
-task CreateTable {
+# input: arrays of per-sample list files (each list file is one per-chromosome path per line)
+# output: tsvs of sample x chromosome paths (one row per sample, one column per chromosome)
+task CreateTables {
     input {
-        Array[File] txts
+        Array[File] vcfs_txts
+        Array[File] tbis_txts
         String prefix
 
         String docker
@@ -290,14 +285,20 @@ task CreateTable {
     }
 
     command {
-        touch ~{prefix}.tsv
-        for txt in ~{txts}; do
-            paste -s $txt >> ~{prefix}.tsv
+        touch ~{prefix}.chromosome_kage_vcf_gzs.tsv
+        for txt in ~{vcfs_txts}; do
+            paste -s $txt >> ~{prefix}.chromosome_kage_vcf_gzs.tsv
+        done
+
+        touch ~{prefix}.chromosome_kage_vcf_gzs.tsv
+        for txt in ~{tbis_txts}; do
+            paste -s $txt >> ~{prefix}.chromosome_kage_vcf_gz_tbis.tsv
         done
     }
 
     output {
-        File output_tsv = "~{prefix}.tsv"
+        File chromosome_kage_vcf_gzs_tsv = "~{prefix}.chromosome_kage_vcf_gzs.tsv"
+        File chromosome_kage_vcf_gz_tbis_tsv = "~{prefix}.chromosome_kage_vcf_gz_tbis.tsv"
     }
 
     runtime {
