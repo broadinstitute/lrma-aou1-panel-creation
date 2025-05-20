@@ -284,6 +284,8 @@ task SerializeArray {
         String prefix
 
         String docker
+
+        RuntimeAttributes runtime_attributes = {}
     }
 
     command {
