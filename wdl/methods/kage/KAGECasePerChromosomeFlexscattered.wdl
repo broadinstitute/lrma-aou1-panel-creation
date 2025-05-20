@@ -94,9 +94,9 @@ workflow KAGECasePerChromosome {
         Array[File] chromosome_kage_vcf_gzs = flatten(KAGE.chromosome_kage_vcf_gzs)
         Array[File] chromosome_kage_vcf_gz_tbis = flatten(KAGE.chromosome_kage_vcf_gz_tbis)
         # serialized array outputs
-        File chromosome_kmer_counts_tsv = SerializeCounts.output_tsv
-        File chromosome_kage_vcf_gzs_tsv = SerializeVCFs.output_tsv
-        File chromosome_kage_vcf_gz_tbis_tsv = SerializeTBIs.output_tsv
+        File chromosome_kmer_counts_txt = SerializeCounts.output_txt
+        File chromosome_kage_vcf_gzs_txt = SerializeVCFs.output_txt
+        File chromosome_kage_vcf_gz_tbis_txt = SerializeTBIs.output_txt
     }
 }
 
@@ -282,11 +282,11 @@ task SerializeArray {
     }
 
     command {
-        mv ~{write_lines(array)} ~{prefix}.tsv
+        mv ~{write_lines(array)} ~{prefix}.txt
     }
 
     output {
-        File output_tsv = "~{prefix}.tsv"
+        File output_txt = "~{prefix}.txt"
     }
 
     runtime {

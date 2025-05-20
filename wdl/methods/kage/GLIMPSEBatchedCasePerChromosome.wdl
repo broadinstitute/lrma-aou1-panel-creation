@@ -19,8 +19,8 @@ workflow GLIMPSEBatchedCasePerChromosome {
 #        File sample_by_chromosome_kage_vcf_gz_tbis_tsv
 #        File sample_names_file
 
-        Array[File] chromosome_kage_vcf_gzs_tsvs         # per sample
-        Array[File] chromosome_kage_vcf_gz_tbis_tsvs     # per sample
+        Array[File] chromosome_kage_vcf_gzs_txts         # one txt list of per-chromosome outputs per sample
+        Array[File] chromosome_kage_vcf_gz_tbis_txts     # one txt list of per-chromosome outputs per sample
         Array[String] sample_names
 
         # per chromosome
