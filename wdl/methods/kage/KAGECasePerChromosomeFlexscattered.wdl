@@ -73,19 +73,22 @@ workflow KAGECasePerChromosome {
     call SerializeArray as SerializeCounts {
         input:
             array = flatten(KAGE.chromosome_kmer_counts),
-            prefix = sample_name + ".chromosome_kmer_counts"
+            prefix = sample_name + ".chromosome_kmer_counts",
+            docker = samtools_docker
     }
 
     call SerializeArray as SerializeVCFs {
         input:
             array = flatten(KAGE.chromosome_kage_vcf_gzs),
-            prefix = sample_name + ".chromosome_kage_vcf_gzs"
+            prefix = sample_name + ".chromosome_kage_vcf_gzs",
+            docker = samtools_docker
     }
 
     call SerializeArray as SerializeTBIs {
         input:
             array = flatten(KAGE.chromosome_kage_vcf_gz_tbis),
-            prefix = sample_name + ".chromosome_kage_vcf_gz_tbis"
+            prefix = sample_name + ".chromosome_kage_vcf_gz_tbis",
+            docker = samtools_docker
     }
 
     output {
@@ -279,6 +282,8 @@ task SerializeArray {
     input {
         Array[String] array
         String prefix
+
+        String docker
     }
 
     command {
