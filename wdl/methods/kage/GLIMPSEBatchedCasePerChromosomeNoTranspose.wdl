@@ -501,7 +501,7 @@ task GLIMPSEPhase {
         disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
         preemptible: select_first([runtime_attributes.preemptible, preemptible])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
+        maxRetries: select_first([runtime_attributes.max_retries, 3])       # OOM can resolve due to non-determinism without memory increase, set retry factor close to 1!
     }
 
     output {
