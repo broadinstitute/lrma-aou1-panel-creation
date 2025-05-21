@@ -24,6 +24,9 @@ workflows:
 - name: GLIMPSEBatchedCasePerChromosome
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/GLIMPSEBatchedCasePerChromosome.wdl
+- name: GLIMPSEBatchedCasePerChromosomeNoTranspose
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/kage/GLIMPSEBatchedCasePerChromosomeNoTranspose.wdl
 - name: PanGenieIndex
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/pangenie/PanGenieIndex.wdl
