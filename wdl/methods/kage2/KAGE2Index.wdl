@@ -69,10 +69,13 @@ task Index {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        # subset reference and panel VCF to chromosomes and replace non-ACGTN with N
+        # subset reference to chromosomes and replace non-ACGTN with N
         samtools faidx -r <(echo -e "~{sep="\n" chromosomes}") ~{reference_fasta} | \
             sed -e '/>/!s/[^ACTGN]/N/g' > reference.subset.fa
-        bcftools view ~{panel_vcf_gz} -r ~{sep="," chromosomes} > panel.subset.vcf
+
+        # subset panel VCF to chromosomes and split to biallelic
+        # TODO do we need to sort?
+        bcftools norm -m -any ~{panel_vcf_gz} -r ~{sep="," chromosomes} > panel.subset.vcf
 
         NPROC=$(nproc)
         NUM_THREADS=$NPROC
