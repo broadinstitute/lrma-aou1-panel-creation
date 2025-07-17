@@ -73,9 +73,10 @@ task Index {
         samtools faidx -r <(echo -e "~{sep="\n" chromosomes}") ~{reference_fasta} | \
             sed -e '/>/!s/[^ACTGN]/N/g' > reference.subset.fa
 
-        # subset panel VCF to chromosomes and split to biallelic
+        # subset panel VCF to chromosomes, split to biallelic, fill AF
         # TODO do we need to sort?
-        bcftools norm -m -any ~{panel_vcf_gz} -r ~{sep="," chromosomes} > panel.subset.vcf
+        bcftools norm -m -any ~{panel_vcf_gz} -r ~{sep="," chromosomes} | \
+            bcftools +fill-tags -O panel.subset.vcf -- -t AF
 
         NPROC=$(nproc)
         NUM_THREADS=$NPROC
