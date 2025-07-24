@@ -21,6 +21,8 @@ workflow GenotypeGVCFsCase {
         File ref_dict
         String output_prefix
 
+        Boolean use_bcftools = true
+
         String gatk_docker = "us.gcr.io/broad-gatk/gatk:4.6.1.0"
         RuntimeAttributes runtime_attributes = {}
         File? monitoring_script
@@ -35,6 +37,7 @@ workflow GenotypeGVCFsCase {
             ref_fasta_index = ref_fasta_index,
             ref_dict = ref_dict,
             output_prefix = output_prefix,
+            use_bcftools = use_bcftools,
             gatk_docker = gatk_docker,
             runtime_attributes = runtime_attributes,
             monitoring_script = monitoring_script
@@ -57,6 +60,7 @@ task GenotypeGVCFs {
         File ref_fasta_index
         File ref_dict
         String output_prefix
+        Boolean use_bcftools
         String? extra_args = "--allow-old-rms-mapping-quality-annotation-data"     # This is needed for gVCFs generated with GATK3 HaplotypeCaller
 
         String gatk_docker
@@ -72,14 +76,21 @@ task GenotypeGVCFs {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        gatk --java-options "-Xmx~{default=6 runtime_attributes.command_mem_gb}G" \
-            GenotypeGVCFs \
-            -V ~{gvcf} \
-            ~{"-L " + intervals} \
-            -R ~{ref_fasta} \
-            -O ~{output_prefix}.vcf.gz \
-            -G StandardAnnotation \
-            ~{extra_args}
+        if [ ~{use_bcftools} ]; then
+            gatk --java-options "-Xmx~{default=6 runtime_attributes.command_mem_gb}G" \
+                GenotypeGVCFs \
+                -V ~{gvcf} \
+                ~{"-L " + intervals} \
+                -R ~{ref_fasta} \
+                -O ~{output_prefix}.vcf.gz \
+                -G StandardAnnotation \
+                ~{extra_args}
+        else
+            bcftools norm -m-any ~{"-r " + intervals} ~{gvcf} | \
+                bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO -e 'ALT="<NON_REF>"' \
+                    -Oz -o ~{output_prefix}.vcf.gz
+            bcftools index -t ~{output_prefix}.vcf.gz
+        fi
     >>>
 
     runtime {
