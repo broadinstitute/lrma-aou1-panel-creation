@@ -16,6 +16,7 @@ workflow GenotypeGVCFsCase {
         File gvcf
         File gvcf_tbi
         File? intervals
+        File? intervals_tbi
         File ref_fasta
         File ref_fasta_index
         File ref_dict
@@ -33,6 +34,7 @@ workflow GenotypeGVCFsCase {
             gvcf = gvcf,
             gvcf_tbi = gvcf_tbi,
             intervals = intervals,
+            intervals_tbi = intervals_tbi,
             ref_fasta = ref_fasta,
             ref_fasta_index = ref_fasta_index,
             ref_dict = ref_dict,
@@ -56,6 +58,7 @@ task GenotypeGVCFs {
         File gvcf
         File gvcf_tbi
         File? intervals
+        File? intervals_tbi
         File ref_fasta
         File ref_fasta_index
         File ref_dict
