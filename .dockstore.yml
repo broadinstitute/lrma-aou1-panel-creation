@@ -24,6 +24,9 @@ workflows:
 - name: KAGE2Index
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage2/KAGE2Index.wdl
+- name: GenotypeGVCFsCase
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/extant-genotyping/GenotypeGVCFsCase.wdl
 - name: GLIMPSEBatchedCasePerChromosome
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/GLIMPSEBatchedCasePerChromosome.wdl
