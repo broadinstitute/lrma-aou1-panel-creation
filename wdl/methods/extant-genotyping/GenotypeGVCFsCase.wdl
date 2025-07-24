@@ -75,7 +75,7 @@ task GenotypeGVCFs {
         gatk --java-options "-Xmx~{default=6 runtime_attributes.command_mem_gb}G" \
             GenotypeGVCFs \
             -V ~{gvcf} \
-            ~{"-L" intervals} \
+            ~{"-L " + intervals} \
             -R ~{ref_fasta} \
             -O ~{output_prefix}.vcf.gz \
             -G StandardAnnotation \
