@@ -77,6 +77,11 @@ task GenotypeGVCFs {
         fi
 
         if [ ~{use_bcftools} ]; then
+            bcftools norm -m-any ~{"-R " + intervals} ~{gvcf} | \
+                bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO -e 'ALT="<NON_REF>"' \
+                    -Oz -o ~{output_prefix}.vcf.gz
+            bcftools index -t ~{output_prefix}.vcf.gz
+        else
             gatk --java-options "-Xmx~{default=6 runtime_attributes.command_mem_gb}G" \
                 GenotypeGVCFs \
                 -V ~{gvcf} \
@@ -85,11 +90,6 @@ task GenotypeGVCFs {
                 -O ~{output_prefix}.vcf.gz \
                 -G StandardAnnotation \
                 ~{extra_args}
-        else
-            bcftools norm -m-any ~{"-R " + intervals} ~{gvcf} | \
-                bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO -e 'ALT="<NON_REF>"' \
-                    -Oz -o ~{output_prefix}.vcf.gz
-            bcftools index -t ~{output_prefix}.vcf.gz
         fi
     >>>
 
