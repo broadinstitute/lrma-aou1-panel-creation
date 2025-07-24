@@ -15,7 +15,7 @@ workflow GenotypeGVCFsCase {
     input {
         File gvcf
         File gvcf_tbi
-        File intervals
+        File? intervals
         File ref_fasta
         File ref_fasta_index
         File ref_dict
@@ -52,12 +52,12 @@ task GenotypeGVCFs {
     input {
         File gvcf
         File gvcf_tbi
-        File intervals
+        File? intervals
         File ref_fasta
         File ref_fasta_index
         File ref_dict
         String output_prefix
-        String? extra_args = '--allow-old-rms-mapping-quality-annotation-data'     # This is needed for gVCFs generated with GATK3 HaplotypeCaller
+        String? extra_args = "--allow-old-rms-mapping-quality-annotation-data"     # This is needed for gVCFs generated with GATK3 HaplotypeCaller
 
         String gatk_docker
         RuntimeAttributes runtime_attributes = {}
@@ -75,7 +75,7 @@ task GenotypeGVCFs {
         gatk --java-options "-Xmx~{default=6 runtime_attributes.command_mem_gb}G" \
             GenotypeGVCFs \
             -V ~{gvcf} \
-            -L ~{intervals} \
+            ~{"-L" intervals} \
             -R ~{ref_fasta} \
             -O ~{output_prefix}.vcf.gz \
             -G StandardAnnotation \
