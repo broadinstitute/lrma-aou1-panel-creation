@@ -80,7 +80,7 @@ task GenotypeGVCFs {
         fi
 
         if [ ~{use_bcftools} ]; then
-            bcftools norm -m-any ~{"-R " + intervals} ~{gvcf} | \
+            bcftools norm --threads $(nproc) -m-any ~{"-R " + intervals} ~{gvcf} | \
                 bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO -e 'ALT="<NON_REF>"' \
                     -Oz -o ~{output_prefix}.vcf.gz
             bcftools index -t ~{output_prefix}.vcf.gz
