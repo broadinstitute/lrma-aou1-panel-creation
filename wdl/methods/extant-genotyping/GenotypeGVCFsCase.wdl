@@ -14,6 +14,7 @@ struct RuntimeAttributes {
 workflow GenotypeGVCFsCase {
     input {
         File gvcf
+        File gvcf_tbi
         File intervals
         File ref_fasta
         File ref_fasta_index
@@ -28,6 +29,7 @@ workflow GenotypeGVCFsCase {
     call GenotypeGVCFs {
         input:
             gvcf = gvcf,
+            gvcf_tbi = gvcf_tbi,
             intervals = intervals,
             ref_fasta = ref_fasta,
             ref_fasta_index = ref_fasta_index,
@@ -49,6 +51,7 @@ task GenotypeGVCFs {
 
     input {
         File gvcf
+        File gvcf_tbi
         File intervals
         File ref_fasta
         File ref_fasta_index
