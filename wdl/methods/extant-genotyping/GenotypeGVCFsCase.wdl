@@ -79,8 +79,6 @@ task GenotypeGVCFs {
             -R ~{ref_fasta} \
             -O ~{output_prefix}.vcf.gz \
             -G StandardAnnotation \
-            --only-output-calls-starting-in-intervals \
-            --merge-input-intervals \
             ~{extra_args}
     >>>
 
