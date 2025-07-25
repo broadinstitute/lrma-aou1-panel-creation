@@ -323,12 +323,11 @@ task GLIMPSE2Phase {
         chmod +x GLIMPSE2_phase_static
 
         ./GLIMPSE2_phase_static \
-            -I ~{output_prefix}.biSNV.bcf \
+            --input-gl ~{output_prefix}.biSNV.bcf \
             -R ~{panel_split_vcf_gz} \
             --input-region ~{input_region} \
             --output-region ~{output_region} \
             --map ~{genetic_map} \
-            --input-GL \
             --thread $(nproc) \
             ~{extra_phase_args} \
             --output ~{output_prefix}.raw.vcf.gz
