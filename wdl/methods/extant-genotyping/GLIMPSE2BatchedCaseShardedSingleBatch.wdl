@@ -25,7 +25,7 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
         Array[File] panel_split_vcf_gz
         Array[File] panel_split_vcf_gz_tbi
 
-        String extra_chunk_args = "--thread $(nproc) --window-mb 5 --buffer-mb 0.5"
+        String extra_chunk_args = "--thread $(nproc) --window-mb 5 --buffer-mb 0.5 --sequential"
         String extra_phase_args = "--impute-reference-only-variants --keep-monomorphic-ref-sites"
         String output_prefix
 
