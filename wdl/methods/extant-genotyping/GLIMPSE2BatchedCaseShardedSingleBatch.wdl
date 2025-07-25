@@ -41,7 +41,7 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
         RuntimeAttributes concat_runtime_attributes = {"use_ssd": true}
         RuntimeAttributes glimpse2_phase_runtime_attributes = {}
         RuntimeAttributes glimpse2_sample_runtime_attributes = {}
-        Map[String, Int]? chromosome_to_glimpse2_command_mem_gb      # for running per-chromosome by choosing large chunk size; this will override glimpse2_phase_runtime_attributes
+#        Map[String, Int]? chromosome_to_glimpse2_command_mem_gb      # for running per-chromosome by choosing large chunk size; this will override glimpse2_phase_runtime_attributes
     }
 
     scatter (j in range(length(chromosomes))) {
@@ -59,9 +59,9 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
         Array[String] input_regions = read_lines(ChromosomeGLIMPSE2Chunk.input_regions)
         Array[String] output_regions = read_lines(ChromosomeGLIMPSE2Chunk.output_regions)
 
-        if (defined(chromosome_to_glimpse2_command_mem_gb)) {
-            Int command_mem_gb = select_first([chromosome_to_glimpse2_command_mem_gb])[chromosome]
-        }
+#        if (defined(chromosome_to_glimpse2_command_mem_gb)) {
+#            Int command_mem_gb = select_first([chromosome_to_glimpse2_command_mem_gb])[chromosome]
+#        }
         scatter (k in range(length(input_regions))) {
             call GLIMPSE2Phase as ChunkedGLIMPSE2Phase {
                 input:
@@ -76,8 +76,8 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
                     extra_phase_args = extra_phase_args,
                     docker = docker,
                     monitoring_script = monitoring_script,
-                    runtime_attributes = glimpse2_phase_runtime_attributes,
-                    command_mem_gb = command_mem_gb
+                    runtime_attributes = glimpse2_phase_runtime_attributes
+#                    command_mem_gb = command_mem_gb
             }
         }
 
