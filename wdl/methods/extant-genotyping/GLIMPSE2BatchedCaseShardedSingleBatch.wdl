@@ -38,7 +38,6 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
         String docker
         File? monitoring_script
 
-        RuntimeAttributes merge_runtime_attributes = {"use_ssd": true}
         RuntimeAttributes concat_runtime_attributes = {"use_ssd": true}
         RuntimeAttributes glimpse2_phase_runtime_attributes = {}
         RuntimeAttributes glimpse2_sample_runtime_attributes = {}
