@@ -27,6 +27,9 @@ workflows:
 - name: GenotypeGVCFsCase
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/extant-genotyping/GenotypeGVCFsCase.wdl
+- name: GLIMPSE2BatchedCaseShardedSingleBatch
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/extant-genotyping/GLIMPSE2BatchedCaseShardedSingleBatch.wdl
 - name: GLIMPSEBatchedCasePerChromosome
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/GLIMPSEBatchedCasePerChromosome.wdl
