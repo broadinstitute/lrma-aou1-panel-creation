@@ -389,7 +389,6 @@ task GLIMPSE2Ligate {
         chmod +x GLIMPSE2_ligate_static
 
         ./GLIMPSE2_ligate_static --input ~{write_lines(vcfs)} --output ~{prefix}.vcf.gz --thread $(nproc)
-        bcftools index -t ~{prefix}.vcf.gz
     >>>
 
     output {
@@ -437,7 +436,6 @@ task GLIMPSE2Sample {
             --solve \
             --output ~{output_prefix}.vcf.gz \
             --log ~{output_prefix}.sample.log
-        bcftools index -t ~{output_prefix}.vcf.gz
     }
 
     runtime {
