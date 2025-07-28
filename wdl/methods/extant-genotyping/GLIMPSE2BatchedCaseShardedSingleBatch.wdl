@@ -202,10 +202,10 @@ task GLIMPSE2SplitReference {
     command <<<
         set -euxo pipefail
 
-        wget https://github.com/odelaneau/GLIMPSE/releases/download/v2.0.1/GLIMPSE2_split_reference
-        chmod +x GLIMPSE2_split_reference
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v2.0.1/GLIMPSE2_split_reference_static
+        chmod +x GLIMPSE2_split_reference_static
 
-        ./GLIMPSE2_split_reference \
+        ./GLIMPSE2_split_reference_static \
             -R ~{panel_split_vcf_gz} \
             --input-region ~{input_region} \
             --output-region ~{output_region} \
