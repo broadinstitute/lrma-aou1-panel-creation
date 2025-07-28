@@ -22,10 +22,11 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
         # per chromosome
         Array[String]+ chromosomes
         Array[File]+ genetic_maps
-        Array[File] panel_split_vcf_gz
+        Array[File] panel_split_vcf_gz          # "split" here means "split to biallelic"; "split" below means "chunked"
         Array[File] panel_split_vcf_gz_tbi
 
         String extra_chunk_args = "--thread $(nproc) --window-mb 5 --buffer-mb 0.5 --sequential"
+        String extra_split_args = "--keep-monomorphic-ref-sites"
         String extra_phase_args = "--impute-reference-only-variants --keep-monomorphic-ref-sites"
         String output_prefix
 
@@ -40,7 +41,6 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
 
         RuntimeAttributes concat_runtime_attributes = {"use_ssd": true}
         RuntimeAttributes glimpse2_phase_runtime_attributes = {}
-        RuntimeAttributes glimpse2_sample_runtime_attributes = {}
 #        Map[String, Int]? chromosome_to_glimpse2_command_mem_gb      # for running per-chromosome by choosing large chunk size; this will override glimpse2_phase_runtime_attributes
     }
 
@@ -63,12 +63,22 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
 #            Int command_mem_gb = select_first([chromosome_to_glimpse2_command_mem_gb])[chromosome]
 #        }
         scatter (k in range(length(input_regions))) {
+            call GLIMPSE2SplitReference as ChunkedGLIMPSE2SplitReference {
+                input:
+                    panel_split_vcf_gz = panel_split_vcf_gz[j],
+                    panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi[j],
+                    input_region = input_regions[k],
+                    output_region = output_regions[k],
+                    genetic_map = genetic_maps[j],
+                    output_prefix = output_prefix + "." + chromosome + ".shard-" + k + ".split",
+                    extra_split_args = extra_split_args
+            }
+
             call GLIMPSE2Phase as ChunkedGLIMPSE2Phase {
                 input:
                     input_vcf_gz = input_vcf_gz,
                     input_vcf_gz_tbi = input_vcf_gz_tbi,
-                    panel_split_vcf_gz = panel_split_vcf_gz[j],
-                    panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbi[j],
+                    panel_split_chunk_bin = ChunkedGLIMPSE2SplitReference.panel_split_chunk_bin,
                     input_region = input_regions[k],
                     output_region = output_regions[k],
                     genetic_map = genetic_maps[j],
@@ -83,8 +93,7 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
 
         call GLIMPSE2Ligate as ChromosomeGLIMPSE2Ligate {
             input:
-                vcfs = ChunkedGLIMPSE2Phase.phased_vcf_gz,
-                vcf_idxs = ChunkedGLIMPSE2Phase.phased_vcf_gz_tbi,
+                phased_bcfs = ChunkedGLIMPSE2Phase.phased_bcf,
                 prefix = output_prefix + "." + chromosome + ".ligated",
                 docker = docker,
                 monitoring_script = monitoring_script
@@ -121,101 +130,11 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
     }
 
     output {
+        Array[Array[File]] chromosome_panel_split_chunk_bins = ChunkedGLIMPSE2SplitReference.panel_split_chunk_bin
         File glimpse2_posteriors_vcf_gz = GLIMPSE2PosteriorsConcatVcfs.vcf_gz
         File glimpse2_posteriors_vcf_gz_tbi = GLIMPSE2PosteriorsConcatVcfs.vcf_gz_tbi
         File glimpse2_posteriors_collisionless_vcf_gz = GLIMPSE2PosteriorsCollisionlessConcatVcfs.vcf_gz
         File glimpse2_posteriors_collisionless_vcf_gz_tbi = GLIMPSE2PosteriorsCollisionlessConcatVcfs.vcf_gz_tbi
-    }
-}
-
-task CreateBatches {
-    input {
-        Array[Array[String]] sample_by_chromosome_vcf_gzs
-        Array[Array[String]] sample_by_chromosome_vcf_gz_tbis
-        Array[String] sample_names
-        Int batch_size
-
-        String docker
-        RuntimeAttributes runtime_attributes = {}
-    }
-
-    command {
-        set -euox pipefail
-
-        cat ~{write_tsv(sample_by_chromosome_vcf_gzs)} | split -l ~{batch_size} - chromosome_vcf_gz_batch_
-        cat ~{write_tsv(sample_by_chromosome_vcf_gz_tbis)} | split -l ~{batch_size} - chromosome_vcf_gz_tbi_batch_
-        cat ~{write_lines(sample_names)} | split -l ~{batch_size} - sample_name_batch_
-    }
-
-    output {
-        Array[File] chromosome_vcf_gz_batch_files = glob("chromosome_vcf_gz_batch_*")
-        Array[File] chromosome_vcf_gz_tbi_batch_files = glob("chromosome_vcf_gz_tbi_batch_*")
-        Array[File] sample_name_batch_files = glob("sample_name_batch_*")
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, 3]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 10]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-}
-
-task ConcatVcfs {
-    input {
-        Array[File] vcf_gzs
-        Array[File] vcf_gz_tbis
-        String output_prefix
-
-        String docker
-        File? monitoring_script
-
-        RuntimeAttributes runtime_attributes = {"use_ssd": true}
-    }
-
-    Int disk_size_gb = 3 * ceil(size(vcf_gzs, "GB"))
-
-    command {
-        set -euox pipefail
-
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
-
-        # TODO FIX LEXICOGRAPHICAL BUG!
-        mkdir inputs
-        mv ~{sep=' ' vcf_gzs} inputs
-        mv ~{sep=' ' vcf_gz_tbis} inputs
-
-        if [ $(ls inputs/*.vcf.gz | wc -l) == 1 ]
-        then
-            cp $(ls inputs/*.vcf.gz) ~{output_prefix}.vcf.gz
-            cp $(ls inputs/*.vcf.gz.tbi) ~{output_prefix}.vcf.gz.tbi
-        else
-            bcftools concat $(ls inputs/*.vcf.gz) --naive -Oz -o ~{output_prefix}.vcf.gz
-            bcftools index -t ~{output_prefix}.vcf.gz
-        fi
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-
-    output {
-        File monitoring_log = "monitoring.log"
-        File vcf_gz = "~{output_prefix}.vcf.gz"
-        File vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
     }
 }
 
@@ -265,12 +184,57 @@ task GLIMPSE2Chunk {
     }
 }
 
+task GLIMPSE2SplitReference {
+    input {
+        File panel_split_vcf_gz
+        File panel_split_vcf_gz_tbi
+        String input_region
+        String output_region
+        File genetic_map
+        String output_prefix
+        String? extra_split_args
+
+        RuntimeAttributes runtime_attributes = {}
+    }
+
+    Int disk_size_gb = 2*ceil(size([panel_split_vcf_gz, panel_split_vcf_gz_tbi], "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v2.0.1/GLIMPSE2_split_reference
+        chmod +x GLIMPSE2_split_reference
+
+        ./GLIMPSE2_split_reference \
+            -R ~{panel_split_vcf_gz} \
+            --input-region ~{input_region} \
+            --output-region ~{output_region} \
+            --map ~{genetic_map} \
+            --thread $(nproc) \
+            ~{extra_split_args} \
+            --output ~{output_prefix}
+    >>>
+
+    output {
+        File panel_split_chunk_bin = glob("~{output_prefix}_*bin")[0]       # TODO parse input region and construct ~{output_prefix}_chr_start_end.bin filename
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+        cpu: select_first([runtime_attributes.cpu, 4])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 10])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+}
+
 task GLIMPSE2Phase {
     input {
         File input_vcf_gz
         File input_vcf_gz_tbi
-        File panel_split_vcf_gz
-        File panel_split_vcf_gz_tbi
+        File panel_split_chunk_bin
         String input_region
         String output_region
         File genetic_map
@@ -293,7 +257,7 @@ task GLIMPSE2Phase {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        # TODO skeep only biallelic SNVs for now
+        # TODO keep only biallelic SNVs for now
         bcftools view --no-version -r ~{input_region},~{output_region} -m2 -M2 -v snps ~{input_vcf_gz} \
             -Ob -o ~{output_prefix}.biSNV.bcf
         bcftools index ~{output_prefix}.biSNV.bcf
@@ -303,21 +267,17 @@ task GLIMPSE2Phase {
 
         ./GLIMPSE2_phase_static \
             --input-gl ~{output_prefix}.biSNV.bcf \
-            -R ~{panel_split_vcf_gz} \
-            --input-region ~{input_region} \
-            --output-region ~{output_region} \
-            --map ~{genetic_map} \
+            -R ~{panel_split_chunk_bin} \
             --thread $(nproc) \
             ~{extra_phase_args} \
-            --output ~{output_prefix}.raw.vcf.gz
+            --output ~{output_prefix}.raw.bcf
 
         # take input VCF header and add GLIMPSE INFO and FORMAT lines (GLIMPSE header only contains a single chromosome and breaks bcftools concat --naive)
         bcftools view --no-version -h ~{input_vcf_gz} | grep '^##' > input.header.txt
         bcftools view --no-version -h ~{output_prefix}.raw.vcf.gz | grep -E '^##INFO|^##FORMAT|^##NMAIN|^##FPLOIDY' > glimpse2.header.txt
         bcftools view --no-version -h ~{input_vcf_gz} | grep '^#CHROM' > input.columns.txt
         cat input.header.txt glimpse2.header.txt input.columns.txt > header.txt
-        bcftools reheader -h header.txt ~{output_prefix}.raw.vcf.gz > ~{output_prefix}.vcf.gz
-        bcftools index -t ~{output_prefix}.vcf.gz
+        bcftools reheader -h header.txt ~{output_prefix}.raw.bcf -Ob -o ~{output_prefix}.bcf
     }
 
     runtime {
@@ -332,15 +292,13 @@ task GLIMPSE2Phase {
 
     output {
         File monitoring_log = "monitoring.log"
-        File phased_vcf_gz = "~{output_prefix}.vcf.gz"          # note that this actually contains posteriors */* GTs; these are converted to phased *|* GTs later on in the sample step
-        File phased_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
+        File phased_bcf = "~{output_prefix}.bcf"
     }
 }
 
 task GLIMPSE2Ligate {
     input {
-        Array[File] vcfs
-        Array[File]? vcf_idxs
+        Array[File] phased_bcfs
         String prefix
 
         String docker
@@ -349,7 +307,7 @@ task GLIMPSE2Ligate {
         RuntimeAttributes runtime_attributes = {}
     }
 
-    Int disk_size_gb = 2*ceil(size(vcfs, "GB")) + 1
+    Int disk_size_gb = 2*ceil(size(phased_bcfs, "GB")) + 1
 
     command <<<
         set -euox pipefail
@@ -360,14 +318,10 @@ task GLIMPSE2Ligate {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        if ! ~{defined(vcf_idxs)}; then
-            for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
-        fi
-
         wget https://github.com/odelaneau/GLIMPSE/releases/download/v2.0.1/GLIMPSE2_ligate_static
         chmod +x GLIMPSE2_ligate_static
 
-        ./GLIMPSE2_ligate_static --input ~{write_lines(vcfs)} --output ~{prefix}.vcf.gz --thread $(nproc)
+        ./GLIMPSE2_ligate_static --input ~{write_lines(phased_bcfs)} --output ~{prefix}.vcf.gz --thread $(nproc)
     >>>
 
     output {
@@ -443,5 +397,60 @@ task FixVariantCollisions {
         preemptible:     3
         max_retries:           2
         docker:"us.gcr.io/broad-gatk/gatk:4.6.0.0"
+    }
+}
+
+task ConcatVcfs {
+    input {
+        Array[File] vcf_gzs
+        Array[File] vcf_gz_tbis
+        String output_prefix
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
+    }
+
+    Int disk_size_gb = 3 * ceil(size(vcf_gzs, "GB"))
+
+    command {
+        set -euox pipefail
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        # TODO FIX LEXICOGRAPHICAL BUG!
+        mkdir inputs
+        mv ~{sep=' ' vcf_gzs} inputs
+        mv ~{sep=' ' vcf_gz_tbis} inputs
+
+        if [ $(ls inputs/*.vcf.gz | wc -l) == 1 ]
+        then
+            cp $(ls inputs/*.vcf.gz) ~{output_prefix}.vcf.gz
+            cp $(ls inputs/*.vcf.gz.tbi) ~{output_prefix}.vcf.gz.tbi
+        else
+            bcftools concat $(ls inputs/*.vcf.gz) --naive -Oz -o ~{output_prefix}.vcf.gz
+            bcftools index -t ~{output_prefix}.vcf.gz
+        fi
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        File vcf_gz = "~{output_prefix}.vcf.gz"
+        File vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
     }
 }
