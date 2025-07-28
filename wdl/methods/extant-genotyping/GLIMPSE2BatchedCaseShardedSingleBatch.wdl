@@ -90,19 +90,9 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
                 monitoring_script = monitoring_script
         }
 
-        call GLIMPSE2Sample as ChromosomeGLIMPSE2Sample {
-            input:
-                ligated_vcf_gz = ChromosomeGLIMPSE2Ligate.ligated_vcf_gz,
-                ligated_vcf_gz_tbi = ChromosomeGLIMPSE2Ligate.ligated_vcf_gz_tbi,
-                output_prefix = output_prefix + "." + chromosome + ".sampled",
-                docker = docker,
-                monitoring_script = monitoring_script,
-                runtime_attributes = glimpse2_sample_runtime_attributes
-        }
-
-        call FixVariantCollisions as ChromosomePhasedCollisionless { input:
-            vcf_gz = ChromosomeGLIMPSE2Sample.glimpse2_vcf_gz,
-            vcf_gz_tbi = ChromosomeGLIMPSE2Sample.glimpse2_vcf_gz_tbi,
+        call FixVariantCollisions as ChromosomeGLIMPSE2PosteriorsCollisionless { input:
+            vcf_gz = ChromosomeGLIMPSE2Ligate.ligated_vcf_gz,
+            vcf_gz_tbi = ChromosomeGLIMPSE2Ligate.ligated_vcf_gz_tbi,
             fix_variant_collisions_java = fix_variant_collisions_java,
             operation = operation,
             weight_tag = weight_tag,
@@ -121,31 +111,20 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
             monitoring_script = monitoring_script
     }
 
-    call ConcatVcfs as GLIMPSE2ConcatVcfs {
+    call ConcatVcfs as GLIMPSE2PosteriorsCollisionlessConcatVcfs {
         input:
-            vcf_gzs = ChromosomeGLIMPSE2Sample.glimpse2_vcf_gz,
-            vcf_gz_tbis = ChromosomeGLIMPSE2Sample.glimpse2_vcf_gz_tbi,
-            output_prefix = output_prefix + ".glimpse2",
-            docker = docker,
-            monitoring_script = monitoring_script
-    }
-
-    call ConcatVcfs as PhasedCollisionlessConcatVcfs {
-        input:
-            vcf_gzs = ChromosomePhasedCollisionless.collisionless_vcf_gz,
-            vcf_gz_tbis = ChromosomePhasedCollisionless.collisionless_vcf_gz_tbi,
+            vcf_gzs = ChromosomeGLIMPSE2PosteriorsCollisionless.collisionless_vcf_gz,
+            vcf_gz_tbis = ChromosomeGLIMPSE2PosteriorsCollisionless.collisionless_vcf_gz_tbi,
             output_prefix = output_prefix + ".glimpse2.collisionless",
             docker = docker,
             monitoring_script = monitoring_script
     }
 
     output {
-        File glimpse_posteriors_vcf_gz = GLIMPSE2PosteriorsConcatVcfs.vcf_gz
-        File glimpse_posteriors_vcf_gz_tbi = GLIMPSE2PosteriorsConcatVcfs.vcf_gz_tbi
-        File glimpse_vcf_gz = GLIMPSE2ConcatVcfs.vcf_gz
-        File glimpse_vcf_gz_tbi = GLIMPSE2ConcatVcfs.vcf_gz_tbi
-        File phased_collisionless_vcf_gz = PhasedCollisionlessConcatVcfs.vcf_gz
-        File phased_collisionless_vcf_gz_tbi = PhasedCollisionlessConcatVcfs.vcf_gz_tbi
+        File glimpse2_posteriors_vcf_gz = GLIMPSE2PosteriorsConcatVcfs.vcf_gz
+        File glimpse2_posteriors_vcf_gz_tbi = GLIMPSE2PosteriorsConcatVcfs.vcf_gz_tbi
+        File glimpse2_posteriors_collisionless_vcf_gz = GLIMPSE2PosteriorsCollisionlessConcatVcfs.vcf_gz
+        File glimpse2_posteriors_collisionless_vcf_gz_tbi = GLIMPSE2PosteriorsCollisionlessConcatVcfs.vcf_gz_tbi
     }
 }
 
@@ -405,53 +384,6 @@ task GLIMPSE2Ligate {
         bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 10])
         preemptible: select_first([runtime_attributes.preemptible, 2])
         maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-}
-
-task GLIMPSE2Sample {
-    input {
-        File ligated_vcf_gz
-        File ligated_vcf_gz_tbi
-        String output_prefix
-
-        String docker
-        File? monitoring_script
-
-        RuntimeAttributes runtime_attributes = {}
-    }
-
-    command {
-        set -euox pipefail
-
-        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
-        touch monitoring.log
-        if [ -s ~{monitoring_script} ]; then
-            bash ~{monitoring_script} > monitoring.log &
-        fi
-
-        wget https://github.com/odelaneau/GLIMPSE/releases/download/v2.0.1/GLIMPSE2_sample_static
-        chmod +x GLIMPSE2_sample_static
-
-        ./GLIMPSE2_sample_static --input ~{ligated_vcf_gz} \
-            --solve \
-            --output ~{output_prefix}.vcf.gz \
-            --log ~{output_prefix}.sample.log
-    }
-
-    runtime {
-        docker: docker
-        cpu: select_first([runtime_attributes.cpu, 1])
-        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
-        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
-        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
-        preemptible: select_first([runtime_attributes.preemptible, 2])
-        maxRetries: select_first([runtime_attributes.max_retries, 1])
-    }
-
-    output {
-        File monitoring_log = "monitoring.log"
-        File glimpse2_vcf_gz = "~{output_prefix}.vcf.gz"
-        File glimpse2_vcf_gz_tbi = "~{output_prefix}.vcf.gz.tbi"
     }
 }
 
