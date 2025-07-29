@@ -94,6 +94,7 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
         call GLIMPSE2Ligate as ChromosomeGLIMPSE2Ligate {
             input:
                 phased_bcfs = ChunkedGLIMPSE2Phase.phased_bcf,
+                phased_bcf_csis = ChunkedGLIMPSE2Phase.phased_bcf_csi,
                 prefix = output_prefix + "." + chromosome + ".ligated",
                 docker = docker,
                 monitoring_script = monitoring_script
@@ -278,6 +279,7 @@ task GLIMPSE2Phase {
         bcftools view --no-version -h ~{input_vcf_gz} | grep '^#CHROM' > input.columns.txt
         cat input.header.txt glimpse2.header.txt input.columns.txt > header.txt
         bcftools reheader -h header.txt ~{output_prefix}.raw.bcf -o ~{output_prefix}.bcf
+        bcftools index ~{output_prefix}.bcf
     }
 
     runtime {
@@ -293,12 +295,14 @@ task GLIMPSE2Phase {
     output {
         File monitoring_log = "monitoring.log"
         File phased_bcf = "~{output_prefix}.bcf"
+        File phased_bcf_csi = "~{output_prefix}.bcf.csi"
     }
 }
 
 task GLIMPSE2Ligate {
     input {
         Array[File] phased_bcfs
+        Array[File] phased_bcf_csis
         String prefix
 
         String docker
