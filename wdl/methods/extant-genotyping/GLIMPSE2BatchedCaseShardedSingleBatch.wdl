@@ -277,7 +277,7 @@ task GLIMPSE2Phase {
         bcftools view --no-version -h ~{output_prefix}.raw.bcf | grep -E '^##INFO|^##FORMAT|^##NMAIN|^##FPLOIDY' > glimpse2.header.txt
         bcftools view --no-version -h ~{input_vcf_gz} | grep '^#CHROM' > input.columns.txt
         cat input.header.txt glimpse2.header.txt input.columns.txt > header.txt
-        bcftools reheader -h header.txt ~{output_prefix}.raw.bcf -Ob -o ~{output_prefix}.bcf
+        bcftools reheader -h header.txt ~{output_prefix}.raw.bcf -o ~{output_prefix}.bcf
     }
 
     runtime {
