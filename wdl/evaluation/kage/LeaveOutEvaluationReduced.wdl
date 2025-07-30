@@ -304,10 +304,20 @@ workflow LeaveOutEvaluation {
         }
     }
 
+    call SubsetCaseGenotypedVCF {
+        input:
+            case_genotyped_vcf_gz = case_genotyped_vcf_gz,
+            case_genotyped_vcf_gz_tbi = case_genotyped_vcf_gz_tbi,
+            chromosomes = chromosomes,
+            sample_names = leave_out_sample_names,
+            docker = samtools_docker,
+            monitoring_script = monitoring_script
+    }
+
     call GLIMPSE2BatchedCaseSharded.GLIMPSE2BatchedCaseShardedSingleBatch as GLIMPSE2BatchedCaseSharded {
         input:
-            input_vcf_gz = case_genotyped_vcf_gz,
-            input_vcf_gz_tbi = case_genotyped_vcf_gz_tbi,
+            input_vcf_gz = SubsetCaseGenotypedVCF.subset_vcf_gz,
+            input_vcf_gz_tbi = SubsetCaseGenotypedVCF.subset_vcf_gz_tbi,
             sample_names = leave_out_sample_names,
             chromosomes = chromosomes,
             genetic_maps = genetic_maps,
@@ -707,6 +717,50 @@ task PreprocessPanelVCFGLIMPSE2 {
         File preprocessed_panel_vcf_gz_tbi = "~{output_prefix}.preprocessed.vcf.gz.tbi"
         File preprocessed_panel_split_vcf_gz = "~{output_prefix}.preprocessed.split.vcf.gz"
         File preprocessed_panel_split_vcf_gz_tbi = "~{output_prefix}.preprocessed.split.vcf.gz.tbi"
+    }
+}
+
+task SubsetCaseGenotypedVCF {
+    input {
+        File case_genotyped_vcf_gz
+        File case_genotyped_vcf_gz_tbi
+        Array[String] chromosomes
+        Array[String] sample_names
+
+        String docker
+        File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {"use_ssd": true}
+    }
+
+    command {
+        set -e
+
+        # Create a zero-size monitoring log file so it exists even if we don't pass a monitoring script
+        touch monitoring.log
+        if [ -s ~{monitoring_script} ]; then
+            bash ~{monitoring_script} > monitoring.log &
+        fi
+
+        bcftools view --no-version ~{case_genotyped_vcf_gz} -r ~{sep="," chromosomes}  -s ~{sep="," sample_names} \
+            -Oz case.subset.vcf.gz
+        bcftools index -t case.subset.vcf.gz
+    }
+
+    runtime {
+        docker: docker
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 6]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, 100]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
+    }
+
+    output {
+        File monitoring_log = "monitoring.log"
+        File subset_vcf_gz = "case.subset.vcf.gz"
+        File subset_vcf_gz_tbi = "case.subset.vcf.gz.tbi"
     }
 }
 
