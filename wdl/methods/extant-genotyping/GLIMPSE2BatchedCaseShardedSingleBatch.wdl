@@ -52,6 +52,7 @@ workflow GLIMPSE2BatchedCaseShardedSingleBatch {
                 vcf = panel_split_vcf_gz[j],
                 tbi = panel_split_vcf_gz_tbi[j],
                 region = chromosome,
+                genetic_map = genetic_maps[j],
                 prefix = output_prefix + "." + chromosome,
                 extra_chunk_args = extra_chunk_args
         }
@@ -144,6 +145,7 @@ task GLIMPSE2Chunk {
         File vcf
         File tbi
         String region
+        File genetic_map
         String prefix
         String? extra_chunk_args
 
@@ -161,6 +163,7 @@ task GLIMPSE2Chunk {
         ./GLIMPSE2_chunk_static \
             -I ~{vcf} \
             --region ~{region} \
+            --map ~{genetic_map} \
             ~{extra_chunk_args} \
             -O chunks.txt
 
