@@ -742,8 +742,8 @@ task SubsetCaseGenotypedVCF {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        bcftools view --no-version ~{case_genotyped_vcf_gz} -r ~{sep="," chromosomes}  -s ~{sep="," sample_names} \
-            -Oz case.subset.vcf.gz
+        bcftools view --no-version ~{case_genotyped_vcf_gz} -r ~{sep="," chromosomes} -s ~{sep="," sample_names} \
+            -Oz -o case.subset.vcf.gz
         bcftools index -t case.subset.vcf.gz
     }
 
