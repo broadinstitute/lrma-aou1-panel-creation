@@ -525,6 +525,7 @@ task ReducePanelVCF {
         File input_vcf_gz_tbi
         String output_prefix
         Int num_bi_snps_to_retain
+        Int sv_length = 50
 
         String docker
         File? monitoring_script
@@ -550,8 +551,8 @@ task ReducePanelVCF {
             bgzip -c > ~{output_prefix}.retained.bi_snp.tsv.gz
         tabix -s1 -b2 -e2 ~{output_prefix}.retained.bi_snp.tsv.gz
 
-        bcftools view ~{input_vcf_gz} | \
-            grep -E 'SVLEN|#' | \
+        bcftools norm -m-any ~{input_vcf_gz} | \
+            bcftools view -i 'ABS(STRLEN(ALT)-STRLEN(REF))>=~{sv_length}' | \
             bcftools query -f'%CHROM\t%POS\t%REF,%ALT\n' | \
             bgzip -c > ~{output_prefix}.retained.sv.tsv.gz
         tabix -s1 -b2 -e2 ~{output_prefix}.retained.sv.tsv.gz
@@ -932,15 +933,19 @@ task CalculateMetrics {
                     if num_evals.sum() == 0:
                         continue
 
-                    non_sv_enc_gt_n = np.sum(gt_vp[~is_missing_v & ~is_sv_v & is_allelic_v & is_context_v], axis=1)
-                    non_sv_truth_enc_gt_n = np.sum(truth_gt_vp[~is_missing_v & ~is_sv_v & is_allelic_v & is_context_v], axis=1)
+                    # non_sv_enc_gt_n = np.sum(gt_vp[~is_missing_v & ~is_sv_v & is_allelic_v & is_context_v], axis=1)
+                    non_sv_enc_gt_n = np.sum(gt_vp[~is_any_missing_truth_v & ~is_sv_v & is_allelic_v & is_context_v], axis=1)
+                    # non_sv_truth_enc_gt_n = np.sum(truth_gt_vp[~is_missing_v & ~is_sv_v & is_allelic_v & is_context_v], axis=1)
+                    non_sv_truth_enc_gt_n = np.sum(truth_gt_vp[~is_any_missing_truth_v & ~is_sv_v & is_allelic_v & is_context_v], axis=1)
                     non_sv_precision = np.nan if non_sv_truth_enc_gt_n.size == 0 else sklearn.metrics.precision_score(non_sv_truth_enc_gt_n, non_sv_enc_gt_n, average=average)
                     non_sv_recall = np.nan if non_sv_truth_enc_gt_n.size == 0 else sklearn.metrics.recall_score(non_sv_truth_enc_gt_n, non_sv_enc_gt_n, average=average)
                     non_sv_f1 = np.nan if non_sv_truth_enc_gt_n.size == 0 else sklearn.metrics.f1_score(non_sv_truth_enc_gt_n, non_sv_enc_gt_n, average=average)
                     non_sv_count = np.sum(~is_sv_v & is_allelic_v & is_context_v)
 
-                    sv_enc_gt_n = np.sum(gt_vp[~is_missing_v & is_sv_v & is_allelic_v & is_context_v], axis=1)
-                    sv_truth_enc_gt_n = np.sum(truth_gt_vp[~is_missing_v & is_sv_v & is_allelic_v & is_context_v], axis=1)
+                    # sv_enc_gt_n = np.sum(gt_vp[~is_missing_v & is_sv_v & is_allelic_v & is_context_v], axis=1)
+                    sv_enc_gt_n = np.sum(gt_vp[~is_any_missing_truth_v & is_sv_v & is_allelic_v & is_context_v], axis=1)
+                    # sv_truth_enc_gt_n = np.sum(truth_gt_vp[~is_missing_v & is_sv_v & is_allelic_v & is_context_v], axis=1)
+                    sv_truth_enc_gt_n = np.sum(truth_gt_vp[~is_any_missing_truth_v & is_sv_v & is_allelic_v & is_context_v], axis=1)
                     sv_precision = sklearn.metrics.precision_score(sv_truth_enc_gt_n, sv_enc_gt_n, average=average)
                     sv_recall = sklearn.metrics.recall_score(sv_truth_enc_gt_n, sv_enc_gt_n, average=average)
                     sv_f1 = sklearn.metrics.f1_score(sv_truth_enc_gt_n, sv_enc_gt_n, average=average)
