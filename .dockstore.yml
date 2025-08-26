@@ -24,3 +24,7 @@ workflows:
 - name: LeaveOneOutEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/kage/LeaveOneOutEvaluation.wdl
+- name: StatisticalPhasing
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/StatisticalPhasing.wdl
+
