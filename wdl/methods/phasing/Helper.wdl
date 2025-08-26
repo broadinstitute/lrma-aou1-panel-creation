@@ -433,3 +433,63 @@ task Shapeit4 {
         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
     }
 }
+
+task shapeit5_phase_common{
+    input{
+        File vcf_input
+        File vcf_index
+        File mappingfile
+        String region
+        String prefix
+        Int memory
+        Int num_threads
+        String extra_args
+        Float minimal_maf = 0.01
+
+        RuntimeAttr? runtime_attr_override
+        String zones = "us-central1-a us-central1-b us-central1-c us-central1-f"
+    }
+    command <<<
+        # add AN AC tag
+        bcftools +fill-tags ~{vcf_input} -Ob -o tmp.out.bcf -- -t AN,AC
+        bcftools index tmp.out.bcf
+        phase_common_static --input tmp.out.bcf \
+                            --filter-maf ~{minimal_maf} \
+                            --region ~{region} \
+                            --map ~{mappingfile} \
+                            --output scaffold.bcf \
+                            --thread ~{num_threads} \
+                            ~{extra_args}
+        bcftools +fill-tags scaffold.bcf -Ob -o ~{prefix}.scaffold.bcf -- -t AN,AC
+        bcftools index -t ~{prefix}.scaffold.bcf
+    >>>
+
+    output{
+        File scaffold_vcf = "~{prefix}.scaffold.bcf"
+        File scaffold_vcf_index = "~{prefix}.scaffold.bcf.tbi"
+    }
+
+    Int disk_size = 100 + ceil(2 * size(vcf_input, "GiB"))
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          num_threads,
+        mem_gb:             memory,
+        disk_gb:            100,
+        boot_disk_gb:       100,
+        preemptible_tries:  0,
+        max_retries:        0,
+        docker:             "hangsuunc/shapeit5:v1"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
+        zones: zones
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
