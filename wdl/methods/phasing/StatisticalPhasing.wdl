@@ -46,7 +46,10 @@ workflow StatisticalPhasing {
         short_vcf_tbi = SubsetVcfShort.subset_tbi,
         sv_vcf = SubsetVcfSV.subset_vcf,
         sv_vcf_tbi = SubsetVcfSV.subset_tbi,
-        prefix = prefix + ".concat"
+        prefix = prefix + ".concat",
+        reference_fasta = reference_fasta,
+        reference_fasta_fai = reference_fasta_fai,
+        region = region,
     }
 
     call H.CreateChunks as CreateChunks { input:
