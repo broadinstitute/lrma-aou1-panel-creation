@@ -461,12 +461,12 @@ task shapeit5_phase_common{
                             --thread ~{num_threads} \
                             ~{extra_args}
         bcftools +fill-tags scaffold.bcf -Ob -o ~{prefix}.scaffold.bcf -- -t AN,AC
-        bcftools index -t ~{prefix}.scaffold.bcf
+        bcftools index ~{prefix}.scaffold.bcf
     >>>
 
     output{
         File scaffold_vcf = "~{prefix}.scaffold.bcf"
-        File scaffold_vcf_index = "~{prefix}.scaffold.bcf.tbi"
+        File scaffold_vcf_index = "~{prefix}.scaffold.bcf.csi"
     }
 
     Int disk_size = 100 + ceil(2 * size(vcf_input, "GiB"))

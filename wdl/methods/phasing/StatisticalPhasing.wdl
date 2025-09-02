@@ -23,7 +23,6 @@ workflow StatisticalPhasing {
 
         Int shapeit_memory
         String shapeit_extra_args 
-        String hiphase_extra_args
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit)
