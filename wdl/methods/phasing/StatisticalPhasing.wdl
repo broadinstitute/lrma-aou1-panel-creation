@@ -19,11 +19,11 @@ workflow StatisticalPhasing {
         String prefix
         String gcs_out_root_dir
         Int shapeit_num_threads
-        Int shapeit5_rare_extra_args
+        String shapeit5_rare_extra_args
         Int merge_num_threads = 4
 
         Int shapeit_memory
-        String shapeit_extra_args 
+        String shapeit5_common_extra_args 
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit)
@@ -71,7 +71,7 @@ workflow StatisticalPhasing {
             prefix = prefix + ".filter_and_concat.phased",
             num_threads = shapeit_num_threads,
             memory = shapeit_memory,
-            extra_args = shapeit_extra_args
+            extra_args = shapeit5_common_extra_args
         }
     }
 
