@@ -19,6 +19,7 @@ workflow StatisticalPhasing {
         String prefix
         String gcs_out_root_dir
         Int shapeit_num_threads
+        Int shapeit5_rare_extra_args
         Int merge_num_threads = 4
 
         Int shapeit_memory
@@ -40,7 +41,7 @@ workflow StatisticalPhasing {
         locus = region
     }
 
-    call FilterAndConcatVcfs { input:
+    call H.FilterAndConcatVcfs { input:
         short_vcf = SubsetVcfShort.subset_vcf,
         short_vcf_tbi = SubsetVcfShort.subset_tbi,
         sv_vcf = SubsetVcfSV.subset_vcf,
@@ -48,138 +49,64 @@ workflow StatisticalPhasing {
         prefix = prefix + ".concat"
     }
 
-    call H.shapeit5_phase_common as Shapeit5_phase_common { input:
-        vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
-        vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
-        mappingfile = genetic_mapping_dict[chromosome],
+    call H.CreateChunks as CreateChunks { input:
+        vcf = FilterAndConcatVcfs.filter_and_concat_vcf,
+        tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
         region = region,
-        prefix = prefix + ".filter_and_concat.phased",
-        num_threads = shapeit_num_threads,
-        memory = shapeit_memory,
-        extra_args = shapeit_extra_args
+        prefix = prefix + ".chunks",
+        extra_chunk_args = "--thread 4 --window-size 50000 --buffer-size 5000"
+    }
+
+    Array[String] region_list = read_lines(CreateChunks.chunks)
+
+    scatter (i in range(length(region_list))) {
+        call H.shapeit5_phase_common as Shapeit5_phase_common { input:
+            vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
+            vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+            mappingfile = genetic_mapping_dict[chromosome],
+            region = region_list[i],
+            prefix = prefix + ".filter_and_concat.phased",
+            num_threads = shapeit_num_threads,
+            memory = shapeit_memory,
+            extra_args = shapeit_extra_args
+        }
+    }
+
+    call H.LigateVcfs as LigateScaffold { input:
+        vcfs = Shapeit5_phase_common.scaffold_vcf,
+        vcf_idxs = Shapeit5_phase_common.scaffold_vcf_index,
+        prefix = prefix + "." + region + ".scaffold.ligated"
+    }
+
+    # phase rare
+
+    scatter (i in range(length(region_list))) {
+        call H.shapeit5_phase_rare as Shapeit5_phase_rare { input:
+            vcf_input = FilterAndConcatVcfs.filter_and_concat_vcf,
+            vcf_index = FilterAndConcatVcfs.filter_and_concat_vcf_tbi,
+            scaffold_bcf = LigateScaffold.ligated_vcf_gz,
+            scaffold_bcf_index = LigateScaffold.ligated_vcf_gz_tbi,
+            mappingfile = genetic_mapping_dict[chromosome],
+            chunk_region = region_list[i],
+            scaffold_region = region,
+            prefix = prefix + ".chunk.phase.rare.phased",
+            chunknum = i,
+            num_threads = shapeit_num_threads,
+            memory = shapeit_memory,
+            extra_args = shapeit5_rare_extra_args
+        }
+    }
+
+    call H.BcftoolsConcatBCFs as ConcatRare { input:
+        vcfs = Shapeit5_phase_rare.chunk_vcf,
+        vcf_idxs = Shapeit5_phase_rare.chunk_vcf_index,
+        prefix = prefix + ".phase.rare.concat"
     }
 
     output {
-        File filtered_vcf = FilterAndConcatVcfs.filter_and_concat_vcf
-        File filtered_tbi = FilterAndConcatVcfs.filter_and_concat_vcf_tbi
-        File phased_common_bcf = Shapeit5_phase_common.scaffold_vcf
-        File phased_common_tbi = Shapeit5_phase_common.scaffold_vcf_index
-    }
-}
-
-task ConvertLowerCase {
-    input {
-        File vcf
-        String prefix
-    }
-
-    Int disk_size = 2*ceil(size([vcf], "GB")) + 1
-    String docker_dir = "/truvari_intrasample"
-    String work_dir = "/cromwell_root/truvari_intrasample"
-
-    command <<<
-        set -euxo pipefail
-        mkdir -p ~{work_dir}
-        cp ~{docker_dir}/convert_lower_case.py ~{work_dir}/convert_lower_case.py
-        cd ~{work_dir}
-
-        python convert_lower_case.py -i ~{vcf} -o ~{prefix}.vcf
-        bgzip ~{prefix}.vcf ~{prefix}.vcf.gz
-        tabix -p vcf ~{prefix}.vcf.gz
-    >>>
-
-    output {
-        File subset_vcf = "~{work_dir}/~{prefix}.vcf.gz"
-        File subset_tbi = "~{work_dir}/~{prefix}.vcf.gz.tbi"
-    }
-    ###################
-    runtime {
-        cpu: 2
-        memory:  "32 GiB"
-        disks: "local-disk 50 HDD"
-        bootDiskSizeGb: 10
-        preemptible_tries:     3
-        max_retries:           2
-        docker:"hangsuunc/cleanvcf:v1"
-    }
-}
-
-# filter out singletons (i.e., keep MAC >= 2) and concatenate with deduplication
-task FilterAndConcatVcfs {
-
-    input {
-        File short_vcf         # multiallelic
-        File short_vcf_tbi
-        File sv_vcf            # biallelic
-        File sv_vcf_tbi
-        String prefix
-    }
-
-    command <<<
-        set -euxo pipefail
-
-        # filter SV singletons
-        bcftools view -i 'MAC>=2' ~{sv_vcf} \
-            --write-index -Oz -o ~{prefix}.SV.vcf.gz
-
-        # filter short singletons and split to biallelic
-        bcftools view -i 'MAC>=2' ~{short_vcf} | \
-            bcftools norm -m-any --do-not-normalize \
-            --write-index -Oz -o ~{prefix}.short.vcf.gz
-
-        # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
-        bcftools concat \
-            ~{prefix}.SV.vcf.gz \
-            ~{prefix}.short.vcf.gz \
-            --allow-overlaps --remove-duplicates \
-            -Oz -o ~{prefix}.vcf.gz
-        bcftools index -t ~{prefix}.vcf.gz
-    >>>
-
-    output {
-        File filter_and_concat_vcf = "~{prefix}.vcf.gz"
-        File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
-    }
-    ###################
-    runtime {
-        cpu: 1
-        memory:  "4 GiB"
-        disks: "local-disk 50 HDD"
-        bootDiskSizeGb: 10
-        preemptible_tries:     3
-        max_retries:           2
-        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
-    }
-}
-
-task UnphaseGenotypes {
-
-    input {
-        File vcf
-        File vcf_tbi
-        String prefix
-    }
-
-    command <<<
-        set -euxo pipefail
-
-        # set (a)ll genotypes to (u)nphased and sort by allele (e.g., 1|0 becomes 0/1)
-        bcftools +setGT ~{vcf} -Oz -o ~{prefix}.vcf.gz -- --target-gt a --new-gt u
-        bcftools index -t ~{prefix}.vcf.gz
-    >>>
-
-    output {
-        File unphased_vcf = "~{prefix}.vcf.gz"
-        File unphased_vcf_tbi = "~{prefix}.vcf.gz.tbi"
-    }
-    ###################
-    runtime {
-        cpu: 1
-        memory:  "4 GiB"
-        disks: "local-disk 50 HDD"
-        bootDiskSizeGb: 10
-        preemptible_tries:     3
-        max_retries:           2
-        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.20"
+        File phased_scaffold_vcf = LigateScaffold.ligated_vcf_gz
+        File phased_scaffold_vcf_tbi = LigateScaffold.ligated_vcf_gz_tbi
+        File phased_rare_vcf = ConcatRare.concated_bcf
+        File phased_rare_vcf_tbi = ConcatRare.concated_bcf_index
     }
 }

@@ -493,3 +493,291 @@ task shapeit5_phase_common{
         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
     }
 }
+
+task CreateChunks {
+
+    input {
+        File vcf
+        File tbi
+        String region
+        String prefix
+        String? extra_chunk_args = "--thread $(nproc) --window-size 5000000 --buffer-size 500000"
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Int disk_size = 2*ceil(size([vcf, tbi], "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_chunk_static
+        chmod +x GLIMPSE_chunk_static
+
+        ./GLIMPSE_chunk_static \
+            -I ~{vcf} \
+            --region ~{region} \
+            ~{extra_chunk_args} \
+            -O chunks.txt
+
+        # cut chunks + buffers
+        cut -f 3 chunks.txt > chunks.regions.txt
+    >>>
+
+    output {
+        File chunks = "chunks.regions.txt"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          4,
+        mem_gb:             8,
+        disk_gb:            disk_size,
+        boot_disk_gb:       10,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+task LigateVcfs {
+
+    input {
+        Array[File] vcfs
+        Array[File]? vcf_idxs
+        String prefix
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Int disk_size = 2*ceil(size(vcfs, "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+        if ! ~{defined(vcf_idxs)}; then
+            for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
+        fi
+
+        ligate_static --input ~{write_lines(vcfs)} --output ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File ligated_vcf_gz = "~{prefix}.vcf.gz"
+        File ligated_vcf_gz_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          2,
+        mem_gb:             8,
+        disk_gb:            disk_size,
+        boot_disk_gb:       10,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:"hangsuunc/shapeit5:v1"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+
+task shapeit5_phase_rare{
+    input{
+        File vcf_input
+        File vcf_index
+        File scaffold_bcf
+        File scaffold_bcf_index
+        File mappingfile
+        String chunk_region
+        String scaffold_region
+        String prefix
+        Int chunknum
+        Int memory
+        Int num_threads
+        String extra_args
+
+        RuntimeAttr? runtime_attr_override
+        String zones = "us-central1-a us-central1-b us-central1-c us-central1-f"
+    }
+    command <<<
+
+        phase_rare --input ~{vcf_input} \
+                    --scaffold ~{scaffold_bcf} \
+                    --map ~{mappingfile} \
+                    --input-region ~{chunk_region} \
+                    --scaffold-region ~{scaffold_region} \
+                    --output ~{prefix}.chunk.~{chunknum}.bcf \
+                    --thread ~{num_threads} \
+                    ~{extra_args}
+
+        bcftools index ~{prefix}.chunk.~{chunknum}.bcf
+
+    >>>
+
+    output{
+        File chunk_vcf = "~{prefix}.chunk.~{chunknum}.bcf"
+        File chunk_vcf_index = "~{prefix}.chunk.~{chunknum}.bcf.csi"
+    }
+
+    Int disk_size = 100 + ceil(2 * size(vcf_input, "GiB"))
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          num_threads,
+        mem_gb:             memory,
+        disk_gb:            100,
+        boot_disk_gb:       100,
+        preemptible_tries:  0,
+        max_retries:        0,
+        docker:             "hangsuunc/shapeit5:v1"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
+        zones: zones
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+
+task BcftoolsConcatBCFs {
+
+    input {
+        Array[File] vcfs
+        Array[File]? vcf_idxs
+        String prefix
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Int disk_size = 2*ceil(size(vcfs, "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+        if ! ~{defined(vcf_idxs)}; then
+            for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
+        fi
+
+        bcftools concat -n -Ob -o ~{prefix}.bcf -f ~{write_lines(vcfs)} 
+        bcftools index -t ~{prefix}.bcf
+    >>>
+
+    output {
+        File concated_bcf = "~{prefix}.bcf"
+        File concated_bcf_index = "~{prefix}.bcf.csi"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          2,
+        mem_gb:             8,
+        disk_gb:            disk_size,
+        boot_disk_gb:       10,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:"hangsuunc/shapeit5:v1"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+# filter out singletons (i.e., keep MAC >= 2) and concatenate with deduplication
+task FilterAndConcatVcfs {
+
+    input {
+        File short_vcf         # multiallelic
+        File short_vcf_tbi
+        File sv_vcf            # biallelic
+        File sv_vcf_tbi
+        String prefix
+        String region
+        File reference_fasta
+        File reference_fasta_fai
+        String? filter_and_concat_short_filter_args = "-i 'MAC>=2'"
+        String? filter_and_concat_sv_filter_args = "-i 'MAC>=2'"
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    command {
+        set -euxo pipefail
+
+        # filter SV singletons
+        bcftools view ~{filter_and_concat_sv_filter_args} ~{sv_vcf} \
+            -r ~{region} \
+            --write-index -Oz -o ~{prefix}.SV.vcf.gz
+
+        # filter short singletons and split to biallelic
+        bcftools view ~{filter_and_concat_short_filter_args} ~{short_vcf} \
+            -r ~{region} | \
+            bcftools norm -m-any -f ~{reference_fasta} | \
+            bcftools sort \
+            --write-index -Oz -o ~{prefix}.short.vcf.gz
+
+        # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
+        bcftools concat \
+            ~{prefix}.SV.vcf.gz \
+            ~{prefix}.short.vcf.gz \
+            --allow-overlaps --remove-duplicates \
+            -Oz -o ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    }
+
+    output {
+        File filter_and_concat_vcf = "~{prefix}.vcf.gz"
+        File filter_and_concat_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          2,
+        mem_gb:             8,
+        disk_gb:            50,
+        boot_disk_gb:       10,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
