@@ -620,7 +620,10 @@ task shapeit5_phase_rare{
     }
     command <<<
 
-        phase_rare_static --input ~{vcf_input} \
+        bcftools +fill-tags ~{vcf_input} -Ob -o tmp.out.bcf -- -t AN,AC
+        bcftools index tmp.out.bcf
+
+        phase_rare_static --input tmp.out.bcf \
                     --scaffold ~{scaffold_bcf} \
                     --map ~{mappingfile} \
                     --input-region ~{chunk_region} \
@@ -629,13 +632,14 @@ task shapeit5_phase_rare{
                     --thread ~{num_threads} \
                     ~{extra_args}
 
-        bcftools index ~{prefix}.chunk.~{chunknum}.bcf
+        bcftools +fill-tags ~{prefix}.chunk.~{chunknum}.bcf -Ob -o ~{prefix}.chunk.~{chunknum}.tagged.bcf -- -t AN,AC
+        bcftools index ~{prefix}.chunk.~{chunknum}.tagged.bcf
 
     >>>
 
     output{
-        File chunk_vcf = "~{prefix}.chunk.~{chunknum}.bcf"
-        File chunk_vcf_index = "~{prefix}.chunk.~{chunknum}.bcf.csi"
+        File chunk_vcf = "~{prefix}.chunk.~{chunknum}.tagged.bcf"
+        File chunk_vcf_index = "~{prefix}.chunk.~{chunknum}.tagged.bcf.csi"
     }
 
     Int disk_size = 100 + ceil(2 * size(vcf_input, "GiB"))
