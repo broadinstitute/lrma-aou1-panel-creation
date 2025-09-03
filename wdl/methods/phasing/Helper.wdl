@@ -620,7 +620,7 @@ task shapeit5_phase_rare{
     }
     command <<<
 
-        phase_rare --input ~{vcf_input} \
+        phase_rare_static --input ~{vcf_input} \
                     --scaffold ~{scaffold_bcf} \
                     --map ~{mappingfile} \
                     --input-region ~{chunk_region} \
