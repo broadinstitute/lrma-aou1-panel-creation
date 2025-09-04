@@ -686,13 +686,14 @@ task BcftoolsConcatBCFs {
             for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         fi
 
-        bcftools concat -n -Ob -o ~{prefix}.bcf -f ~{write_lines(vcfs)} 
-        bcftools index ~{prefix}.bcf
+        bcftools concat -n --allow-overlaps --remove-duplicates -Ob -o ~{prefix}.bcf -f ~{write_lines(vcfs)} 
+        bcftools sort ~{prefix}.bcf -Ob -o ~{prefix}.sorted.bcf
+        bcftools index ~{prefix}.sorted.bcf
     >>>
 
     output {
-        File concated_bcf = "~{prefix}.bcf"
-        File concated_bcf_index = "~{prefix}.bcf.csi"
+        File concated_bcf = "~{prefix}.sorted.bcf"
+        File concated_bcf_index = "~{prefix}.sorted.bcf.csi"
     }
 
     #########################
