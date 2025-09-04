@@ -686,7 +686,7 @@ task BcftoolsConcatBCFs {
             for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
         fi
 
-        bcftools concat -n -Ob -o ~{prefix}.bcf -f ~{write_lines(vcfs)} 
+        bcftools concat --remove-duplicates -Ob -o ~{prefix}.bcf -f ~{write_lines(vcfs)} 
         bcftools sort ~{prefix}.bcf -Ob -o ~{prefix}.sorted.bcf
         bcftools index ~{prefix}.sorted.bcf
     >>>
