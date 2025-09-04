@@ -687,7 +687,7 @@ task BcftoolsConcatBCFs {
         fi
 
         bcftools concat -n -Ob -o ~{prefix}.bcf -f ~{write_lines(vcfs)} 
-        bcftools index -t ~{prefix}.bcf
+        bcftools index ~{prefix}.bcf
     >>>
 
     output {
