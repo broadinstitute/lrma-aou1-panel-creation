@@ -8,7 +8,7 @@ workflow StatisticalPhasing {
     input {
 
         File joint_short_vcf
-        File joint_short_vcf_tbi
+        File? joint_short_vcf_tbi
         File? joint_sv_vcf
         File? joint_sv_vcf_tbi
         File reference_fasta
@@ -33,7 +33,7 @@ workflow StatisticalPhasing {
 
     call H.SubsetVCF as SubsetVcfShort { input:
         vcf_gz = joint_short_vcf,
-        vcf_tbi = joint_short_vcf_tbi,
+        vcf_tbi = select_first([joint_short_vcf_tbi]),
         locus = region
     }
     

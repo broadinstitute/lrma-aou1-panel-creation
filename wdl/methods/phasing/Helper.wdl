@@ -124,7 +124,7 @@ task SubsetVCF {
 
     input {
         File vcf_gz
-        File vcf_tbi
+        File? vcf_tbi
         String locus
         String prefix = "subset"
 
@@ -135,6 +135,10 @@ task SubsetVCF {
 
     command <<<
         set -euxo pipefail
+
+        if ~{defined(vcf_tbi)}; then
+            tabix -p vcf ~{vcf_gz}
+        fi
 
         bcftools view ~{vcf_gz} --regions ~{locus} | bgzip > ~{prefix}.vcf.gz
         tabix -p vcf ~{prefix}.vcf.gz
