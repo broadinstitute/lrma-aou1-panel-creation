@@ -400,6 +400,7 @@ task Shapeit4 {
                 --output ~{prefix}.bcf \
                 --thread ~{num_threads} \
                 ~{extra_args}
+        bcftools index ~{prefix}.bcf
 
         # if ps -p "${job_id}" > /dev/null; then kill "${job_id}"; fi
     >>>
@@ -407,6 +408,7 @@ task Shapeit4 {
     output{
         # File resouce_monitor_log = "resources.log"
         File phased_bcf = "~{prefix}.bcf"
+        File phased_bcf_index = "~{prefix}.bcf.csi"
     }
 
     #Int disk_size = 100 + ceil(2 * size(vcf_input, "GiB"))

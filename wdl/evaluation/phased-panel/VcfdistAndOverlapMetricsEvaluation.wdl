@@ -20,31 +20,43 @@ struct OverlapMetricsOutputs {
 workflow VcfdistAndOverlapMetricsEvaluation {
     input {
         Array[String] samples
+        Array[File] confident_regions_bed_files
         File truth_vcf
+        File truth_vcf_idx
         File eval_vcf
+        File eval_vcf_idx
         String region
         File reference_fasta
         File reference_fasta_fai
 
         File vcfdist_bed_file
         String? vcfdist_extra_args
+        Int? vcfdist_mem_gb
 
+        Boolean do_overlap_metrics = true
         String overlap_phase_tag
         String overlap_metrics_docker
+        String summarize_evaluations_docker
     }
 
-    scatter (sample in samples) {
+    scatter (i in range(length(samples))) {
+        String sample = samples[i]
+
         call SubsetSampleFromVcf as SubsetSampleFromVcfEval { input:
             vcf = eval_vcf,
+            vcf_idx = eval_vcf_idx,
             sample = sample,
             region = region,
+            bed_file = confident_regions_bed_files[i],
             reference_fasta_fai = reference_fasta_fai
         }
 
         call SubsetSampleFromVcf as SubsetSampleFromVcfTruth { input:
             vcf = truth_vcf,
+            vcf_idx = truth_vcf_idx,
             sample = sample,
             region = region,
+            bed_file = confident_regions_bed_files[i],
             reference_fasta_fai = reference_fasta_fai
         }
 
@@ -54,30 +66,46 @@ workflow VcfdistAndOverlapMetricsEvaluation {
             truth_vcf = SubsetSampleFromVcfTruth.single_sample_vcf,
             bed_file = vcfdist_bed_file,
             reference_fasta = reference_fasta,
-            extra_args = vcfdist_extra_args
+            extra_args = vcfdist_extra_args,
+            mem_gb = vcfdist_mem_gb
         }
     }
 
-    call CalculateOverlapMetrics { input:
-        vcf = eval_vcf,
-        phase_tag = overlap_phase_tag,
-        docker = overlap_metrics_docker
+    if (do_overlap_metrics) {
+        call CalculateOverlapMetrics { input:
+            vcf = eval_vcf,
+            vcf_idx = eval_vcf_idx,
+            region = region,
+            phase_tag = overlap_phase_tag,
+            docker = overlap_metrics_docker
+        }
     }
+    Array[String] labels_per_vcf = select_all([
+        "Shapeit5"
+    ])
+
+    call SummarizeEvaluations { input:
+        labels_per_vcf = labels_per_vcf,
+        vcfdist_outputs_per_vcf_and_sample = select_all([
+            Vcfdist.outputs,
+        ]),
+        docker = summarize_evaluations_docker
+    }
+
 
     output {
         # per-sample
-        Array[VcfdistOutputs] vcfdist_outputs_per_sample = Vcfdist.outputs
-
-        # per-cohort
-        OverlapMetricsOutputs overlap_metrics_outputs = CalculateOverlapMetrics.outputs
-    }
+        File evaluation_summary_tsv = SummarizeEvaluations.evaluation_summary_tsv
+        }
 }
 
 task SubsetSampleFromVcf {
     input {
         File vcf
+        File vcf_idx
         String sample
         String region
+        File? bed_file
         File reference_fasta_fai
     }
 
@@ -86,10 +114,11 @@ task SubsetSampleFromVcf {
     command <<<
         set -euxo pipefail
 
-        bcftools index ~{vcf}
+        # must use -T bed_file to intersect with -r region properly
         bcftools view ~{vcf} \
             -s ~{sample} \
             -r ~{region} \
+            ~{"-T " + bed_file} \
             -Oz -o ~{sample}.subset.g.vcf.gz
         bcftools reheader ~{sample}.subset.g.vcf.gz \
             --fai ~{reference_fasta_fai} \
@@ -104,7 +133,7 @@ task SubsetSampleFromVcf {
 
     runtime {
         cpu: 1
-        memory: "64 GiB"
+        memory: "4 GiB"
         disks: "local-disk " + disk_size + " HDD"
         bootDiskSizeGb: 10
         preemptible: 0
@@ -124,8 +153,8 @@ task Vcfdist {
         Int verbosity = 1
 
         Int disk_size_gb = ceil(size(truth_vcf, "GiB") + 10)
-        Int mem_gb = 16
-        Int cpu = 2
+        Int mem_gb = 32
+        Int cpu = 4
         Int preemptible = 1
     }
 
@@ -171,12 +200,14 @@ task Vcfdist {
 task CalculateOverlapMetrics {
     input {
         File vcf
+        File vcf_idx
+        String region
         String? phase_tag    # e.g., "PG" for kanpig integrated, "PS" for HiPhase, "NONE" for Shapeit4
 
         # docker needs bcftools, scikit-allel, and pandas
         String docker
         Int disk_size_gb = ceil(size(vcf, "GiB") + 10)
-        Int mem_gb = 8
+        Int mem_gb = 32
         Int cpu = 2
         Int preemptible = 1
     }
@@ -185,12 +216,16 @@ task CalculateOverlapMetrics {
         set -euxo pipefail
 
         # split to biallelic
-        bcftools norm -m- --do-not-normalize ~{vcf} \
+        bcftools norm \
+            -r ~{region} \
+            -m- --do-not-normalize ~{vcf} \
             -Oz -o split.vcf.gz
         bcftools index -t split.vcf.gz
 
         # join and subset to multiallelic
-        bcftools norm -m+ --do-not-normalize ~{vcf} | \
+        bcftools norm \
+            -r ~{region} \
+            -m+ --do-not-normalize ~{vcf} | \
             bcftools view --min-alleles 3 \
                 -Oz -o multi.vcf.gz
         bcftools index -t multi.vcf.gz
@@ -306,6 +341,98 @@ task CalculateOverlapMetrics {
     runtime {
         docker: docker
         disks: "local-disk " + disk_size_gb + " HDD"
+        memory: mem_gb + " GiB"
+        cpu: cpu
+        preemptible: preemptible
+    }
+}
+
+task SummarizeEvaluations {
+    input {
+        Array[String] labels_per_vcf
+        Array[Array[VcfdistOutputs]] vcfdist_outputs_per_vcf_and_sample
+
+        String docker
+        Int disk_size_gb = 50
+        Int boot_disk_size_gb = 15
+        Int mem_gb = 8
+        Int cpu = 2
+        Int preemptible = 1
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        python - --labels_per_vcf_txt ~{write_lines(labels_per_vcf)} \
+                 --vcfdist_outputs_per_vcf_and_sample_json ~{write_json(vcfdist_outputs_per_vcf_and_sample)} \
+                 <<-'EOF'
+        import argparse
+        import json
+        import pandas as pd
+
+        def summarize(labels_per_vcf_txt,
+                      vcfdist_outputs_per_vcf_and_sample_json):
+            with open(labels_per_vcf_txt) as f:
+                labels = f.read().splitlines()
+
+            with open(vcfdist_outputs_per_vcf_and_sample_json) as f:
+                vcfdist_outputs_per_vcf_and_sample = json.load(f)
+
+            summary_dict = {}
+            for i, label in enumerate(labels):
+                summary_dict[label] = {}
+                summary_dict[label]['NUM_VCFDIST_SAMPLES'] = len(vcfdist_outputs_per_vcf_and_sample[i])
+                summary_dict[label].update(summarize_vcfdist_outputs_over_samples(vcfdist_outputs_per_vcf_and_sample[i]))
+                # if overlap_metrics_outputs_per_vcf:
+                #     summary_dict[label].update(summarize_overlap_metrics_outputs(overlap_metrics_outputs_per_vcf[i]))
+
+            pd.DataFrame.from_dict(summary_dict, orient='index').to_csv('evaluation_summary.tsv', sep='\t', float_format="%.4f")
+
+        def summarize_vcfdist_outputs_over_samples(vcfdist_outputs_per_sample):
+            precision_recall_metrics_dict = {}
+            for s, vcfdist_outputs in enumerate(vcfdist_outputs_per_sample):
+                precision_recall_metrics_dict[s] = {}
+                pr_metrics_df = pd.read_csv(vcfdist_outputs['precision_recall_summary_tsv'], sep='\t', index_col=[0, 1])
+                for var_type in ['SNP', 'INDEL', 'SV']:
+                    var_type_metrics_dict = pr_metrics_df.loc[var_type, 'NONE'][['TRUTH_TP', 'QUERY_TP', 'TRUTH_FN', 'QUERY_FP', 'PREC', 'RECALL', 'F1_SCORE']].add_prefix(f'{var_type}_').to_dict()
+                    precision_recall_metrics_dict[s].update(var_type_metrics_dict)
+            return pd.DataFrame.from_dict(precision_recall_metrics_dict, orient='index').mean(axis=0)
+
+
+        def summarize_overlap_metrics_outputs(overlap_metrics_outputs):
+            return pd.read_csv(overlap_metrics_outputs['metrics_tsv'], sep='\t').iloc[0].to_dict()
+
+        def main():
+            parser = argparse.ArgumentParser()
+
+            parser.add_argument('--labels_per_vcf_txt',
+                                type=str)
+
+            parser.add_argument('--vcfdist_outputs_per_vcf_and_sample_json',
+                                type=str)
+
+            parser.add_argument('--overlap_metrics_outputs_per_vcf_json',
+                                type=str)
+
+            args = parser.parse_args()
+
+            summarize(args.labels_per_vcf_txt,
+                      args.vcfdist_outputs_per_vcf_and_sample_json,
+                      args.overlap_metrics_outputs_per_vcf_json)
+
+        if __name__ == '__main__':
+            main()
+        EOF
+    >>>
+
+    output {
+        File evaluation_summary_tsv = "evaluation_summary.tsv"
+    }
+
+    runtime {
+        docker: docker
+        disks: "local-disk " + disk_size_gb + " HDD"
+        bootDiskSizeGb: boot_disk_size_gb
         memory: mem_gb + " GiB"
         cpu: cpu
         preemptible: preemptible
