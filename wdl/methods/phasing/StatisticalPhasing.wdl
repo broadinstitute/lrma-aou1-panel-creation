@@ -33,7 +33,6 @@ workflow StatisticalPhasing {
 
     call H.SubsetVCF as SubsetVcfShort { input:
         vcf_gz = joint_short_vcf,
-        vcf_tbi = select_first([joint_short_vcf_tbi]),
         locus = region
     }
     
