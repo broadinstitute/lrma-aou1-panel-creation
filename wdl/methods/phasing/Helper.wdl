@@ -137,16 +137,16 @@ task SubsetVCF {
         set -euxo pipefail
 
         if ~{defined(vcf_tbi)}; then
-            tabix -p vcf ~{vcf_gz}
+            bcftools index ~{vcf_gz}
         fi
 
-        bcftools view ~{vcf_gz} --regions ~{locus} | bgzip > ~{prefix}.vcf.gz
-        tabix -p vcf ~{prefix}.vcf.gz
+        bcftools view ~{vcf_gz} --regions ~{locus} -O b -o ~{prefix}.bcf
+        bcftools index ~{prefix}.bcf
     >>>
 
     output {
-        File subset_vcf = "~{prefix}.vcf.gz"
-        File subset_tbi = "~{prefix}.vcf.gz.tbi"
+        File subset_vcf = "~{prefix}.bcf"
+        File subset_tbi = "~{prefix}.bcf.csi"
     }
 
     #########################
