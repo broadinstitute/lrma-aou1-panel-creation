@@ -135,11 +135,7 @@ task SubsetVCF {
 
     command <<<
         set -euxo pipefail
-
-        if ~{defined(vcf_tbi)}; then
-            bcftools index ~{vcf_gz}
-        fi
-
+        bcftools index ~{vcf_gz}
         bcftools view ~{vcf_gz} --regions ~{locus} -O b -o ~{prefix}.bcf
         bcftools index ~{prefix}.bcf
     >>>
