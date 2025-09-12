@@ -422,7 +422,7 @@ task Shapeit4 {
         boot_disk_gb:       100,
         preemptible_tries:  0,
         max_retries:        0,
-        docker:             "hangsuunc/shapeit4:v1"
+        docker:             "us.gcr.io/broad-dsp-lrma/hangsuunc/shapeit4:v1"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
     runtime {
