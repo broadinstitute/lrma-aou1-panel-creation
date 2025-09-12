@@ -131,7 +131,7 @@ task SubsetVCF {
         RuntimeAttr? runtime_attr_override
     }
 
-    Int disk_size = 2*ceil(size([vcf_gz, vcf_tbi], "GB")) + 1
+    Int disk_size = 2*ceil(size([vcf_gz, vcf_tbi], "GB")) + 100
 
     command <<<
         set -euxo pipefail
