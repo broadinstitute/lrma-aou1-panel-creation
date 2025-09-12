@@ -135,8 +135,9 @@ task SubsetVCF {
 
     command <<<
         set -euxo pipefail
-        bcftools index ~{vcf_gz}
-        bcftools view ~{vcf_gz} --regions ~{locus} -O b -o ~{prefix}.bcf
+        cp ~{vcf_gz} tmp.bcf
+        bcftools index tmp.bcf
+        bcftools view tmp.bcf --regions ~{locus} -O b -o ~{prefix}.bcf
         bcftools index ~{prefix}.bcf
     >>>
 
