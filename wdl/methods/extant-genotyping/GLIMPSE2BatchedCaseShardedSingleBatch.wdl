@@ -364,7 +364,7 @@ task FixVariantCollisions {
         RuntimeAttributes runtime_attributes = {}
     }
 
-    Int disk_size_gb = 2*size(vcf_gz, "GB") + 1
+    Int disk_size_gb = 100
 
     command <<<
         set -euox pipefail
