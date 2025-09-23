@@ -360,7 +360,11 @@ task FixVariantCollisions {
         String output_prefix
 
         File? monitoring_script
+
+        RuntimeAttributes runtime_attributes = {}
     }
+
+    Int disk_size_gb = 2*size(vcf_gz, "GB") + 1
 
     command <<<
         set -euox pipefail
@@ -395,15 +399,15 @@ task FixVariantCollisions {
         File windows = "windows.txt"
         File histogram = "histogram.txt"
     }
-    ###################
+
     runtime {
-        cpu: 1
-        memory:  "16 GiB"
-        disks: "local-disk 100 SSD"
-        bootDiskSizeGb: 10
-        preemptible:     3
-        max_retries:           2
-        docker:"us.gcr.io/broad-gatk/gatk:4.6.0.0"
+        docker: "us.gcr.io/broad-gatk/gatk:4.6.0.0"
+        cpu: select_first([runtime_attributes.cpu, 1])
+        memory: select_first([runtime_attributes.command_mem_gb, 15]) + select_first([runtime_attributes.additional_mem_gb, 1]) + " GB"
+        disks: "local-disk " + select_first([runtime_attributes.disk_size_gb, disk_size_gb]) + if select_first([runtime_attributes.use_ssd, false]) then " SSD" else " HDD"
+        bootDiskSizeGb: select_first([runtime_attributes.boot_disk_size_gb, 15])
+        preemptible: select_first([runtime_attributes.preemptible, 2])
+        maxRetries: select_first([runtime_attributes.max_retries, 1])
     }
 }
 

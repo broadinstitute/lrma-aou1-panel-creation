@@ -551,6 +551,7 @@ task ReducePanelVCF {
             bgzip -c > ~{output_prefix}.retained.bi_snp.tsv.gz
         tabix -s1 -b2 -e2 ~{output_prefix}.retained.bi_snp.tsv.gz
 
+        # TODO be more careful about retaining all bubble alleles in bubbles containing any SV-length bubble allele (or even use original representations to identify SVs)
         bcftools norm -m-any ~{input_vcf_gz} | \
             bcftools view -i 'ABS(STRLEN(ALT)-STRLEN(REF))>=~{sv_length}' | \
             bcftools query -f'%CHROM\t%POS\t%REF,%ALT\n' | \
