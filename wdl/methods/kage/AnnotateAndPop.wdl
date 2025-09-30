@@ -87,7 +87,7 @@ task AnnotateAndPop {
     command <<<
         set -euox pipefail
 
-        bcftools annotate -a ~{panel_split_vcf_gz} ~{collisionless_vcf_gz} \
+        bcftools annotate -r ~{chromosome} -a ~{panel_split_vcf_gz} ~{collisionless_vcf_gz} \
             -c CHROM,POS,REF,ALT,ID:=INFO/ID,INFO/ID:=INFO/ID \
             -Oz -o ~{output_prefix}.collisionless.id.vcf.gz
         bcftools index -t ~{output_prefix}.collisionless.id.vcf.gz
