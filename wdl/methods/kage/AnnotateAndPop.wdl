@@ -17,6 +17,8 @@ workflow AnnotateAndPop {
         Array[File] collisionless_vcf_gz_tbis
         Array[File] posteriors_vcf_gzs          # whole-genome, per-batch
         Array[File] posteriors_vcf_gz_tbis
+        Array[File] panel_split_vcf_gzs         # per-chromosome
+        Array[File] panel_split_vcf_gz_tbis
         Array[File] panel_id_split_vcf_gzs      # per-chromosome
         Array[File] panel_id_split_vcf_gz_tbis
         Array[String]+ chromosomes
@@ -35,6 +37,8 @@ workflow AnnotateAndPop {
                     collisionless_vcf_gz_tbi = collisionless_vcf_gz_tbis[i],
                     posteriors_vcf_gz = posteriors_vcf_gzs[i],
                     posteriors_vcf_gz_tbi = posteriors_vcf_gz_tbis[i],
+                    panel_split_vcf_gz = panel_split_vcf_gzs[j],
+                    panel_split_vcf_gz_tbi = panel_split_vcf_gz_tbis[j],
                     panel_id_split_vcf_gz = panel_id_split_vcf_gzs[j],
                     panel_id_split_vcf_gz_tbi = panel_id_split_vcf_gz_tbis[j],
                     chromosome = chromosomes[j],
@@ -66,6 +70,8 @@ task AnnotateAndPop {
         File collisionless_vcf_gz_tbi
         File posteriors_vcf_gz
         File posteriors_vcf_gz_tbi
+        File panel_split_vcf_gz
+        File panel_split_vcf_gz_tbi
         File panel_id_split_vcf_gz
         File panel_id_split_vcf_gz_tbi
         String chromosome
@@ -81,7 +87,11 @@ task AnnotateAndPop {
     command <<<
         set -euox pipefail
 
-        bcftools annotate -r ~{chromosome} -a ~{posteriors_vcf_gz} ~{collisionless_vcf_gz} \
+        bcftools annotate -a ~{panel_split_vcf_gz} ~{collisionless_vcf_gz} \
+            -c CHROM,POS,REF,ALT,ID:=INFO/ID,INFO/ID:=INFO/ID \
+            -Oz -o ~{output_prefix}.collisionless.id.vcf.gz
+        bcftools index -t ~{output_prefix}.collisionless.id.vcf.gz
+        bcftools annotate -r ~{chromosome} -a ~{posteriors_vcf_gz} ~{output_prefix}.collisionless.id.vcf.gz \
             -c CHROM,POS,REF,ALT,FORMAT/UGT:=FORMAT/GT,FORMAT/DS,FORMAT/GP,FORMAT/HS \
             -Oz -o ~{output_prefix}.annotated.vcf.gz
         bcftools index -t ~{output_prefix}.annotated.vcf.gz
