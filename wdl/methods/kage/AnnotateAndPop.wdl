@@ -100,7 +100,7 @@ task AnnotateAndPop {
         # DO NOT apply bcftools norm -m+ before using this, pass a biallelic VCF instead!
         python - --panel_id_split_vcf_gz ~{panel_id_split_vcf_gz} \
                  --input_vcf_gz ~{output_prefix}.annotated.vcf.gz \
-                 --output_vcf_gz /tmp/~{output_prefix}.annotated-popped.vcf.gz \
+                 --output_vcf /tmp/~{output_prefix}.annotated-popped.vcf \
                  <<-'EOF'
         import sys
         import argparse
@@ -115,7 +115,7 @@ task AnnotateAndPop {
                                 type=str)
             parser.add_argument('--input_vcf_gz',
                                 type=str)
-            parser.add_argument('--output_vcf_gz',
+            parser.add_argument('--output_vcf',
                                 type=str)
 
             args = parser.parse_args()
@@ -134,7 +134,7 @@ task AnnotateAndPop {
                 assert len(ids) == 1
                 chrom_to_variants[fields[0]][ids[0]] = [fields[1], fields[3], fields[4]]
 
-            with open(args.output_vcf_gz, 'w') as f:
+            with open(args.output_vcf, 'w') as f:
                 for line in tqdm.tqdm(gzip.open(args.input_vcf_gz, 'rt')):
                     if line.startswith('#'):
                         # header line
@@ -162,7 +162,9 @@ task AnnotateAndPop {
                         raise 'VCF should be biallelic'
                     bubble_id = info_field['ID']
                     for assigned_id in bubble_id.split(':'):
-                        ids.add((assigned_id, int(chrom_to_variants[fields[0]][assigned_id][0])))
+                        variants = chrom_to_variants[fields[0]][assigned_id]
+                        if variants:
+                            ids.add((assigned_id, int(variants[0])))
                     # sort the ids by the starting coordinate (to ensure the VCF is sorted)
                     ids = list(ids)
                     ids.sort(key=lambda x : x[1])
@@ -212,7 +214,7 @@ task AnnotateAndPop {
             main()
         EOF
 
-        bcftools sort /tmp/~{output_prefix}.annotated-popped.vcf.gz -Oz -o ~{output_prefix}.annotated-popped.vcf.gz
+        bcftools sort /tmp/~{output_prefix}.annotated-popped.vcf -Oz -o ~{output_prefix}.annotated-popped.vcf.gz
         bcftools index -t ~{output_prefix}.annotated-popped.vcf.gz
     >>>
 
