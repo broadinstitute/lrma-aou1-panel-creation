@@ -18,6 +18,7 @@ workflow LigateVcf {
 
     call H.LigateVcfs as LigateScaffold { input:
         vcfs = phased_vcfs,
+        vcf_idxs = phased_vcf_tbis,
         prefix = prefix + "." + chromosome + ".shapeit4.phased.ligated"
     }
 
