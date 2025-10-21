@@ -103,6 +103,7 @@ task SubsetSampleFromVcf {
         String region
         File? bed_file
         File reference_fasta_fai
+        String? extra_args
     }
 
     Int disk_size = 1 + ceil(2 * (size(vcf, "GiB")))
@@ -115,6 +116,7 @@ task SubsetSampleFromVcf {
             -s ~{sample} \
             -r ~{region} \
             ~{"-T " + bed_file} \
+            ~{extra_args} \
             -Oz -o ~{sample}.subset.g.vcf.gz
         bcftools reheader ~{sample}.subset.g.vcf.gz \
             --fai ~{reference_fasta_fai} \
