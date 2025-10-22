@@ -37,6 +37,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
         File vcfdist_bed_file
         String? vcfdist_extra_args
         Int? vcfdist_mem_gb
+        String vcfdist_docker = "timd1/vcfdist:v2.5.3"
 
         Boolean do_overlap_metrics = true
         String overlap_phase_tag
@@ -71,7 +72,8 @@ workflow VcfdistAndOverlapMetricsEvaluation {
             bed_file = vcfdist_bed_file,
             reference_fasta = reference_fasta,
             extra_args = vcfdist_extra_args,
-            mem_gb = vcfdist_mem_gb
+            mem_gb = vcfdist_mem_gb,
+            docker = vcfdist_docker
         }
     }
 
@@ -150,6 +152,7 @@ task Vcfdist {
         String? extra_args
         Int verbosity = 1
 
+        String docker
         Int disk_size_gb = ceil(size(truth_vcf, "GiB") + 10)
         Int mem_gb = 32
         Int cpu = 4
@@ -190,7 +193,7 @@ task Vcfdist {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsde-methods/slee/vcfdist:v2.5.3"
+        docker: docker
         disks: "local-disk " + disk_size_gb + " HDD"
         memory: mem_gb + " GiB"
         cpu: cpu
