@@ -190,7 +190,7 @@ task Vcfdist {
     }
 
     runtime {
-        docker: "timd1/vcfdist:v2.5.3"
+        docker: "us.gcr.io/broad-dsde-methods/slee/vcfdist:v2.5.3"
         disks: "local-disk " + disk_size_gb + " HDD"
         memory: mem_gb + " GiB"
         cpu: cpu
