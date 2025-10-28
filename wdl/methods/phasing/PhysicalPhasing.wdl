@@ -3,7 +3,7 @@ version 1.0
 import "./Helper.wdl" as H
 
 
-workflow PhysicalAndStatisticalPhasing {
+workflow PhasicalPhasing {
 
     input {
         File all_chr_bam
@@ -12,6 +12,8 @@ workflow PhysicalAndStatisticalPhasing {
         File reference_fasta_fai
         String small_vcfs_directory
         String sv_vcfs_directory
+        File? trgt_vcf
+        File? trgt_vcf_tbi
         String prefix
         Int hiphase_memory
         String hiphase_extra_args
@@ -31,11 +33,13 @@ workflow PhysicalAndStatisticalPhasing {
     }
 
 
-    call H.HiPhase { input:
+    call H.HiphaseAll as HiphaseAll { input:
         bam = all_chr_bam,
         bai = all_chr_bai,
         unphased_snp_vcf = small_vcfs_directory + "/" + sample_id + '.vcf.gz',
         unphased_sv_vcf = UnphaseSVGenotypes.unphased_vcf,
+        unphased_trgt_vcf = trgt_vcf,
+        unphased_trgt_vcf_tbi = trgt_vcf_tbi,
         ref_fasta = reference_fasta,
         ref_fasta_fai = reference_fasta_fai,
         samplename = sample_id,
@@ -44,10 +48,13 @@ workflow PhysicalAndStatisticalPhasing {
     }
 
     output {
-        File hiphase_short_vcf = HiPhase.phased_snp_vcf
-        File hiphase_short_tbi = HiPhase.phased_snp_vcf_tbi
-        File hiphase_sv_vcf = HiPhase.phased_sv_vcf
-        File hiphase_sv_tbi = HiPhase.phased_sv_vcf_tbi
+        File hiphase_short_vcf = HiphaseAll.phased_snp_vcf
+        File hiphase_short_tbi = HiphaseAll.phased_snp_vcf_tbi
+        File hiphase_sv_vcf = HiphaseAll.phased_sv_vcf
+        File hiphase_sv_tbi = HiphaseAll.phased_sv_vcf_tbi
+        File? hiphase_trgt_vcf = HiphaseAll.phased_trgt_vcf
+        File? hiphase_trgt_tbi = HiphaseAll.phased_trgt_vcf_tbi
+        File? haplotag_file = HiphaseAll.haplotag_file
     }
 }
 

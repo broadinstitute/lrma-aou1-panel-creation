@@ -107,7 +107,7 @@ task HiPhase {
     }
 }
 
-task HiphaseSVTrgt {
+task HiphaseAll {
 
     meta {
         description: "Generates phased VCF. Note this runs fast so no need to parallize."
@@ -119,10 +119,13 @@ task HiphaseSVTrgt {
         File bai
 
         File unphased_snp_vcf
+        File? unphased_snp_vcf_tbi
         
         File unphased_sv_vcf
-        
-        File unphased_trgt_vcf
+        File? unphased_sv_vcf_tbi
+
+        File? unphased_trgt_vcf
+        File? unphased_trgt_vcf_tbi
 
         File ref_fasta
         File ref_fasta_fai
@@ -136,17 +139,17 @@ task HiphaseSVTrgt {
         RuntimeAttr? runtime_attr_override
     }
 
-    # Int bam_sz = ceil(size(bam, "GB"))
-	Int disk_size = 30  #if bam_sz > 200 then 2*bam_sz else bam_sz + 200
+    Int disk_size = ceil(size(bam, "GB") + 100)
+	# Int disk_size = 30  #if bam_sz > 200 then 2*bam_sz else bam_sz + 200
 
     command <<<
         set -euxo pipefail
 
         touch ~{bai}
 
-        bcftools index -t ~{unphased_snp_vcf}
-        bcftools index -t ~{unphased_sv_vcf}
-        bcftools index -t ~{unphased_trgt_vcf}
+        if ! ~{defined(unphased_snp_vcf_tbi)}; then bcftools index -t ~{unphased_snp_vcf}
+        if ! ~{defined(unphased_sv_vcf_tbi)}; then bcftools index -t ~{unphased_sv_vcf}
+        if [ ! ~{defined(unphased_trgt_vcf_tbi)} ] && [ ~{defined(unphased_trgt_vcf)} ]; then bcftools index -t ~{unphased_trgt_vcf}
 
         hiphase \
         --threads ~{thread_num} \
@@ -157,8 +160,7 @@ task HiphaseSVTrgt {
         --output-vcf ~{samplename}_phased_snp.vcf.gz \
         --vcf ~{unphased_sv_vcf} \
         --output-vcf ~{samplename}_phased_sv.vcf.gz \
-        --vcf ~{unphased_trgt_vcf} \
-        --output-vcf ~{samplename}_phased_trgt.vcf.gz \
+        ${if [defined(optional_input_file)]; then "--vcf " + ~{unphased_trgt_vcf} + " --output-vcf " + ~{samplename}_phased_trgt.vcf.gz else ""} \
         --haplotag-file ~{samplename}_phased_sv_haplotag.tsv \
         --stats-file ~{samplename}.stats.csv \
         --blocks-file ~{samplename}.blocks.tsv \
@@ -171,9 +173,10 @@ task HiphaseSVTrgt {
 
         bcftools sort ~{samplename}_phased_sv.vcf.gz -O z -o ~{samplename}_phased_sv.sorted.vcf.gz
         tabix -p vcf ~{samplename}_phased_sv.sorted.vcf.gz
-        
-        bcftools sort ~{samplename}_phased_trgt.vcf.gz -O z -o ~{samplename}_phased_trgt.sorted.vcf.gz
-        tabix -p vcf ~{samplename}_phased_trgt.sorted.vcf.gz
+        if [ ~{defined(unphased_trgt_vcf)} ]; then
+            bcftools sort ~{samplename}_phased_trgt.vcf.gz -O z -o ~{samplename}_phased_trgt.sorted.vcf.gz
+            tabix -p vcf ~{samplename}_phased_trgt.sorted.vcf.gz
+        fi
     >>>
 
     output {
@@ -181,9 +184,9 @@ task HiphaseSVTrgt {
         File phased_snp_vcf_tbi = "~{samplename}_phased_snp.sorted.vcf.gz.tbi"
         File phased_sv_vcf   = "~{samplename}_phased_sv.sorted.vcf.gz"
         File phased_sv_vcf_tbi = "~{samplename}_phased_sv.sorted.vcf.gz.tbi"
-        File phased_trgt_vcf = "~{samplename}_phased_trgt.sorted.vcf.gz"
-        File phased_trgt_vcf_tbi = "~{samplename}_phased_trgt.sorted.vcf.gz.tbi"
-        File haplotag_file = "~{samplename}_phased_sv_haplotag.tsv"
+        File? phased_trgt_vcf = "~{samplename}_phased_trgt.sorted.vcf.gz"
+        File? phased_trgt_vcf_tbi = "~{samplename}_phased_trgt.sorted.vcf.gz.tbi"
+        File? haplotag_file = "~{samplename}_phased_sv_haplotag.tsv"
         
     }
 
@@ -319,6 +322,7 @@ task SubsetVCF {
 
     input {
         File vcf_gz
+        File? vcf_tbi
         String locus
         String prefix = "subset"
 
@@ -329,7 +333,9 @@ task SubsetVCF {
 
     command <<<
         set -euxo pipefail
-        tabix -p vcf ~{vcf_gz}
+        if ! [defined(vcf_tbi)}]; then
+            tabix -p vcf ~{vcf_gz}
+        fi
         tabix -h ~{vcf_gz} ~{locus} | bgzip > ~{prefix}.vcf.gz
         # bcftools view ~{vcf_gz} --regions ~{locus} -O z -o ~{prefix}.vcf.gz
         tabix -p vcf ~{prefix}.vcf.gz

@@ -9,9 +9,9 @@ workflow PhysicalAndStatisticalPhasing {
         Array[File] sample_bams
         Array[File] sample_bais
         File joint_short_vcf
-        File joint_short_vcf_tbi
+        File? joint_short_vcf_tbi
         File joint_sv_vcf
-        File joint_sv_vcf_tbi
+        File? joint_sv_vcf_tbi
         File reference_fasta
         File reference_fasta_fai
         File genetic_mapping_tsv_for_shapeit4
