@@ -49,11 +49,8 @@ workflow PhasicalPhasing {
 
     output {
         File hiphase_short_vcf = HiphaseAll.phased_snp_vcf
-        File hiphase_short_tbi = HiphaseAll.phased_snp_vcf_tbi
         File hiphase_sv_vcf = HiphaseAll.phased_sv_vcf
-        File hiphase_sv_tbi = HiphaseAll.phased_sv_vcf_tbi
         File? hiphase_trgt_vcf = HiphaseAll.phased_trgt_vcf
-        File? hiphase_trgt_tbi = HiphaseAll.phased_trgt_vcf_tbi
         File? haplotag_file = HiphaseAll.haplotag_file
     }
 }

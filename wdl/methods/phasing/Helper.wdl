@@ -168,40 +168,26 @@ task HiphaseAll {
         --vcf ~{unphased_sv_vcf} \
         --output-vcf ~{samplename}_phased_sv.vcf.gz \
         $argument \
-        --haplotag-file ~{samplename}_phased_sv_haplotag.tsv \
+        --haplotag-file ~{samplename}_phased_haplotag.tsv \
         --stats-file ~{samplename}.stats.csv \
         --blocks-file ~{samplename}.blocks.tsv \
         --summary-file ~{samplename}.summary.tsv \
         ~{extra_args}
 
-
-        if [ ~{defined(unphased_trgt_vcf)} ]; then
-            bcftools sort ~{samplename}_phased_trgt.vcf.gz -O z -o ~{samplename}_phased_sv.sorted.vcf.gz
-            tabix -p vcf ~{samplename}_phased_trgt.sorted.vcf.gz
-        fi        
-
-        bcftools sort ~{samplename}_phased_snp.vcf.gz -O z -o ~{samplename}_phased_snp.sorted.vcf.gz
-        tabix -p vcf ~{samplename}_phased_snp.sorted.vcf.gz
-
-        bcftools sort ~{samplename}_phased_sv.vcf.gz -O z -o ~{samplename}_phased_sv.sorted.vcf.gz
-        tabix -p vcf ~{samplename}_phased_sv.sorted.vcf.gz
         
     >>>
 
     output {
-        File phased_snp_vcf = "~{samplename}_phased_snp.sorted.vcf.gz"
-        File phased_snp_vcf_tbi = "~{samplename}_phased_snp.sorted.vcf.gz.tbi"
-        File phased_sv_vcf   = "~{samplename}_phased_sv.sorted.vcf.gz"
-        File phased_sv_vcf_tbi = "~{samplename}_phased_sv.sorted.vcf.gz.tbi"
-        File? phased_trgt_vcf = "~{samplename}_phased_trgt.sorted.vcf.gz"
-        File? phased_trgt_vcf_tbi = "~{samplename}_phased_trgt.sorted.vcf.gz.tbi"
-        File? haplotag_file = "~{samplename}_phased_sv_haplotag.tsv"
+        File phased_snp_vcf = "~{samplename}_phased_snp.vcf.gz"
+        File phased_sv_vcf   = "~{samplename}_phased_sv.vcf.gz"
+        File? phased_trgt_vcf = "~{samplename}_phased_trgt.vcf.gz"
+        File? haplotag_file = "~{samplename}_phased_haplotag.tsv"
         
     }
 
     #########################
     RuntimeAttr default_attr = object {
-        cpu_cores:          16,
+        cpu_cores:          8,
         mem_gb:             memory,
         disk_gb:            disk_size,
         boot_disk_gb:       100,
