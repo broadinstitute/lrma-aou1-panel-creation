@@ -150,6 +150,13 @@ task HiphaseAll {
         if ! ~{defined(unphased_snp_vcf_tbi)}; then bcftools index -t ~{unphased_snp_vcf}
         if ! ~{defined(unphased_sv_vcf_tbi)}; then bcftools index -t ~{unphased_sv_vcf}
         if [ ! ~{defined(unphased_trgt_vcf_tbi)} ] && [ ~{defined(unphased_trgt_vcf)} ]; then bcftools index -t ~{unphased_trgt_vcf}
+        if [ ~{defined(unphased_trgt_vcf)} ]; then 
+            argument="--vcf ~{unphased_trgt_vcf} --output-vcf ~{samplename}_phased_trgt.vcf.gz"
+        else
+            argument=""
+        fi
+
+        echo $argument
 
         hiphase \
         --threads ~{thread_num} \
@@ -160,7 +167,7 @@ task HiphaseAll {
         --output-vcf ~{samplename}_phased_snp.vcf.gz \
         --vcf ~{unphased_sv_vcf} \
         --output-vcf ~{samplename}_phased_sv.vcf.gz \
-        ${if [defined(optional_input_file)]; then "--vcf " + ~{unphased_trgt_vcf} + " --output-vcf " + ~{samplename}_phased_trgt.vcf.gz else ""} \
+        $argument \
         --haplotag-file ~{samplename}_phased_sv_haplotag.tsv \
         --stats-file ~{samplename}.stats.csv \
         --blocks-file ~{samplename}.blocks.tsv \
@@ -176,6 +183,7 @@ task HiphaseAll {
         if [ ~{defined(unphased_trgt_vcf)} ]; then
             bcftools sort ~{samplename}_phased_trgt.vcf.gz -O z -o ~{samplename}_phased_trgt.sorted.vcf.gz
             tabix -p vcf ~{samplename}_phased_trgt.sorted.vcf.gz
+        fi
 
 
     >>>
