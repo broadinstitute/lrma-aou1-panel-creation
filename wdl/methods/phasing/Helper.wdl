@@ -176,7 +176,8 @@ task HiphaseAll {
         if [ ~{defined(unphased_trgt_vcf)} ]; then
             bcftools sort ~{samplename}_phased_trgt.vcf.gz -O z -o ~{samplename}_phased_trgt.sorted.vcf.gz
             tabix -p vcf ~{samplename}_phased_trgt.sorted.vcf.gz
-        fi
+
+
     >>>
 
     output {
