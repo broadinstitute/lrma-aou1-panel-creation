@@ -147,9 +147,9 @@ task HiphaseAll {
 
         touch ~{bai}
 
-        if ! ~{defined(unphased_snp_vcf_tbi)}; then bcftools index -t ~{unphased_snp_vcf}
-        if ! ~{defined(unphased_sv_vcf_tbi)}; then bcftools index -t ~{unphased_sv_vcf}
-        if [ ! ~{defined(unphased_trgt_vcf_tbi)} ] && [ ~{defined(unphased_trgt_vcf)} ]; then bcftools index -t ~{unphased_trgt_vcf}
+        if ! ~{defined(unphased_snp_vcf_tbi)}; then bcftools index -t ~{unphased_snp_vcf} fi
+        if ! ~{defined(unphased_sv_vcf_tbi)}; then bcftools index -t ~{unphased_sv_vcf} fi
+        if [ ! ~{defined(unphased_trgt_vcf_tbi)} ] && [ ~{defined(unphased_trgt_vcf)} ]; then bcftools index -t ~{unphased_trgt_vcf} fi
         if [ ~{defined(unphased_trgt_vcf)} ]; then 
             argument="--vcf ~{unphased_trgt_vcf} --output-vcf ~{samplename}_phased_trgt.vcf.gz"
         else
@@ -173,19 +173,19 @@ task HiphaseAll {
         --blocks-file ~{samplename}.blocks.tsv \
         --summary-file ~{samplename}.summary.tsv \
         ~{extra_args}
-        
+
+
+        if [ ~{defined(unphased_trgt_vcf)} ]; then
+            bcftools sort ~{samplename}_phased_trgt.vcf.gz -O z -o ~{samplename}_phased_sv.sorted.vcf.gz
+            tabix -p vcf ~{samplename}_phased_trgt.sorted.vcf.gz
+        fi        
 
         bcftools sort ~{samplename}_phased_snp.vcf.gz -O z -o ~{samplename}_phased_snp.sorted.vcf.gz
         tabix -p vcf ~{samplename}_phased_snp.sorted.vcf.gz
 
         bcftools sort ~{samplename}_phased_sv.vcf.gz -O z -o ~{samplename}_phased_sv.sorted.vcf.gz
         tabix -p vcf ~{samplename}_phased_sv.sorted.vcf.gz
-        if [ ~{defined(unphased_trgt_vcf)} ]; then
-            bcftools sort ~{samplename}_phased_trgt.vcf.gz -O z -o ~{samplename}_phased_trgt.sorted.vcf.gz
-            tabix -p vcf ~{samplename}_phased_trgt.sorted.vcf.gz
-        fi
-
-
+        
     >>>
 
     output {
