@@ -174,7 +174,7 @@ task PreprocessCaseReads {
 
         # filter out read pairs containing N nucleotides
         # TODO move functionality into KAGE code
-        samtools view --reference ~{reference_fasta} -@ $(nproc) --regions-file chromosomes.bed -u ~{input_cram} | \
+        samtools view --reference ~{reference_fasta} -@ $(nproc) --regions-file chromosomes.bed -u -X ~{input_cram} ~{input_cram_idx} | \
             samtools fasta --reference ~{reference_fasta} -@ $(nproc) | \
             sed -E '~{filter_N_regex}' > ~{output_prefix}.preprocessed.fasta
     }
@@ -222,7 +222,7 @@ task PreprocessCaseReadsWithoutSubsetting {
 
         # filter out read pairs containing N nucleotides
         # TODO move functionality into KAGE code
-        samtools fasta --reference ~{reference_fasta} -@ $(nproc) ~{input_cram} | sed -E '~{filter_N_regex}' > ~{output_prefix}.preprocessed.fasta
+        samtools fasta --reference ~{reference_fasta} -@ $(nproc) -X ~{input_cram} ~{input_cram_idx} | sed -E '~{filter_N_regex}' > ~{output_prefix}.preprocessed.fasta
     }
 
     runtime {
