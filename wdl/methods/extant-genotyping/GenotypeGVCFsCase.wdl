@@ -41,6 +41,7 @@ workflow GenotypeGVCFsCase {
             ref_dict = ref_dict,
             output_prefix = output_prefix,
             use_bcftools = use_bcftools,
+            is_dragen = is_dragen,
             gatk_docker = gatk_docker,
             runtime_attributes = runtime_attributes,
             monitoring_script = monitoring_script
@@ -65,6 +66,7 @@ task GenotypeGVCFs {
         File ref_dict
         String output_prefix
         Boolean use_bcftools
+        Boolean is_dragen
         String? extra_args = "--allow-old-rms-mapping-quality-annotation-data"     # This is needed for gVCFs generated with GATK3 HaplotypeCaller
 
         String gatk_docker
