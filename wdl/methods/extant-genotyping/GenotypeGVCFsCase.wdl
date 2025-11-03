@@ -85,9 +85,9 @@ task GenotypeGVCFs {
         if [ ~{use_bcftools} ]; then
             if [ ~{is_dragen} ]; then
                 bcftools view ~{"-T " + intervals} ~{gvcf} | \
-                bcftools annotate -x FORMAT/AF | \
+                bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO | \
                 bcftools norm --threads $(nproc) -m-any | \
-                bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO -e 'ALT="<NON_REF>"' \
+                bcftools view -e 'ALT="<NON_REF>"' \
                     -Oz -o ~{output_prefix}.vcf.gz
             else
                 bcftools norm --threads $(nproc) -m-any ~{"-T " + intervals} ~{gvcf} | \
