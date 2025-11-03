@@ -23,6 +23,7 @@ workflow GenotypeGVCFsCase {
         String output_prefix
 
         Boolean use_bcftools = true
+        Boolean is_dragen = false
 
         String gatk_docker = "us.gcr.io/broad-gatk/gatk:4.6.1.0"
         RuntimeAttributes runtime_attributes = {}
@@ -80,9 +81,16 @@ task GenotypeGVCFs {
         fi
 
         if [ ~{use_bcftools} ]; then
-            bcftools norm --threads $(nproc) -m-any ~{"-T " + intervals} ~{gvcf} | \
+            if [ ~{is_dragen} ]; then
+                bcftools annotate -x FORMAT/AF ~{"-T " + intervals} ~{gvcf} | \
+                bcftools norm --threads $(nproc) -m-any | \
                 bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO -e 'ALT="<NON_REF>"' \
                     -Oz -o ~{output_prefix}.vcf.gz
+            else
+                bcftools norm --threads $(nproc) -m-any ~{"-T " + intervals} ~{gvcf} | \
+                    bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO -e 'ALT="<NON_REF>"' \
+                        -Oz -o ~{output_prefix}.vcf.gz
+            fi
             bcftools index -t ~{output_prefix}.vcf.gz
         else
             gatk --java-options "-Xmx~{default=6 runtime_attributes.command_mem_gb}G" \
