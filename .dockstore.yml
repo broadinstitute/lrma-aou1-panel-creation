@@ -30,6 +30,9 @@ workflows:
 - name: GLIMPSE2BatchedCaseShardedSingleBatch
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/extant-genotyping/GLIMPSE2BatchedCaseShardedSingleBatch.wdl
+- name: AnnotateAndPop
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/extant-genotyping/AnnotateAndPop.wdl
 - name: GLIMPSEBatchedCasePerChromosome
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/kage/GLIMPSEBatchedCasePerChromosome.wdl
