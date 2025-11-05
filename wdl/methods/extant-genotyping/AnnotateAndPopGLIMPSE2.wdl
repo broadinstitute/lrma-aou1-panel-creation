@@ -82,8 +82,9 @@ task AnnotateAndPop {
         set -euox pipefail
 
         bcftools annotate -r ~{chromosome} -a ~{panel_split_vcf_gz} ~{posteriors_vcf_gz} \
-            -c CHROM,POS,REF,ALT,ID:=INFO/ID,INFO/ID:=INFO/ID \
-            -Oz -o ~{output_prefix}.annotated.vcf.gz
+            -c CHROM,POS,REF,ALT,ID:=INFO/ID,INFO/ID:=INFO/ID | \
+            bcftools norm -m+any -N \
+                -Oz -o ~{output_prefix}.annotated.vcf.gz
         bcftools index -t ~{output_prefix}.annotated.vcf.gz
 
         # modified version of convert-to-biallelic.py
