@@ -48,7 +48,7 @@ workflow AnnotateAndPop {
             input:
                 vcf_gzs = ChromosomeAnnotateAndPop.annotated_and_popped_vcf_gz,
                 vcf_gz_tbis = ChromosomeAnnotateAndPop.annotated_and_popped_vcf_gz_tbi,
-                output_prefix = output_prefixes[i],
+                output_prefix = output_prefixes[i] + ".annotated-popped",
                 docker = docker
         }
     }
