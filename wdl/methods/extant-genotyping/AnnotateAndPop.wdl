@@ -13,7 +13,7 @@ struct RuntimeAttributes {
 
 workflow AnnotateAndPop {
     input {
-        Array[File] posteriors_vcf_gzs          # whole-genome, per-batch, multiallelic GLIMPSE2
+        Array[File] posteriors_vcf_gzs          # whole-genome, per-batch, biallelic GLIMPSE2
         Array[File] posteriors_vcf_gz_tbis
         Array[File] panel_split_vcf_gzs         # per-chromosome
         Array[File] panel_split_vcf_gz_tbis
@@ -48,7 +48,7 @@ workflow AnnotateAndPop {
             input:
                 vcf_gzs = ChromosomeAnnotateAndPop.annotated_and_popped_vcf_gz,
                 vcf_gz_tbis = ChromosomeAnnotateAndPop.annotated_and_popped_vcf_gz_tbi,
-                output_prefix = output_prefixes[i] + ".annotated-popped",
+                output_prefix = output_prefixes[i],
                 docker = docker
         }
     }
@@ -82,9 +82,8 @@ task AnnotateAndPop {
         set -euox pipefail
 
         bcftools annotate -r ~{chromosome} -a ~{panel_split_vcf_gz} ~{posteriors_vcf_gz} \
-            -c CHROM,POS,REF,ALT,ID:=INFO/ID,INFO/ID:=INFO/ID | \
-            bcftools norm -m+any -N \
-                -Oz -o ~{output_prefix}.annotated.vcf.gz
+            -c CHROM,POS,REF,ALT,ID:=INFO/ID,INFO/ID:=INFO/ID \
+            -Oz -o ~{output_prefix}.annotated.vcf.gz
         bcftools index -t ~{output_prefix}.annotated.vcf.gz
 
         # modified version of convert-to-biallelic.py
@@ -149,12 +148,13 @@ task AnnotateAndPop {
                     #    continue
                     # collect all variant IDs in this region
                     ids = set([])
+                    if len(info_field['ID'].split(',')) > 1:
+                        raise 'VCF should be biallelic'
                     bubble_id = info_field['ID']
-                    for bubble_id in info_field['ID'].split(','):
-                        for assigned_id in bubble_id.split(':'):
-                            variants = chrom_to_variants[fields[0]][assigned_id]
-                            if variants:
-                                ids.add((assigned_id, int(variants[0])))
+                    for assigned_id in bubble_id.split(':'):
+                        variants = chrom_to_variants[fields[0]][assigned_id]
+                        if variants:
+                            ids.add((assigned_id, int(variants[0])))
                     # sort the ids by the starting coordinate (to ensure the VCF is sorted)
                     ids = list(ids)
                     ids.sort(key=lambda x : x[1])
@@ -169,8 +169,8 @@ task AnnotateAndPop {
                         vcf_line[3] = chrom_to_variants[fields[0]][var_id][1]
                         # set ALT
                         vcf_line[4] = chrom_to_variants[fields[0]][var_id][2]
-                        # set INFO/ID to ID
-                        vcf_line[7] = 'ID=' + var_id
+                        # set INFO/ID to bubble ID
+                        vcf_line[7] = 'ID=' + bubble_id
                         # also add other INFO fields (except ID which was replaced)
                         for k,v in info_field.items():
                             if k == 'ID':
