@@ -19,7 +19,6 @@ workflow StatisticalPhasingFromPanGenie {
         File pangenie_vcf_gz        # cohort, whole genome, multiallelic
         File pangenie_vcf_gz_tbi
         Array[String]+ chromosomes
-        Array[File]+ genetic_maps
         String output_prefix
 
         String docker
