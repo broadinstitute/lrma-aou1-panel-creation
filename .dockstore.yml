@@ -12,7 +12,7 @@ workflows:
 - name: FixVariantCollisions
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/FixVariantCollisions.wdl
-  - name: StatisticalPhasingFromPanGenie
+- name: StatisticalPhasingFromPanGenie
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/StatisticalPhasingFromPanGenie.wdl
 - name: KAGEPanelWithPreprocessing
