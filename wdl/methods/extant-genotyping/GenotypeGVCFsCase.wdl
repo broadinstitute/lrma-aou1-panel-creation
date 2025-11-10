@@ -82,8 +82,8 @@ task GenotypeGVCFs {
             bash ~{monitoring_script} > monitoring.log &
         fi
 
-        if [ ~{use_bcftools} ]; then
-            if [ ~{is_dragen} ]; then
+        if ~{use_bcftools}; then
+            if ~{is_dragen}; then
                 bcftools view ~{"-T " + intervals} ~{gvcf} | \
                 bcftools annotate -x ^FORMAT/GT,^FORMAT/GQ,^FORMAT/PL,QUAL,INFO | \
                 bcftools norm --threads $(nproc) -m-any | \
