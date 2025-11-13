@@ -733,6 +733,7 @@ task FilterAndConcatVcfs {
         String region
         File reference_fasta
         File reference_fasta_fai
+        Int length_threshold = 50
         String? filter_and_concat_short_filter_args = "-i 'MAC>=2'"
         String? filter_and_concat_sv_filter_args = "-i 'MAC>=2'"
 
@@ -747,17 +748,29 @@ task FilterAndConcatVcfs {
             -r ~{region} \
             --write-index -Oz -o ~{prefix}.SV.vcf.gz
 
+        # filter SV length variants (>=50bp)
+        bcftools query -i 'abs(strlen(ALT)-strlen(REF))>=~{length_threshold}' \
+                       -f '%CHROM\t%POS\t%REF\t%ALT\t[%GT]\n' \
+                       ~{prefix}.SV.vcf.gz -Oz -o ~{prefix}.SV.filtered.vcf.gz
+        bcftools index -t ~{prefix}.SV.filtered.vcf.gz
+
         # filter short singletons and split to biallelic
         bcftools view ~{filter_and_concat_short_filter_args} ~{short_vcf} \
             -r ~{region} | \
             bcftools norm -m-any -f ~{reference_fasta} | \
             bcftools sort \
             --write-index -Oz -o ~{prefix}.short.vcf.gz
+        
+        # filter short length variants (<50bp)
+        bcftools query -i 'abs(strlen(ALT)-strlen(REF))<~{length_threshold}' \
+                       -f '%CHROM\t%POS\t%REF\t%ALT\t[%GT]\n' \
+                       ~{prefix}.short.vcf.gz -Oz -o ~{prefix}.short.filtered.vcf.gz
+        bcftools index -t ~{prefix}.short.filtered.vcf.gz
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
         bcftools concat \
-            ~{prefix}.SV.vcf.gz \
-            ~{prefix}.short.vcf.gz \
+            ~{prefix}.SV.filtered.vcf.gz \
+            ~{prefix}.short.filtered.vcf.gz \
             --allow-overlaps --remove-duplicates \
             -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
