@@ -770,9 +770,9 @@ task FilterAndConcatVcfs {
 
     #########################
     RuntimeAttr default_attr = object {
-        cpu_cores:          2,
-        mem_gb:             8,
-        disk_gb:            50,
+        cpu_cores:          4,
+        mem_gb:             16,
+        disk_gb:            500,
         boot_disk_gb:       10,
         preemptible_tries:  2,
         max_retries:        1,
