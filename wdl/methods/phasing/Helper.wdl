@@ -563,7 +563,7 @@ task LigateVcfs {
         RuntimeAttr? runtime_attr_override
     }
 
-    Int disk_size = 2*ceil(size(vcfs, "GB")) + 1
+    Int disk_size = 2*ceil(size(vcfs, "GB")) + 100
 
     command <<<
         set -euxo pipefail
