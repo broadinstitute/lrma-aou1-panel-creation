@@ -563,7 +563,7 @@ task LigateVcfs {
         RuntimeAttr? runtime_attr_override
     }
 
-    Int disk_size = 2*ceil(size(vcfs, "GB")) + 100
+    Int disk_size = 2*ceil(size(vcfs, "GB")) + 1000
 
     command <<<
         set -euxo pipefail
@@ -681,7 +681,7 @@ task BcftoolsConcatBCFs {
         RuntimeAttr? runtime_attr_override
     }
 
-    Int disk_size = 2*ceil(size(vcfs, "GB")) + 1
+    Int disk_size = 2*ceil(size(vcfs, "GB")) + 1000
 
     command <<<
         set -euxo pipefail
@@ -772,7 +772,7 @@ task FilterAndConcatVcfs {
     RuntimeAttr default_attr = object {
         cpu_cores:          4,
         mem_gb:             16,
-        disk_gb:            500,
+        disk_gb:            1000,
         boot_disk_gb:       10,
         preemptible_tries:  2,
         max_retries:        1,
