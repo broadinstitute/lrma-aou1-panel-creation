@@ -774,7 +774,7 @@ task FilterAndConcatVcfs {
         mem_gb:             16,
         disk_gb:            1000,
         boot_disk_gb:       10,
-        preemptible_tries:  2,
+        preemptible_tries:  0,
         max_retries:        1,
         docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
     }

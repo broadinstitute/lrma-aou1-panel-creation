@@ -30,3 +30,6 @@ workflows:
 - name: LigateVcf
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/LigateVcf.wdl
+- name: StatisticalPhasingPhase2
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/StatisticalPhasing_phase2.wdl
