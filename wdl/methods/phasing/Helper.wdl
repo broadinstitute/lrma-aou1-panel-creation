@@ -749,8 +749,7 @@ task FilterAndConcatVcfs {
             --write-index -Oz -o ~{prefix}.SV.vcf.gz
 
         # filter SV length variants (>=50bp)
-        bcftools query -i 'abs(strlen(ALT)-strlen(REF))>=~{length_threshold}' \
-                       -f '%CHROM\t%POS\t%REF\t%ALT\t[%GT]\n' \
+        bcftools filter -i 'abs(strlen(ALT)-strlen(REF))>=~{length_threshold}' \
                        ~{prefix}.SV.vcf.gz -Oz -o ~{prefix}.SV.filtered.vcf.gz
         bcftools index -t ~{prefix}.SV.filtered.vcf.gz
 
@@ -762,10 +761,8 @@ task FilterAndConcatVcfs {
             --write-index -Oz -o ~{prefix}.short.vcf.gz
         
         # filter short length variants (<50bp)
-        bcftools query -i 'abs(strlen(ALT)-strlen(REF))<~{length_threshold}' \
-                       -f '%CHROM\t%POS\t%REF\t%ALT\t[%GT]\n' \
-                       ~{prefix}.short.vcf.gz -o ~{prefix}.short.filtered.vcf
-        bcftools view ~{prefix}.short.filtered.vcf -Oz -o ~{prefix}.short.filtered.vcf.gz
+        bcftools filter -i 'abs(strlen(ALT)-strlen(REF))<~{length_threshold}' \
+                       ~{prefix}.short.vcf.gz -Oz -o ~{prefix}.short.filtered.vcf.gz
         bcftools index -t ~{prefix}.short.filtered.vcf.gz
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
