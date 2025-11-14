@@ -705,7 +705,7 @@ task BcftoolsConcatBCFs {
         mem_gb:             8,
         disk_gb:            disk_size,
         boot_disk_gb:       10,
-        preemptible_tries:  2,
+        preemptible_tries:  0,
         max_retries:        1,
         docker:"hangsuunc/shapeit5:v1"
     }
