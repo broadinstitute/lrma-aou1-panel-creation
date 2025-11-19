@@ -734,7 +734,6 @@ task FilterAndConcatVcfs {
         String region
         File reference_fasta
         File reference_fasta_fai
-        Int length_threshold = 50
         String? filter_and_concat_short_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))<50'"
         String? filter_and_concat_sv_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))>=50'"
 

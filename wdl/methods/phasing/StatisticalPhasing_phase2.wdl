@@ -61,8 +61,8 @@ workflow StatisticalPhasing {
                 reference_fasta = reference_fasta,
                 reference_fasta_fai = reference_fasta_fai,
                 region = s_region,
-                filter_and_concat_short_filter_args = "-i 'MAC>=2'",
-                filter_and_concat_sv_filter_args = "-i 'MAC>=2'",
+                filter_and_concat_short_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))<50'",
+                filter_and_concat_sv_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))>=50'",
             }
         } 
     }
