@@ -31,16 +31,14 @@ workflow StatisticalPhasing {
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit)
 
 
-    call H.CreateChunks as SubsetCreateChunks { input:
-        vcf = select_first([joint_sv_vcf,joint_short_vcf]),
-        tbi = select_first([joint_sv_vcf_tbi,joint_short_vcf_tbi]),
-        region = region,
-        prefix = prefix + "subset.chunks",
-        extra_chunk_args = "--thread 4 --window-size 50000 --buffer-size 0"
+    call H.split_into_shard as SubsetCreateChunks { input:
+        locus = region,
+        bin_size = 1000000,
+        pad_size = 0,
+        output_prefix = prefix + ".subset_create_chunks"
     }
-    Array[String] subset_region_list = read_lines(SubsetCreateChunks.chunks)
 
-    scatter (s_region in subset_region_list) {
+    scatter (s_region in SubsetCreateChunks.locuslist) {
         call H.SubsetVCF as SubsetVcfShort { input:
             vcf_gz = joint_short_vcf,
             locus = s_region
@@ -69,18 +67,18 @@ workflow StatisticalPhasing {
         } 
     }
 
-    call H.BcftoolsConcatBCFs as ConcatSubsets { input:
+    call H.bcftools_concat_naive as ConcatSubsets { input:
         vcfs = select_all(select_first([FilterAndConcatVcfs.filter_and_concat_vcf,SubsetVcfShort.subset_vcf])),
-        vcf_idxs = select_all(select_first([FilterAndConcatVcfs.filter_and_concat_vcf_tbi,SubsetVcfShort.subset_tbi])),
+        vcf_tbis = select_all(select_first([FilterAndConcatVcfs.filter_and_concat_vcf_tbi,SubsetVcfShort.subset_tbi])),
         prefix = prefix + ".subset.concat"
     }
 
     call H.CreateChunks as CreateChunks { input:
-        vcf = ConcatSubsets.concated_bcf,
-        tbi = ConcatSubsets.concated_bcf_index,
+        vcf = ConcatSubsets.concatenated_vcf,
+        tbi = ConcatSubsets.concatenated_vcf_tbi,
         region = region,
         prefix = prefix + ".chunks",
-        extra_chunk_args = "--thread 4 --window-size 50000 --buffer-size 5000"
+        extra_chunk_args = "--thread 4 --window-size 2000000 --buffer-size 200000"
     }
 
     Array[String] region_list = read_lines(CreateChunks.chunks)
@@ -88,8 +86,8 @@ workflow StatisticalPhasing {
     scatter (i in range(length(region_list))) {
         if (shapeit5) {
             call H.shapeit5_phase_common as Shapeit5_phase_common { input:
-                vcf_input = ConcatSubsets.concated_bcf,
-                vcf_index = ConcatSubsets.concated_bcf_index,
+                vcf_input = ConcatSubsets.concatenated_vcf,
+                vcf_index = ConcatSubsets.concatenated_vcf_tbi,
                 mappingfile = genetic_mapping_dict[chromosome],
                 region = region_list[i],
                 prefix = prefix + ".filter_and_concat.phased",
@@ -100,8 +98,8 @@ workflow StatisticalPhasing {
         } 
         if (!shapeit5) {
             call H.Shapeit4 as Shapeit4 { input:
-                vcf_input = ConcatSubsets.concated_bcf,
-                vcf_index = ConcatSubsets.concated_bcf_index,
+                vcf_input = ConcatSubsets.concatenated_vcf,
+                vcf_index = ConcatSubsets.concatenated_vcf_tbi,
                 mappingfile = genetic_mapping_dict[chromosome],
                 region = region_list[i],
                 prefix = prefix + ".filter_and_concat.phased",
@@ -121,8 +119,8 @@ workflow StatisticalPhasing {
     if (shapeit5) {
         scatter (i in range(length(region_list))) {
             call H.shapeit5_phase_rare as Shapeit5_phase_rare { input:
-                vcf_input = ConcatSubsets.concated_bcf,
-                vcf_index = ConcatSubsets.concated_bcf_index,
+                vcf_input = ConcatSubsets.concatenated_vcf,
+                vcf_index = ConcatSubsets.concatenated_vcf_tbi,
                 scaffold_bcf = LigateScaffold.ligated_vcf_gz,
                 scaffold_bcf_index = LigateScaffold.ligated_vcf_gz_tbi,
                 mappingfile = genetic_mapping_dict[chromosome],

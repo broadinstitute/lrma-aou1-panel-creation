@@ -135,9 +135,10 @@ task SubsetVCF {
 
     command <<<
         set -euxo pipefail
-        cp ~{vcf_gz} tmp.bcf
-        bcftools index tmp.bcf
-        bcftools view tmp.bcf --regions ~{locus} -O b -o ~{prefix}.bcf
+        if ! ~{defined(vcf_tbi)}; then
+            bcftools index ~{vcf_gz}
+        fi
+        bcftools view ~{vcf_gz} --regions ~{locus} -O b -o ~{prefix}.bcf
         bcftools index ~{prefix}.bcf
     >>>
 
@@ -734,8 +735,8 @@ task FilterAndConcatVcfs {
         File reference_fasta
         File reference_fasta_fai
         Int length_threshold = 50
-        String? filter_and_concat_short_filter_args = "-i 'MAC>=2'"
-        String? filter_and_concat_sv_filter_args = "-i 'MAC>=2'"
+        String? filter_and_concat_short_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))<50'"
+        String? filter_and_concat_sv_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))>=50'"
 
         RuntimeAttr? runtime_attr_override
     }
@@ -748,27 +749,17 @@ task FilterAndConcatVcfs {
             -r ~{region} \
             --write-index -Oz -o ~{prefix}.SV.vcf.gz
 
-        # filter SV length variants (>=50bp)
-        bcftools filter -i 'abs(strlen(ALT)-strlen(REF))>=~{length_threshold}' \
-                       ~{prefix}.SV.vcf.gz -Oz -o ~{prefix}.SV.filtered.vcf.gz
-        bcftools index -t ~{prefix}.SV.filtered.vcf.gz
-
         # filter short singletons and split to biallelic
         bcftools view ~{filter_and_concat_short_filter_args} ~{short_vcf} \
             -r ~{region} | \
             bcftools norm -m-any -f ~{reference_fasta} | \
             bcftools sort \
             --write-index -Oz -o ~{prefix}.short.vcf.gz
-        
-        # filter short length variants (<50bp)
-        bcftools filter -i 'abs(strlen(ALT)-strlen(REF))<~{length_threshold}' \
-                       ~{prefix}.short.vcf.gz -Oz -o ~{prefix}.short.filtered.vcf.gz
-        bcftools index -t ~{prefix}.short.filtered.vcf.gz
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
         bcftools concat \
-            ~{prefix}.SV.filtered.vcf.gz \
-            ~{prefix}.short.filtered.vcf.gz \
+            ~{prefix}.SV.vcf.gz \
+            ~{prefix}.short.vcf.gz \
             --allow-overlaps --remove-duplicates \
             -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
@@ -798,5 +789,125 @@ task FilterAndConcatVcfs {
         preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
         maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+task split_into_shard {
+    input {
+        String locus
+        Int bin_size
+        Int pad_size
+        String output_prefix
+
+        Int? preemptible_tries
+    }
+
+
+    command <<<
+        set -eo pipefail
+
+        python - --locus ~{locus} \
+                 --bin_size ~{bin_size} \
+                 --pad_size ~{pad_size} \
+                 --output_file ~{output_prefix} \
+                 <<-'EOF'
+        import gzip
+        import argparse
+
+        def split_locus(locus):
+            chromosome, span = locus.split(":")
+            start, end = span.split("-")
+            return(chromosome, int(start), int(end))
+
+        def split_locus_to_intervals(locus, bin_size=15000, pad_size=500):
+            chromo, start, end = split_locus(locus)
+            bin_num = (end - start)//bin_size
+            intervals = [(chromo, start, start + bin_size + pad_size)]
+            for i in range(1, bin_num):
+                start_pos = start + i*bin_size - pad_size
+                end_pos = start_pos + bin_size + pad_size
+                intervals.append((chromo, start_pos, end_pos))
+            intervals.append((chromo, start + bin_num*bin_size - pad_size, end))
+            return(intervals)
+
+        def write_bed_file(content, output_file):
+            with open(output_file, "w") as f:
+                for item in content:
+                    l = "%s:%d-%d" % (item[0], item[1], item[2])
+                    f.write(l+ "\n")
+
+        def main():
+            parser = argparse.ArgumentParser()
+
+            parser.add_argument('--locus',
+                                type=str)
+
+            parser.add_argument('--output_file',
+                                type=str)
+
+            parser.add_argument('--bin_size',
+                    type=int)
+
+            parser.add_argument('--pad_size',
+                    type=int)
+
+            args = parser.parse_args()
+
+            intervals = split_locus_to_intervals(args.locus, args.bin_size, args.pad_size)
+            write_bed_file(intervals, args.output_file + ".txt")
+
+        if __name__ == "__main__":
+            main()
+        EOF
+
+    >>>
+
+    runtime {
+        docker: "us.gcr.io/broad-dsde-methods/slee/kage-lite:pr_29"
+        memory: "4 GB"
+        cpu: 1
+        disks: "local-disk 100 SSD"
+    }
+
+    output {
+        Array[String] locuslist = read_lines("~{output_prefix}.txt")
+    }
+}
+
+task bcftools_concat_naive {
+    input {
+        Array[File] vcfs
+        Array[File]? vcf_tbis
+        String prefix
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        # Index all input VCF files if no precomputed tbis provided.
+        if ! ~{defined(vcf_tbis)}; then
+            for vcf in ~{sep=" " vcfs}; do
+                bcftools index "$vcf"
+            done
+        fi
+
+        bcftools concat \
+            ~{sep=" " vcfs} \
+            -n \
+            --no-version \
+            -Oz -o ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File concatenated_vcf = "~{prefix}.vcf.gz"
+        File concatenated_vcf_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-basic:0.1.1"
+        memory: "32 GB"
+        cpu: 8
+        disks: "local-disk 1000 SSD"
     }
 }
