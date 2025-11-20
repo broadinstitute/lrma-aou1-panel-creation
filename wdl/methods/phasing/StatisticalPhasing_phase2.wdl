@@ -43,6 +43,7 @@ workflow StatisticalPhasing {
     scatter (s_region in SubsetCreateChunks.locuslist) {
         call H.SubsetVCFStreaming as SubsetVcfShort { input:
             vcf_gz = joint_short_vcf,
+            vcf_tbi = joint_short_vcf_tbi,
             locus = s_region
         }
         # if no SV VCF provided, use the short VCF as the input
