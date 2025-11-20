@@ -826,8 +826,8 @@ task FilterAndConcatVcfs {
         bcftools concat \
             ~{prefix}.SV.vcf.gz \
             ~{prefix}.short.vcf.gz \
-            --allow-overlaps --remove-duplicates \
-            -Oz -o ~{prefix}.vcf.gz
+            --allow-overlaps --remove-duplicates | \
+            bcftools sort -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     }
 
