@@ -8,7 +8,7 @@ workflow StatisticalPhasing {
     input {
 
         File joint_short_vcf
-        File? joint_short_vcf_tbi
+        File joint_short_vcf_tbi
         File? joint_sv_vcf
         File? joint_sv_vcf_tbi
         File reference_fasta
@@ -17,15 +17,17 @@ workflow StatisticalPhasing {
         String chromosome
         String region
         String prefix
-        String gcs_out_root_dir
-        Int shapeit_num_threads
-        String shapeit5_rare_extra_args
-        Int merge_num_threads = 4
+
+        String extra_chunk_args = "--thread $(nproc) --window-size 2000000 --buffer-size 200000"
+
+        String filter_and_concat_short_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))<50'"
+        String filter_and_concat_sv_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))>=50'"
 
         Boolean shapeit5 = true
-
+        Int shapeit_num_threads
         Int shapeit_memory
-        String shapeit5_common_extra_args 
+        String shapeit5_common_extra_args
+        String shapeit5_rare_extra_args
     }
 
     Map[String, String] genetic_mapping_dict = read_map(genetic_mapping_tsv_for_shapeit)
@@ -39,7 +41,7 @@ workflow StatisticalPhasing {
     }
 
     scatter (s_region in SubsetCreateChunks.locuslist) {
-        call H.SubsetVCF as SubsetVcfShort { input:
+        call H.SubsetVCFStreaming as SubsetVcfShort { input:
             vcf_gz = joint_short_vcf,
             locus = s_region
         }
@@ -61,8 +63,8 @@ workflow StatisticalPhasing {
                 reference_fasta = reference_fasta,
                 reference_fasta_fai = reference_fasta_fai,
                 region = s_region,
-                filter_and_concat_short_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))<50'",
-                filter_and_concat_sv_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))>=50'",
+                filter_and_concat_short_filter_args = filter_and_concat_short_filter_args,
+                filter_and_concat_sv_filter_args = filter_and_concat_sv_filter_args
             }
         } 
     }
@@ -78,7 +80,7 @@ workflow StatisticalPhasing {
         tbi = ConcatSubsets.concatenated_vcf_tbi,
         region = region,
         prefix = prefix + ".chunks",
-        extra_chunk_args = "--thread 4 --window-size 2000000 --buffer-size 200000"
+        extra_chunk_args = extra_chunk_args
     }
 
     Array[String] region_list = read_lines(CreateChunks.chunks)

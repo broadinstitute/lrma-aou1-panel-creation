@@ -169,6 +169,73 @@ task SubsetVCF {
     }
 }
 
+task SubsetVCFStreaming {
+
+    meta {
+        description: "Subset a VCF file to a given locus"
+    }
+
+    parameter_meta {
+        vcf_gz: {
+            description: "VCF file to be subsetted",
+            localization_optional: true
+        }
+        vcf_tbi: {
+            description: "Tabix index for the VCF file",
+            localization_optional: true
+        }
+        locus: "Locus to be subsetted"
+        prefix: "Prefix for the output file"
+        runtime_attr_override: "Override default runtime attributes"
+    }
+
+    input {
+        File vcf_gz
+        File vcf_tbi
+        String locus
+        String prefix = "subset"
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Int disk_size = 2*ceil(size([vcf_gz, vcf_tbi], "GB")) + 100
+
+    command <<<
+        set -euxo pipefail
+
+        export GCS_OAUTH_TOKEN=$(gcloud auth application-default print-access-token)
+
+        bcftools --no-version view ~{vcf_gz} --regions ~{locus} -Oz -o ~{prefix}.vcf.gz
+        bcftools index -t ~{prefix}.vcf.gz
+    >>>
+
+    output {
+        File subset_vcf = "~{prefix}.vcf.gz"
+        File subset_tbi = "~{prefix}.vcf.gz.tbi"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          1,
+        mem_gb:             16,
+        disk_gb:            disk_size,
+        boot_disk_gb:       10,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:             "us.gcr.io/broad-dsp-lrma/lr-utils:0.1.9"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
 
 task SubsetBam {
 
