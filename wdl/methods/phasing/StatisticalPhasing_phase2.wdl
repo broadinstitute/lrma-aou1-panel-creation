@@ -24,7 +24,7 @@ workflow StatisticalPhasing {
         String filter_and_concat_sv_filter_args = "-i 'MAC>=2 && abs(strlen(ALT)-strlen(REF))>=50'"
 
         Boolean shapeit5 = true
-        Int shapeit_num_threads
+        Int shapeit_cpu
         Int shapeit_memory
         String shapeit5_common_extra_args
         String shapeit5_rare_extra_args
@@ -94,7 +94,7 @@ workflow StatisticalPhasing {
                 mappingfile = genetic_mapping_dict[chromosome],
                 region = region_list[i],
                 prefix = prefix + ".filter_and_concat.phased",
-                num_threads = shapeit_num_threads,
+                cpu = shapeit_cpu,
                 memory = shapeit_memory,
                 extra_args = shapeit5_common_extra_args
             }
@@ -106,7 +106,7 @@ workflow StatisticalPhasing {
                 mappingfile = genetic_mapping_dict[chromosome],
                 region = region_list[i],
                 prefix = prefix + ".filter_and_concat.phased",
-                num_threads = shapeit_num_threads,
+                cpu = shapeit_cpu,
                 memory = shapeit_memory
             }
         }
@@ -131,7 +131,7 @@ workflow StatisticalPhasing {
                 scaffold_region = region,
                 prefix = prefix + ".chunk.phase.rare.phased",
                 chunknum = i,
-                num_threads = shapeit_num_threads,
+                cpu = shapeit_cpu,
                 memory = shapeit_memory,
                 extra_args = shapeit5_rare_extra_args
             }
