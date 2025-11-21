@@ -36,6 +36,6 @@ workflows:
 - name: Vcfdist_switch
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/Vcfdist.wdl
-- name: PhysicalPhasing
+- name: PhysicalPhasingPhase2
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasing.wdl
