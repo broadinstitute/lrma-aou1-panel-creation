@@ -33,3 +33,6 @@ workflows:
 - name: StatisticalPhasingPhase2
   subclass: wdl
   primaryDescriptorPath: /wdl/methods/phasing/StatisticalPhasing_phase2.wdl
+- name: Vcfdist_switch
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/evaluation/phased-panel/Vcfdist.wdl
