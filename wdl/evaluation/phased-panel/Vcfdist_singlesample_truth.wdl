@@ -20,7 +20,7 @@ struct OverlapMetricsOutputs {
 workflow VcfdistAndOverlapMetricsEvaluation {
     input {
         Array[String] samples
-        File truth_vcf
+        Array[File] truth_vcfs
         Array[File] confident_regions_bed_files
         File eval_vcf
         File? eval_vcf_idx
@@ -35,6 +35,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
     scatter (i in range(length(samples))) {
         String sample = samples[i]
+        File truth_vcf = truth_vcfs[i]
 
         call SubsetSampleFromVcf as SubsetSampleFromVcfEval { input:
             vcf = eval_vcf,
