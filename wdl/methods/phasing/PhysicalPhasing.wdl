@@ -81,8 +81,8 @@ workflow PhysicalAndStatisticalPhasing {
         File hiphase_short_tbi = select_first([HiPhase.phased_snp_vcf_tbi, HiphaseTrgt.phased_snp_vcf_tbi]) 
         File hiphase_sv_vcf = select_first([HiPhase.phased_sv_vcf, HiphaseTrgt.phased_sv_vcf])
         File hiphase_sv_tbi = select_first([HiPhase.phased_sv_vcf_tbi, HiphaseTrgt.phased_sv_vcf_tbi])
-        File? hiphase_trgt_vcf = select_first([HiphaseTrgt.phased_trgt_vcf])
-        File? hiphase_trgt_tbi = select_first([HiphaseTrgt.phased_trgt_vcf_tbi])
+        File? hiphase_trgt_vcf = HiphaseTrgt.phased_trgt_vcf
+        File? hiphase_trgt_tbi = HiphaseTrgt.phased_trgt_vcf_tbi
     }
 }
 
