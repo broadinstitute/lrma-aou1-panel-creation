@@ -76,8 +76,8 @@ task HiPhase {
         --verbose \
         ~{extra_args}
 
-        bcftools index -t ~{samplename}_phased_snp.vcf.gz
-        bcftools index -t ~{samplename}_phased_sv.vcf.gz
+        # bcftools index -t ~{samplename}_phased_snp.vcf.gz
+        # bcftools index -t ~{samplename}_phased_sv.vcf.gz
 
         # bcftools sort ~{samplename}_phased_snp.vcf.gz -O z -o ~{samplename}_phased_snp.sorted.vcf.gz
         # tabix -p vcf ~{samplename}_phased_snp.sorted.vcf.gz
@@ -187,9 +187,9 @@ task HiPhaseTRGT {
         --verbose \
         ~{extra_args}
 
-        bcftools index -t ~{samplename}_phased_snp.vcf.gz
-        bcftools index -t ~{samplename}_phased_sv.vcf.gz
-        bcftools index -t ~{samplename}_phased_trgt.vcf.gz
+        # bcftools index -t ~{samplename}_phased_snp.vcf.gz
+        # bcftools index -t ~{samplename}_phased_sv.vcf.gz
+        # bcftools index -t ~{samplename}_phased_trgt.vcf.gz
         # bcftools sort ~{samplename}_phased_snp.vcf.gz -O z -o ~{samplename}_phased_snp.sorted.vcf.gz
         # tabix -p vcf ~{samplename}_phased_snp.sorted.vcf.gz
 
