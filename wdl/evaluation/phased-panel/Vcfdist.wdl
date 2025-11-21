@@ -118,6 +118,7 @@ task SubsetSampleFromVcf {
         bcftools index -t ~{sample}.subset.reheadered.g.vcf.gz
     >>>
     
+    
     output {
         File single_sample_vcf = "~{sample}.subset.reheadered.g.vcf.gz"
         File single_sample_vcf_tbi = "~{sample}.subset.reheadered.g.vcf.gz.tbi"
