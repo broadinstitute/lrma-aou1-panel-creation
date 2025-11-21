@@ -92,7 +92,7 @@ task ConvertLowerCase {
         String prefix
     }
     String docker_dir = "/truvari_intrasample"
-    String work_dir = "/cromwell_root/truvari_intrasample"
+    String work_dir = "/mnt/disks/cromwell_root/truvari_intrasample"
 
     command <<<
         set -euxo pipefail
