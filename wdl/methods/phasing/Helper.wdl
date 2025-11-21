@@ -448,7 +448,7 @@ task Shapeit4 {
         File mappingfile
         String region
         String prefix
-        Int num_threads
+        Int cpu
         Int memory
         String extra_args
 
@@ -467,7 +467,7 @@ task Shapeit4 {
                 --region ~{region} \
                 --sequencing \
                 --output ~{prefix}.bcf \
-                --thread ~{num_threads} \
+                --thread $(nproc) \
                 ~{extra_args}
         bcftools index ~{prefix}.bcf
 
@@ -484,7 +484,7 @@ task Shapeit4 {
 
  #########################
     RuntimeAttr default_attr = object {
-        cpu_cores:          num_threads,
+        cpu_cores:          cpu,
         mem_gb:             memory,
         disk_gb:            100,
         boot_disk_gb:       100,
@@ -512,8 +512,8 @@ task shapeit5_phase_common{
         File mappingfile
         String region
         String prefix
+        Int cpu
         Int memory
-        Int num_threads
         String extra_args
         Float minimal_maf = 0.01
 
@@ -529,7 +529,7 @@ task shapeit5_phase_common{
                             --region ~{region} \
                             --map ~{mappingfile} \
                             --output scaffold.bcf \
-                            --thread ~{num_threads} \
+                            --thread $(nproc) \
                             ~{extra_args}
         bcftools +fill-tags scaffold.bcf -Ob -o ~{prefix}.scaffold.bcf -- -t AN,AC
         bcftools index ~{prefix}.scaffold.bcf
@@ -544,7 +544,7 @@ task shapeit5_phase_common{
 
     #########################
     RuntimeAttr default_attr = object {
-        cpu_cores:          num_threads,
+        cpu_cores:          cpu,
         mem_gb:             memory,
         disk_gb:            100,
         boot_disk_gb:       100,
@@ -682,8 +682,8 @@ task shapeit5_phase_rare{
         String scaffold_region
         String prefix
         Int chunknum
+        Int cpu
         Int memory
-        Int num_threads
         String extra_args
 
         RuntimeAttr? runtime_attr_override
@@ -700,7 +700,7 @@ task shapeit5_phase_rare{
                     --input-region ~{chunk_region} \
                     --scaffold-region ~{scaffold_region} \
                     --output ~{prefix}.chunk.~{chunknum}.bcf \
-                    --thread ~{num_threads} \
+                    --thread $(nproc) \
                     ~{extra_args}
 
         bcftools +fill-tags ~{prefix}.chunk.~{chunknum}.bcf -Ob -o ~{prefix}.chunk.~{chunknum}.tagged.bcf -- -t AN,AC
@@ -717,7 +717,7 @@ task shapeit5_phase_rare{
 
     #########################
     RuntimeAttr default_attr = object {
-        cpu_cores:          num_threads,
+        cpu_cores:          cpu,
         mem_gb:             memory,
         disk_gb:            100,
         boot_disk_gb:       100,
