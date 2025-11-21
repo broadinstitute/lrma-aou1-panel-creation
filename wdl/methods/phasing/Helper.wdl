@@ -205,7 +205,7 @@ task SubsetVCFStreaming {
 
         export GCS_OAUTH_TOKEN=$(gcloud auth application-default print-access-token)
 
-        bcftools --no-version view ~{vcf_gz} --regions ~{locus} -Oz -o ~{prefix}.vcf.gz
+        bcftools view --no-version ~{vcf_gz} --regions ~{locus} -Oz -o ~{prefix}.vcf.gz
         bcftools index -t ~{prefix}.vcf.gz
     >>>
 
