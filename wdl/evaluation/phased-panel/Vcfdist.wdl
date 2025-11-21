@@ -49,7 +49,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
         call SubsetSampleFromVcf as SubsetSampleFromVcfTruth { input:
             vcf = truth_vcf,
-            original_sample_name = "syndip",
+            original_sample_name = sample,
             sample = sample,
             region = region,
             bed_file = confident_regions_bed_files[i],
@@ -117,7 +117,7 @@ task SubsetSampleFromVcf {
             -o ~{sample}.subset.reheadered.g.vcf.gz
         bcftools index -t ~{sample}.subset.reheadered.g.vcf.gz
     >>>
-    
+
     
     output {
         File single_sample_vcf = "~{sample}.subset.reheadered.g.vcf.gz"
