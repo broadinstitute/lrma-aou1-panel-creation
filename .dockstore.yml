@@ -12,6 +12,9 @@ workflows:
 - name: VcfdistAndOverlapMetricsEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/VcfdistAndOverlapMetricsEvaluation.wdl
+  - name: VcfdistAndSwitchEvaluation
+  subclass: wdl
+  primaryDescriptorPath: /wdl/evaluation/phased-panel/VcfdistAndSwitchEvaluation.wdl
 - name: PhasedPanelEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/phased-panel/PhasedPanelEvaluation.wdl
