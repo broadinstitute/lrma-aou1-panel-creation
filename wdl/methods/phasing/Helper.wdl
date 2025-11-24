@@ -817,7 +817,7 @@ task FilterAndConcatVcfs {
         bcftools index -t ~{prefix}.SV.vcf.gz
 
         # split to biallelic and filter short
-        bcftools norm -r ~{region} -m-any -f ~{reference_fasta} ~{short_vcf} | \
+        bcftools norm -r ~{region} -m-any -N -f ~{reference_fasta} ~{short_vcf} | \
             bcftools +fill-tags -- -t AF,AC,AN | \
             bcftools view ~{filter_and_concat_short_filter_args} | \
             bcftools sort -Oz -o ~{prefix}.short.vcf.gz
