@@ -21,7 +21,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
     input {
         Array[String] samples
         File truth_vcf
-        String? truth_sample_name
+        String? truth_sample_name # dipcall truth sample may be "syndip"
         Array[File] confident_regions_bed_files
         File eval_vcf
         File? eval_vcf_idx
