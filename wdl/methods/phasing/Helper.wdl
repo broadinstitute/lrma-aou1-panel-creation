@@ -844,7 +844,7 @@ task FilterAndConcatVcfs {
         boot_disk_gb:       10,
         preemptible_tries:  0,
         max_retries:        1,
-        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
+        docker:"hangsuunc/shapeit5:v1"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
     runtime {
