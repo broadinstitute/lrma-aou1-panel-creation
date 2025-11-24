@@ -24,7 +24,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
         String? truth_sample_name # dipcall truth sample may be "syndip"
         Array[File] confident_regions_bed_files
         Array[File] eval_vcfs
-        File? eval_vcf_idx
+        Array[File] eval_vcf_idx_list
         String region
         File reference_fasta
         File reference_fasta_fai
@@ -38,6 +38,8 @@ workflow VcfdistAndOverlapMetricsEvaluation {
         String sample = samples[i]
         File truth_vcf = truth_vcfs[i]
         File eval_vcf = eval_vcfs[i]
+        File eval_vcf_idx = eval_vcf_idx_list[i]
+        
         String truth_sample = select_first([truth_sample_name, sample])
 
         call SubsetSampleFromVcf as SubsetSampleFromVcfEval { input:
