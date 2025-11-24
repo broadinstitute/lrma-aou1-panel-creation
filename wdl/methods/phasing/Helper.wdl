@@ -43,8 +43,8 @@ task HiPhase {
         RuntimeAttr? runtime_attr_override
     }
 
-    # Int bam_sz = ceil(size(bam, "GB"))
-	Int disk_size = 30 # if bam_sz > 200 then 2*bam_sz else bam_sz + 200
+    Int bam_sz = ceil(size(bam, "GB"))
+	Int disk_size = bam_sz + 200 # if bam_sz > 200 then 2*bam_sz else bam_sz + 200
     Int thread_num = memory/2
 
     command <<<
@@ -148,8 +148,8 @@ task HiPhaseTRGT {
         RuntimeAttr? runtime_attr_override
     }
 
-    # Int bam_sz = ceil(size(bam, "GB"))
-	Int disk_size = 30 # if bam_sz > 200 then 2*bam_sz else bam_sz + 200
+    Int bam_sz = ceil(size(bam, "GB"))
+	Int disk_size = bam_sz + 200 # if bam_sz > 200 then 2*bam_sz else bam_sz + 200
     Int thread_num = memory/2
 
     command <<<
