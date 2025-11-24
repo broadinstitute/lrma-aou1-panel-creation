@@ -21,7 +21,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
     input {
         Array[String] samples
         File truth_vcf
-        String truth_sample_name
+        String? truth_sample_name
         Array[File] confident_regions_bed_files
         File eval_vcf
         File? eval_vcf_idx
@@ -36,6 +36,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
     scatter (i in range(length(samples))) {
         String sample = samples[i]
+        String truth_sample = select_first([truth_sample_name, sample])
 
         call SubsetSampleFromVcf as SubsetSampleFromVcfEval { input:
             vcf = eval_vcf,
@@ -49,7 +50,7 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
         call SubsetSampleFromVcf as SubsetSampleFromVcfTruth { input:
             vcf = truth_vcf,
-            original_sample_name = truth_sample_name,
+            original_sample_name = truth_sample,
             sample = sample,
             region = region,
             bed_file = confident_regions_bed_files[i],
