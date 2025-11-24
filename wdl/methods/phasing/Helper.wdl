@@ -810,17 +810,17 @@ task FilterAndConcatVcfs {
     command {
         set -euxo pipefail
 
-        # filter SV singletons
-        bcftools view ~{filter_and_concat_sv_filter_args} ~{sv_vcf} \
-            -r ~{region} \
-            --write-index -Oz -o ~{prefix}.SV.vcf.gz
+        # filter SV
+        bcftools +fill-tags -r ~{region} ~{sv_vcf} -- -t AF,AC,AN | \
+            bcftools view ~{filter_and_concat_sv_filter_args} \
+                --write-index -Oz -o ~{prefix}.SV.vcf.gz
 
-        # filter short singletons and split to biallelic
-        bcftools view ~{filter_and_concat_short_filter_args} ~{short_vcf} \
-            -r ~{region} | \
-            bcftools norm -m-any -f ~{reference_fasta} | \
+        # split to biallelic and filter short
+        bcftools norm -r ~{region} -m-any -N -f ~{reference_fasta} ~{short_vcf} | \
+            bcftools +fill-tags -- -t AF,AC,AN | \
+            bcftools view ~{filter_and_concat_short_filter_args} | \
             bcftools sort \
-            --write-index -Oz -o ~{prefix}.short.vcf.gz
+                --write-index -Oz -o ~{prefix}.short.vcf.gz
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
         bcftools concat \
