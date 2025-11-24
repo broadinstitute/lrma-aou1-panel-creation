@@ -20,10 +20,10 @@ struct OverlapMetricsOutputs {
 workflow VcfdistAndOverlapMetricsEvaluation {
     input {
         Array[String] samples
-        File truth_vcf
+        Array[File] truth_vcfs
         String? truth_sample_name # dipcall truth sample may be "syndip"
         Array[File] confident_regions_bed_files
-        File eval_vcf
+        Array[File] eval_vcfs
         File? eval_vcf_idx
         String region
         File reference_fasta
@@ -36,6 +36,8 @@ workflow VcfdistAndOverlapMetricsEvaluation {
 
     scatter (i in range(length(samples))) {
         String sample = samples[i]
+        File truth_vcf = truth_vcfs[i]
+        File eval_vcf = eval_vcfs[i]
         String truth_sample = select_first([truth_sample_name, sample])
 
         call SubsetSampleFromVcf as SubsetSampleFromVcfEval { input:
