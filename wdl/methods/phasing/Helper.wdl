@@ -813,14 +813,15 @@ task FilterAndConcatVcfs {
         # filter SV
         bcftools +fill-tags -r ~{region} ~{sv_vcf} -- -t AF,AC,AN | \
             bcftools view ~{filter_and_concat_sv_filter_args} \
-                --write-index -Oz -o ~{prefix}.SV.vcf.gz
+                -Oz -o ~{prefix}.SV.vcf.gz
+        bcftools index -t ~{prefix}.SV.vcf.gz
 
         # split to biallelic and filter short
         bcftools norm -r ~{region} -m-any -N -f ~{reference_fasta} ~{short_vcf} | \
             bcftools +fill-tags -- -t AF,AC,AN | \
             bcftools view ~{filter_and_concat_short_filter_args} | \
-            bcftools sort \
-                --write-index -Oz -o ~{prefix}.short.vcf.gz
+            bcftools sort -Oz -o ~{prefix}.short.vcf.gz
+        bcftools index -t ~{prefix}.short.vcf.gz
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
         bcftools concat \
