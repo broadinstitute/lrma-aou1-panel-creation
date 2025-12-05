@@ -21,6 +21,21 @@ workflows:
 - name: LeaveOutEvaluation
   subclass: wdl
   primaryDescriptorPath: /wdl/evaluation/kage/LeaveOutEvaluation.wdl
-- name: LeaveOneOutEvaluation
+- name: BatchSplitCohort
   subclass: wdl
-  primaryDescriptorPath: /wdl/evaluation/kage/LeaveOneOutEvaluation.wdl
+  primaryDescriptorPath: /wdl/methods/phasing/BatchSplitCohort.wdl
+- name: HierarchicalMergeVCFs
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/HierarchicalMergeVCFs.wdl
+- name: PhysicalPhasingTRGT
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasingTRGT.wdl
+- name: PhysicalPhasing_Subset
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasing_Subset.wdl
+- name: TRGTMerge
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/TRGTMerge.wdl
+- name: PhysicalPhasingShortTRGT
+  subclass: wdl
+  primaryDescriptorPath: /wdl/methods/phasing/PhysicalPhasingShortTRGT.wdl
