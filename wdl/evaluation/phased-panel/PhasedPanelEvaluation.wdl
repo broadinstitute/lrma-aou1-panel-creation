@@ -26,6 +26,7 @@ workflow PhasedPanelEvaluation {
         File joint_sv_vcf
         File joint_sv_vcf_tbi
         File genetic_mapping_tsv_for_shapeit4
+        File chunk_file_for_shapeit4
         String chromosome
         Int shapeit4_num_threads
         Int hiphase_memory
@@ -69,6 +70,7 @@ workflow PhasedPanelEvaluation {
         String leave_out_docker
         String kage_docker
         String pangenie_docker
+        Int batch_size # Merge vcf batch size
         RuntimeAttributes? leave_out_runtime_attributes
         RuntimeAttributes? leave_out_medium_runtime_attributes
         RuntimeAttributes? leave_out_large_runtime_attributes
@@ -86,6 +88,7 @@ workflow PhasedPanelEvaluation {
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
         genetic_mapping_tsv_for_shapeit4 = genetic_mapping_tsv_for_shapeit4,
+        chunk_file_for_shapeit4 = chunk_file_for_shapeit4,
         chromosome = chromosome,
         region = region,
         prefix = output_prefix,
@@ -95,11 +98,12 @@ workflow PhasedPanelEvaluation {
         hiphase_memory = hiphase_memory,
         shapeit4_memory = shapeit4_memory,
         shapeit4_extra_args = shapeit4_extra_args,
-        hiphase_extra_args = hiphase_extra_args
+        hiphase_extra_args = hiphase_extra_args,
+        batch_size = batch_size
     }
 
     call FixVariantCollisions { input:
-        phased_bcf = PhysicalAndStatisticalPhasing.phased_bcf,
+        phased_bcf = PhysicalAndStatisticalPhasing.phased_vcf,
         fix_variant_collisions_java = fix_variant_collisions_java,
         operation = operation,
         weight_tag = weight_tag,
@@ -153,7 +157,8 @@ workflow PhasedPanelEvaluation {
         vcf_input = LeaveOutEvaluation.glimpse_vcf_gzs,
         tbi_input = LeaveOutEvaluation.glimpse_vcf_gz_tbis,
         pref = output_prefix + ".glimpse.merged",
-        threads_num = merge_num_threads
+        threads_num = merge_num_threads,
+        batch_size = batch_size
     }
 
     call FixVariantCollisions as GenotypingFixVariantCollisions { input:
@@ -211,7 +216,7 @@ workflow PhasedPanelEvaluation {
     call VcfdistAndOverlapMetricsEvaluation.VcfdistAndOverlapMetricsEvaluation as EvaluateShapeit4 { input:
         samples = vcfdist_samples,
         truth_vcf = vcfdist_truth_vcf,
-        eval_vcf = PhysicalAndStatisticalPhasing.phased_bcf,
+        eval_vcf = PhysicalAndStatisticalPhasing.phased_vcf,
         region = region,
         reference_fasta = reference_fasta,
         reference_fasta_fai = reference_fasta_fai,
@@ -285,7 +290,8 @@ workflow PhasedPanelEvaluation {
             vcf_input = select_all(LeaveOutEvaluation.pangenie_vcf_gzs),
             tbi_input = select_all(LeaveOutEvaluation.pangenie_vcf_gz_tbis),
             pref = output_prefix + ".pangenie.merged",
-            threads_num = merge_num_threads
+            threads_num = merge_num_threads,
+            batch_size = batch_size
         }
 
         # summarize PanGenie metrics vs. panel
