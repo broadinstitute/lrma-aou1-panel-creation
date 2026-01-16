@@ -82,24 +82,24 @@ workflow StatisticalPhasing {
             operation = operation,
             weight_tag = weight_tag,
             is_weight_format_field = is_weight_format_field,
-            output_prefix = output_prefix
+            output_prefix = output_prefix + ".collisionless.shard-" + s,
         }
     }
 
-#    call BcftoolsConcatNaive as ConcatSubsets { input:
-#        vcfs = select_all(FixVariantCollisions.phased_collisionless_bcf),
-#        vcf_tbis = select_all(select_first([FilterAndConcatVcfs.filter_and_concat_vcf_tbi,SubsetVcfShort.subset_tbi])),
-#        output_prefix = output_prefix + ".subset.concat"
-#    }
+    call BcftoolsConcatNaive { input:
+        vcfs = FixVariantCollisions.phased_collisionless_vcf,
+        vcf_idxs = FixVariantCollisions.phased_collisionless_vcf_idx,
+        output_prefix = output_prefix + ".collisionless"
+    }
 
-#    call CreateChunks as CreateChunks { input:
-#        vcf = ConcatSubsets.concatenated_vcf,
-#        tbi = ConcatSubsets.concatenated_vcf_tbi,
-#        region = region,
-#        extra_chunk_args = extra_chunk_args
-#    }
+    call CreateShapeitChunks { input:
+        vcf = BcftoolsConcatNaive.concatenated_vcf,
+        vcf_idx = BcftoolsConcatNaive.concatenated_vcf_idx,
+        region = region,
+        extra_chunk_args = extra_chunk_args
+    }
 
-#    Array[String] region_list = read_lines(CreateChunks.common_chunks) # for shapeit4
+#    Array[String] region_list = read_lines(CreateShapeitChunks.common_chunks) # for shapeit4
 
 #    scatter (i in range(length(region_list))) {
 #        # phase common using shapeit4
@@ -146,7 +146,7 @@ workflow StatisticalPhasing {
 
 #    # phase rare
 #    if (shapeit5) {
-#        Array[String] rare_region_list = read_lines(CreateChunks.rare_chunks) # for shapeit5
+#        Array[String] rare_region_list = read_lines(CreateShapeitChunks.rare_chunks) # for shapeit5
 #        scatter (i in range(length(region_list))) {
 #            call Shapeit5PhaseRareNew as Shapeit5_phase_rare { input:
 #                vcf_input = ConcatSubsets.concatenated_vcf,
@@ -301,7 +301,7 @@ task SubsetVCF {
     command <<<
         set -euxo pipefail
 
-        bcftools view ~{vcf} --regions ~{region} -Ob -o ~{output_prefix}.bcf
+        bcftools view --no-version ~{vcf} --regions ~{region} -Ob -o ~{output_prefix}.bcf
         bcftools index ~{output_prefix}.bcf
     >>>
 
@@ -414,23 +414,23 @@ task FilterAndConcatVcfs {
 
         # filter SV
         bcftools +fill-tags --no-version -r ~{region} ~{sv_vcf} -- -t AF,AC,AN | \
-            bcftools view ~{filter_and_concat_sv_filter_args} \
+            bcftools view --no-version ~{filter_and_concat_sv_filter_args} \
                 -Ob -o ~{output_prefix}.SV.bcf
         bcftools index ~{output_prefix}.SV.bcf
 
         # split to biallelic and filter short
-        bcftools norm -r ~{region} -m-any -N -f ~{reference_fasta} ~{short_vcf} | \
+        bcftools norm --no-version -r ~{region} -m-any -N -f ~{reference_fasta} ~{short_vcf} | \
             bcftools +fill-tags --no-version -- -t AF,AC,AN | \
-            bcftools view ~{filter_and_concat_short_filter_args} | \
-            bcftools sort -Ob -o ~{output_prefix}.short.bcf
+            bcftools view --no-version ~{filter_and_concat_short_filter_args} | \
+            bcftools sort --no-version -Ob -o ~{output_prefix}.short.bcf
         bcftools index ~{output_prefix}.short.bcf
 
         # concatenate with deduplication; providing SV VCF as first argument preferentially keeps those records
-        bcftools concat \
+        bcftools concat --no-version \
             ~{output_prefix}.SV.bcf \
             ~{output_prefix}.short.bcf \
             --allow-overlaps --remove-duplicates | \
-            bcftools sort -Ob -o ~{output_prefix}.bcf
+            bcftools sort --no-version -Ob -o ~{output_prefix}.bcf
         bcftools index ~{output_prefix}.bcf
     >>>
 
@@ -480,7 +480,7 @@ task FixVariantCollisions {
         set -euxo pipefail
 
         # convert bcf to vcf.gz
-        bcftools view ~{phased_bcf} -Oz -o phased.vcf.gz
+        bcftools view --no-version ~{phased_bcf} -Oz -o phased.vcf.gz
         bcftools index -t phased.vcf.gz
 
         java ~{fix_variant_collisions_java} \
@@ -494,18 +494,18 @@ task FixVariantCollisions {
             null                            # do not output figures
 
         # replace all missing alleles (correctly) emitted with reference alleles, since this is expected by PanGenie panel-creation script
-        bcftools view collisionless.vcf | \
+        bcftools view --no-version collisionless.vcf | \
             sed -e 's/\.|0/0|0/g' | sed -e 's/0|\./0|0/g' | sed -e 's/\.|1/0|1/g' | sed -e 's/1|\./1|0/g' | sed -e 's/\.|\./0|0/g' | \
-            bcftools view -Oz -o ~{output_prefix}.phased.collisionless.vcf.gz
+            bcftools view --no-version -Oz -o ~{output_prefix}.phased.collisionless.vcf.gz
         # index and convert via vcf.gz to avoid errors from missing header lines
         bcftools index -t ~{output_prefix}.phased.collisionless.vcf.gz
-        bcftools view ~{output_prefix}.phased.collisionless.vcf.gz -Ob -o ~{output_prefix}.phased.collisionless.bcf
+        bcftools view --no-version ~{output_prefix}.phased.collisionless.vcf.gz -Ob -o ~{output_prefix}.phased.collisionless.bcf
         bcftools index ~{output_prefix}.phased.collisionless.bcf
     >>>
 
     output {
-        File phased_collisionless_bcf = "~{output_prefix}.phased.collisionless.bcf"
-        File phased_collisionless_bcf_index = "~{output_prefix}.phased.collisionless.bcf.csi"
+        File phased_collisionless_vcf = "~{output_prefix}.phased.collisionless.bcf"
+        File phased_collisionless_vcf_idx = "~{output_prefix}.phased.collisionless.bcf.csi"
         File windows = "windows.txt"
         File histogram = "histogram.txt"
     }
@@ -514,6 +514,110 @@ task FixVariantCollisions {
     RuntimeAttr default_attr = object {
         cpu_cores:          1,
         mem_gb:             16,
+        disk_gb:            disk_gb,
+        boot_disk_gb:       10,
+        use_ssd:            true,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:             "us.gcr.io/broad-dsp-lrma/lr-utils:0.1.11"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + if select_first([runtime_attr.use_ssd, default_attr.use_ssd]) then " SSD" else " HDD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+task CreateShapeitChunks {
+    input {
+        File vcf
+        File vcf_idx
+        String region
+        String extra_chunk_args = "--thread $(nproc) --window-size 5000000 --buffer-size 500000"
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Int disk_gb = 2 * ceil(size([vcf, vcf_idx], "GB")) + 1
+
+    command <<<
+        set -euxo pipefail
+
+        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_chunk_static
+        chmod +x GLIMPSE_chunk_static
+
+        ./GLIMPSE_chunk_static \
+            -I ~{vcf} \
+            --region ~{region} \
+            ~{extra_chunk_args} \
+            -O chunks.txt
+
+        # cut chunks + buffers
+        cut -f 3 chunks.txt > common.chunks.regions.txt
+        cut -f 4 chunks.txt > rare.chunks.regions.txt
+    >>>
+
+    output {
+        File common_chunks = "common.chunks.regions.txt"
+        File rare_chunks = "rare.chunks.regions.txt"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          4,
+        mem_gb:             16,
+        disk_gb:            disk_gb,
+        boot_disk_gb:       10,
+        use_ssd:            true,
+        preemptible_tries:  2,
+        max_retries:        1,
+        docker:             "us.gcr.io/broad-dsp-lrma/lr-utils:0.1.11"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + if select_first([runtime_attr.use_ssd, default_attr.use_ssd]) then " SSD" else " HDD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
+}
+
+task BcftoolsConcatNaive {
+    input {
+        Array[File] vcfs
+        Array[File] vcf_idxs
+        String output_prefix
+
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Int disk_gb = 3 * ceil(size([vcfs], "GB"))
+
+    command <<<
+        set -euxo pipefail
+
+        bcftools concat --no-version ~{sep=" " vcfs} --naive-force | \
+            bcftools sort --no-version -Oz -o ~{output_prefix}.bcf
+        bcftools index ~{output_prefix}.bcf
+    >>>
+
+    output {
+        File concatenated_vcf = "~{output_prefix}.bcf"
+        File concatenated_vcf_idx = "~{output_prefix}.bcf.csi"
+    }
+
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          4,
+        mem_gb:             8,
         disk_gb:            disk_gb,
         boot_disk_gb:       10,
         use_ssd:            true,
@@ -581,63 +685,6 @@ task FixVariantCollisions {
 #        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
 #        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
 #        zones: zones
-#        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
-#        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
-#        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
-#        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
-#    }
-#}
-
-#task CreateChunks {
-
-#    input {
-#        File vcf
-#        File tbi
-#        String region
-#        String extra_chunk_args = "--thread $(nproc) --window-size 5000000 --buffer-size 500000"
-
-#        RuntimeAttr? runtime_attr_override
-#    }
-
-#    Int disk_gb = 2*ceil(size([vcf, tbi], "GB")) + 1
-
-#    command <<<
-#        set -euxo pipefail
-
-#        wget https://github.com/odelaneau/GLIMPSE/releases/download/v1.1.1/GLIMPSE_chunk_static
-#        chmod +x GLIMPSE_chunk_static
-
-#        ./GLIMPSE_chunk_static \
-#            -I ~{vcf} \
-#            --region ~{region} \
-#            ~{extra_chunk_args} \
-#            -O chunks.txt
-
-#        # cut chunks + buffers
-#        cut -f 3 chunks.txt > common.chunks.regions.txt
-#        cut -f 4 chunks.txt > rare.chunks.regions.txt
-#    >>>
-
-#    output {
-#        File common_chunks = "common.chunks.regions.txt"
-#        File rare_chunks = "rare.chunks.regions.txt"
-#    }
-
-#    #########################
-#    RuntimeAttr default_attr = object {
-#        cpu_cores:          4,
-#        mem_gb:             16,
-#        disk_gb:            disk_gb,
-#        boot_disk_gb:       10,
-#        preemptible_tries:  2,
-#        max_retries:        1,
-#        docker:"us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.2"
-#    }
-#    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
-#    runtime {
-#        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
-#        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-#        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
 #        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
 #        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
 #        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
@@ -774,56 +821,6 @@ task FixVariantCollisions {
 #}
 
 
-#task BcftoolsConcatBCFs {
-
-#    input {
-#        Array[File] vcfs
-#        Array[File]? vcf_idxs
-#        String output_prefix
-
-#        RuntimeAttr? runtime_attr_override
-#    }
-
-#    Int disk_gb = 2*ceil(size(vcfs, "GB")) + 1000
-
-#    command <<<
-#        set -euxo pipefail
-#        if ! ~{defined(vcf_idxs)}; then
-#            for ff in ~{sep=' ' vcfs}; do bcftools index $ff; done
-#        fi
-
-#        bcftools concat --no-version --allow-overlap --remove-duplicates -Ob -o ~{output_prefix}.bcf -f ~{write_lines(vcfs)}
-#        bcftools sort --no-version ~{output_prefix}.bcf -Ob -o ~{output_prefix}.sorted.bcf
-#        bcftools index ~{output_prefix}.sorted.bcf
-#    >>>
-
-#    output {
-#        File concated_bcf = "~{output_prefix}.sorted.bcf"
-#        File concated_bcf_index = "~{output_prefix}.sorted.bcf.csi"
-#    }
-
-#    #########################
-#    RuntimeAttr default_attr = object {
-#        cpu_cores:          2,
-#        mem_gb:             8,
-#        disk_gb:            disk_gb,
-#        boot_disk_gb:       10,
-#        preemptible_tries:  0,
-#        max_retries:        1,
-#        docker:"hangsuunc/shapeit5:v1"
-#    }
-#    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
-#    runtime {
-#        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
-#        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-#        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " SSD"
-#        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
-#        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
-#        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
-#        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
-#    }
-#}
-
 #task FilterCommonandRareVariants {
 
 #    input {
@@ -880,43 +877,5 @@ task FixVariantCollisions {
 #        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
 #        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
 #        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
-#    }
-#}
-
-#task BcftoolsConcatNaive {
-#    input {
-#        Array[File] vcfs
-#        Array[File]? vcf_tbis
-#        String output_prefix
-#    }
-
-#    command <<<
-#        set -euxo pipefail
-
-#        # Index all input VCF files if no precomputed tbis provided.
-#        if ! ~{defined(vcf_tbis)}; then
-#            for vcf in ~{sep=" " vcfs}; do
-#                bcftools index "$vcf"
-#            done
-#        fi
-
-#        bcftools concat \
-#            ~{sep=" " vcfs} \
-#            --naive-force \
-#            --no-version | \
-#            bcftools sort -Oz -o ~{output_prefix}.vcf.gz
-#        bcftools index -t ~{output_prefix}.vcf.gz
-#    >>>
-
-#    output {
-#        File concatenated_vcf = "~{output_prefix}.vcf.gz"
-#        File concatenated_vcf_tbi = "~{output_prefix}.vcf.gz.tbi"
-#    }
-
-#    runtime {
-#        docker: "hangsuunc/shapeit5:v1"
-#        memory: "32 GB"
-#        cpu: 8
-#        disks: "local-disk 1000 SSD"
 #    }
 #}
