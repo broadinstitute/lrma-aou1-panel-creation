@@ -295,7 +295,7 @@ task SubsetVCF {
     command <<<
         set -euxo pipefail
 
-        bcftools view --no-version ~{vcf} --regions ~{region} -Ob -o ~{output_prefix}.bcf
+        bcftools view --no-version ~{vcf} --regions ~{region} --regions-overlap 0 -Ob -o ~{output_prefix}.bcf
         bcftools index ~{output_prefix}.bcf
     >>>
 
@@ -353,7 +353,7 @@ task SubsetVCFStreaming {
 
         export GCS_OAUTH_TOKEN=$(gcloud auth application-default print-access-token)
 
-        bcftools view --no-version ~{vcf} --regions ~{region} -Ob -o ~{output_prefix}.bcf
+        bcftools view --no-version ~{vcf} --regions ~{region} --regions-overlap 0 -Ob -o ~{output_prefix}.bcf
         bcftools index ~{output_prefix}.bcf
     >>>
 
