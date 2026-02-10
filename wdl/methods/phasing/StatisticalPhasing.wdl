@@ -409,17 +409,17 @@ task FilterAndConcatVcfs {
 
         # split to biallelic and filter short (re-fill tags when needed)
         bcftools norm --no-version -r ~{region} \
-                -m-any -N -f ~{reference_fasta} ~{short_vcf} | \
-            bcftools +fill-tags --no-version -- -t AF,AC,AN | \
-            bcftools filter --no-version ~{filter_and_concat_short_filter_args} | \
-            bcftools +fill-tags --no-version -- -t AF,AC,AN | \
+                -m-any -N -f ~{reference_fasta} ~{short_vcf} -Ou | \
+            bcftools +fill-tags --no-version -- -t AF,AC,AN -Ou | \
+            bcftools filter --no-version ~{filter_and_concat_short_filter_args} -Ou | \
+            bcftools +fill-tags --no-version -- -t AF,AC,AN -Ou | \
             bcftools view --no-version ~{filter_and_concat_short_view_args} \
                 -Ob -o ~{output_prefix}.short.bcf
         bcftools index ~{output_prefix}.short.bcf
 
         # populate missing with hom-ref and filter SV
-        bcftools +setGT -r ~{region} ~{sv_vcf} --no-version -- -t . -n 0p | \
-            bcftools +fill-tags --no-version -- -t AF,AC,AN | \
+        bcftools +setGT -r ~{region} ~{sv_vcf} --no-version -- -t . -n 0p -Ou | \
+            bcftools +fill-tags --no-version -- -t AF,AC,AN -Ou | \
             bcftools view --no-version ~{filter_and_concat_sv_view_args} \
                 -Ob -o ~{output_prefix}.SV.bcf
         bcftools index ~{output_prefix}.SV.bcf
@@ -428,7 +428,7 @@ task FilterAndConcatVcfs {
         bcftools concat --no-version \
             ~{output_prefix}.SV.bcf \
             ~{output_prefix}.short.bcf \
-            --allow-overlaps --remove-duplicates | \
+            --allow-overlaps --remove-duplicates -Ou | \
             bcftools sort -Oz -o ~{output_prefix}.vcf.gz
         bcftools index -t ~{output_prefix}.vcf.gz
     >>>
@@ -491,7 +491,7 @@ task FixVariantCollisions {
             null                            # do not output figures
 
         # replace all missing alleles (correctly) emitted with reference alleles, since this is expected by PanGenie panel-creation script
-        bcftools +setGT --no-version collisionless.vcf -- -t . -n 0p | \
+        bcftools +setGT --no-version collisionless.vcf -- -t . -n 0p -Ou | \
             bcftools +fill-tags --no-version --threads $(($(nproc)-1)) -Oz -o ~{output_prefix}.phased.collisionless.vcf.gz -- -t AF,AC,AN
         # use vcf.gz to avoid errors from missing header lines
         bcftools index -t ~{output_prefix}.phased.collisionless.vcf.gz
@@ -647,7 +647,7 @@ task FilterCommon {
         set -euxo pipefail
 
         # filter to common
-        bcftools +fill-tags --no-version -r ~{region} ~{vcf} -- -t AF,AC,AN | \
+        bcftools +fill-tags --no-version -r ~{region} ~{vcf} -- -t AF,AC,AN -Ou | \
             bcftools view ~{filter_common_args} \
                 -Ob -o ~{output_prefix}.common.bcf
         bcftools index ~{output_prefix}.common.bcf
@@ -805,7 +805,7 @@ task Shapeit5Rare {
 
         # we only need to fill rare in input (common in scaffold should have been imputed or filled previously);
         # this also fills common in input, but those records will be ignored by Shapeit5
-        bcftools +setGT --no-version ~{vcf} -- -t . -n 0p | \
+        bcftools +setGT --no-version ~{vcf} -- -t . -n 0p -Ou | \
             bcftools +fill-tags --no-version -Ob -o input.bcf -- -t AF,AC,AN
         bcftools index input.bcf
 
