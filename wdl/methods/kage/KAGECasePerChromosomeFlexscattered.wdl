@@ -206,7 +206,7 @@ task KAGE {
                     samtools fasta --reference ~{reference_fasta} -@ $(nproc) > outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa &
             else
                 echo "Not subsetting reads..."
-                samtools fasta --reference ~{reference_fasta} -@ $(nproc) -X ~{input_cram} ~{input_cram_idx} > outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa &
+                samtools fasta --reference ~{reference_fasta} -@ $(nproc) ~{input_cram} > outputs-$C_WITH_LEADING_ZEROS/~{output_prefix}.preprocessed.fa &
             fi
 
             kmer_mapper map \
