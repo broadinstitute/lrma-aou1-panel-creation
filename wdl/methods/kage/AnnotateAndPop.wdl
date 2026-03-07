@@ -83,6 +83,7 @@ task AnnotateAndPop {
     }
 
     Int disk_size_gb = 3 * ceil(size([collisionless_vcf_gz, posteriors_vcf_gz] , "GB"))
+    Int sort_mem_gb = select_first([runtime_attributes.command_mem_gb, 6])
 
     command <<<
         set -euox pipefail
@@ -100,7 +101,7 @@ task AnnotateAndPop {
         # output piped directly to bcftools sort
         python - --panel_id_split_vcf_gz ~{panel_id_split_vcf_gz} \
                  --input_vcf_gz ~{output_prefix}.annotated.vcf.gz \
-                 <<-'EOF' | bcftools sort -Oz -o ~{output_prefix}.annotated-popped.vcf.gz
+                 <<-'EOF' | bcftools sort --max-mem ~{sort_mem_gb} -Oz -o ~{output_prefix}.annotated-popped.vcf.gz
         import sys
         import argparse
         from collections import defaultdict
@@ -209,6 +210,7 @@ task AnnotateAndPop {
         if __name__ == '__main__':
             main()
         EOF
+
         bcftools index -t ~{output_prefix}.annotated-popped.vcf.gz
     >>>
 
