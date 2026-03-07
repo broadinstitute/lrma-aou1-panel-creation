@@ -97,9 +97,10 @@ task AnnotateAndPop {
 
         # modified version of convert-to-biallelic.py
         # DO NOT apply bcftools norm -m+ before using this, pass a biallelic VCF instead!
+        # output piped directly to bcftools sort
         python - --panel_id_split_vcf_gz ~{panel_id_split_vcf_gz} \
                  --input_vcf_gz ~{output_prefix}.annotated.vcf.gz \
-                 <<-'EOF'
+                 <<-'EOF' | bcftools sort -Oz -o ~{output_prefix}.annotated-popped.vcf.gz
         import sys
         import argparse
         from collections import defaultdict
@@ -207,7 +208,7 @@ task AnnotateAndPop {
 
         if __name__ == '__main__':
             main()
-        EOF | bcftools sort -Oz -o ~{output_prefix}.annotated-popped.vcf.gz
+        EOF
         bcftools index -t ~{output_prefix}.annotated-popped.vcf.gz
     >>>
 
